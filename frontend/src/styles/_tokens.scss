@@ -1,0 +1,29 @@
+// Default theme tokens = "Restaurant Remelle" template (docs/00 D1).
+// Must stay in sync with DEFAULT_THEME in core/theme/theme.tokens.ts — these values give the
+// correct first paint before ThemeService runs; ThemeService overrides them per restaurant.
+:root {
+  --wl-primary: #b9553a;
+  --wl-primary-dark: #9a4330;
+  --wl-primary-soft: #f3dfd5;
+  --wl-secondary: #4e7a4a;
+  --wl-accent: #e0a53b;
+  --wl-bg: #f7efe4;
+  --wl-surface: #fffaf3;
+  --wl-surface-alt: #efe3d2;
+  --wl-line: #e6d8c5;
+  --wl-text: #2b2522;
+  --wl-text-soft: #4a403a;
+  --wl-muted: #84776d;
+  --wl-btn-radius: 999px;
+
+  --wl-font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --wl-font-display: 'Abril Fatface', Georgia, serif;
+  --wl-font-script: 'Great Vibes', 'Brush Script MT', cursive;
+  --wl-font-hand: 'Caveat', 'Comic Sans MS', cursive;
+  --wl-font-sans: 'Jost', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --wl-radius: 14px;
+  --wl-radius-lg: 22px;
+  --wl-shadow-sm: 0 4px 14px -6px rgba(80, 45, 25, 0.18);
+  --wl-shadow: 0 10px 30px -12px rgba(80, 45, 25, 0.22);
+}

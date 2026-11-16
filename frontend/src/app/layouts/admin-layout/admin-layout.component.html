@@ -1,0 +1,46 @@
+<mat-sidenav-container class="ad-container">
+  <mat-sidenav
+    #drawer
+    class="ad-sidenav"
+    [mode]="isHandset() ? 'over' : 'side'"
+    [opened]="!isHandset()"
+    [attr.role]="isHandset() ? 'dialog' : 'navigation'"
+  >
+    <a routerLink="/" class="ad-brand" aria-label="WaitLess home">
+      <img src="brand/waitless-logo.svg" alt="WaitLess" width="150" height="36" />
+    </a>
+    <p class="ad-area">{{ area() }}</p>
+    <mat-nav-list>
+      @for (item of nav(); track item.path) {
+        <a
+          mat-list-item
+          [routerLink]="item.path"
+          routerLinkActive
+          #rla="routerLinkActive"
+          [activated]="rla.isActive"
+          [routerLinkActiveOptions]="{ exact: item.path === '.' }"
+          (click)="isHandset() && drawer.close()"
+        >
+          <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+          <span matListItemTitle>{{ item.label }}</span>
+        </a>
+      }
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content>
+    <mat-toolbar class="ad-toolbar">
+      @if (isHandset()) {
+        <button mat-icon-button type="button" aria-label="Open navigation" (click)="drawer.toggle()">
+          <mat-icon>menu</mat-icon>
+        </button>
+      }
+      <span class="ad-toolbar__title">{{ area() }}</span>
+      <span class="ad-spacer"></span>
+      <a mat-button routerLink="/">WaitLess site</a>
+    </mat-toolbar>
+    <main class="ad-main">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

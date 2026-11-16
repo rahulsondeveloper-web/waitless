@@ -1,0 +1,129 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+main {
+  flex: 1;
+}
+
+.pl-header {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 50;
+  background: color-mix(in srgb, var(--wl-bg) 90%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--wl-line);
+}
+.pl-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: 72px;
+}
+.pl-brand img {
+  display: block;
+  height: 43px;
+  width: auto;
+}
+
+.pl-nav {
+  display: flex;
+  gap: 1.5rem;
+  a {
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: var(--wl-text-soft);
+    padding-block: 0.3rem;
+    border-bottom: 2px solid transparent;
+    &:hover,
+    &.is-active {
+      color: var(--wl-primary);
+      border-color: var(--wl-primary);
+    }
+  }
+}
+.pl-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pl-toggle {
+  display: none;
+  border: 0;
+  background: transparent;
+  color: var(--wl-text);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+}
+
+.pl-footer {
+  background: var(--wl-text);
+  color: #d9cfc4;
+  padding-top: 2.5rem;
+  margin-top: 4rem;
+}
+.pl-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2rem;
+  padding-bottom: 2rem;
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.8rem;
+  }
+  a:hover {
+    color: #fff;
+  }
+}
+.pl-footer__logo {
+  filter: brightness(0) invert(1);
+  opacity: 0.92;
+}
+.pl-footer__tag {
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+}
+.pl-footer__bottom {
+  border-top: 1px solid #423833;
+  padding-block: 1rem;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 1080px) {
+  .pl-toggle {
+    display: inline-grid;
+    place-items: center;
+  }
+  .pl-nav {
+    display: none;
+    position: absolute;
+    top: 72px;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0;
+    padding: 0.5rem 1rem 1rem;
+    background: var(--wl-bg);
+    border-bottom: 1px solid var(--wl-line);
+    &.is-open {
+      display: flex;
+    }
+    a {
+      padding: 0.8rem 0;
+      border-bottom: 1px solid var(--wl-line);
+    }
+  }
+}
+@media (max-width: 480px) {
+  .pl-actions .wl-btn {
+    display: none;
+  }
+  .pl-brand img {
+    height: 36px;
+  }
+}

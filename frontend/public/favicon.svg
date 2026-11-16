@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="WaitLess">
+  <!-- Plate + clock: "your food, on time" -->
+  <circle cx="32" cy="32" r="30" fill="#B9553A"/>
+  <circle cx="32" cy="32" r="22" fill="#FFFAF3"/>
+  <circle cx="32" cy="32" r="17.5" fill="none" stroke="#EFE3D2" stroke-width="1.5"/>
+  <!-- hour ticks -->
+  <g fill="#B9553A">
+    <rect x="31" y="12.5" width="2" height="4" rx="1"/>
+    <rect x="31" y="47.5" width="2" height="4" rx="1"/>
+    <rect x="12.5" y="31" width="4" height="2" rx="1"/>
+    <rect x="47.5" y="31" width="4" height="2" rx="1"/>
+  </g>
+  <!-- hands: a quick tick toward 2 o'clock -->
+  <g stroke="#2B2522" stroke-linecap="round">
+    <line x1="32" y1="32" x2="32" y2="20" stroke-width="3"/>
+    <line x1="32" y1="32" x2="41" y2="26.5" stroke-width="3"/>
+  </g>
+  <circle cx="32" cy="32" r="2.6" fill="#4E7A4A"/>
+  <!-- leaf accent from the default theme -->
+  <path d="M47 5 C56 4 60 9 59 15 C52 16 47 12 47 5 Z" fill="#4E7A4A"/>
+  <path d="M48.5 6.5 L57.5 13.5" stroke="#3D5E3A" stroke-width="1" stroke-linecap="round"/>
+</svg>

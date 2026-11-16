@@ -1,0 +1,54 @@
+.status-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 1.5rem 0;
+  padding: 1rem 1.2rem;
+  border-radius: 14px;
+  background: #fdf0d8;
+  color: #7a5310;
+  &.is-ok {
+    background: #e3efe1;
+    color: #2f5a2c;
+  }
+  small {
+    display: block;
+    opacity: 0.85;
+  }
+}
+.checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.check {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  small {
+    display: block;
+    color: var(--wl-muted);
+  }
+}
+.check__name {
+  text-transform: capitalize;
+}
+.check__detail {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+}
+.check__dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: #c2452d;
+}
+[data-status='ok'] .check__dot {
+  background: var(--wl-secondary);
+}
+[data-status='disabled'] .check__dot {
+  background: var(--wl-muted);
+}

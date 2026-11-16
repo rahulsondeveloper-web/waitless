@@ -1,0 +1,53 @@
+<header class="sf-header">
+  <div class="wl-container sf-header__inner">
+    <a routerLink="." class="sf-brand">
+      <span class="sf-brand__logo" aria-hidden="true">{{ initial() }}</span>
+      <span class="sf-brand__name">{{ name() }}</span>
+    </a>
+
+    <nav class="sf-nav" [class.is-open]="menuOpen()" aria-label="Restaurant">
+      @for (item of nav; track item.path) {
+        <a
+          [routerLink]="item.path"
+          routerLinkActive="is-active"
+          [routerLinkActiveOptions]="{ exact: item.path === '.' }"
+          (click)="menuOpen.set(false)"
+          >{{ item.label }}</a
+        >
+      }
+    </nav>
+
+    <div class="sf-actions">
+      <a routerLink="/login" class="sf-icon" aria-label="Login or profile">
+        <span class="material-symbols-outlined">person</span>
+      </a>
+      <a routerLink="cart" class="sf-icon" aria-label="Cart">
+        <span class="material-symbols-outlined">shopping_bag</span>
+      </a>
+      <a routerLink="/" class="sf-waitless" title="Back to WaitLess">
+        <img src="brand/waitless-mark.svg" alt="" width="26" height="26" />
+        <span>WaitLess</span>
+      </a>
+      <button
+        type="button"
+        class="sf-icon sf-toggle"
+        (click)="menuOpen.set(!menuOpen())"
+        [attr.aria-expanded]="menuOpen()"
+        aria-label="Toggle navigation"
+      >
+        <span class="material-symbols-outlined">{{ menuOpen() ? 'close' : 'menu' }}</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <router-outlet />
+</main>
+
+<footer class="sf-footer">
+  <div class="wl-container sf-footer__inner">
+    <span>© {{ name() }}</span>
+    <a routerLink="/">Powered by <b>WaitLess</b></a>
+  </div>
+</footer>

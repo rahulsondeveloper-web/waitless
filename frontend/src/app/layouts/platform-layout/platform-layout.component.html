@@ -1,0 +1,53 @@
+<header class="pl-header">
+  <div class="wl-container pl-header__inner">
+    <a routerLink="/" class="pl-brand" aria-label="WaitLess home">
+      <img src="brand/waitless-logo.svg" alt="WaitLess" width="180" height="43" />
+    </a>
+
+    <nav class="pl-nav" [class.is-open]="menuOpen()" aria-label="Main">
+      @for (item of nav; track item.label) {
+        <a
+          [routerLink]="item.link"
+          [fragment]="item.fragment"
+          routerLinkActive="is-active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          (click)="menuOpen.set(false)"
+          >{{ item.label }}</a
+        >
+      }
+    </nav>
+
+    <div class="pl-actions">
+      <a routerLink="/login" class="wl-btn wl-btn--primary wl-btn--sm">Login / Register</a>
+      <button
+        type="button"
+        class="pl-toggle"
+        (click)="toggleMenu()"
+        [attr.aria-expanded]="menuOpen()"
+        aria-label="Toggle navigation"
+      >
+        <span class="material-symbols-outlined">{{ menuOpen() ? 'close' : 'menu' }}</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <router-outlet />
+</main>
+
+<footer class="pl-footer">
+  <div class="wl-container pl-footer__inner">
+    <div>
+      <img src="brand/waitless-logo.svg" alt="WaitLess" width="160" height="38" class="pl-footer__logo" />
+      <p class="pl-footer__tag">{{ config.platformTagline }}</p>
+    </div>
+    <nav aria-label="Footer">
+      <a routerLink="/about">About Us</a>
+      <a routerLink="/restaurants">Find Restaurants</a>
+      <a routerLink="/" fragment="for-restaurants">For Restaurants</a>
+      <a routerLink="/status">System Status</a>
+    </nav>
+  </div>
+  <div class="wl-container pl-footer__bottom">© {{ year }} WaitLess. All rights reserved.</div>
+</footer>

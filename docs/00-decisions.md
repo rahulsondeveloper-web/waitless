@@ -1,0 +1,67 @@
+# 00 — Decisions Log
+
+Decisions taken during scoping (2026-11-16). "Owner" = confirmed by the product owner; "Default" = proposed default, accepted by not being overridden. Any row can be reopened; changing one after its phase has shipped needs a migration note.
+
+## Product
+
+| # | Topic | Decision | Source |
+|---|---|---|---|
+| D1 | Default storefront theme | The *Restaurant Remelle* template (cream `#F7EFE4`, terracotta `#B9553A`, sage `#4E7A4A`; Cormorant Garamond, Abril Fatface, Great Vibes, Caveat, Jost) is the default theme. Owners can **Reset to default theme** at any time. | Owner |
+| D2 | WaitLess brand | Placeholder logo in `design/brand/`. Platform site uses the same palette family so the hand-off between platform and storefront feels continuous. | Owner |
+| D3 | Restaurant URLs | Path-based only: `/r/{slug}`. Subdomains/custom domains are out of scope but the tenant resolver is written so a host-based resolver can be added later. | Default |
+| D4 | Menu scope | One menu per restaurant (tenant). Branches override **availability** and **price** per item. | Default |
+| D5 | Ratings | Simple 1–5 stars + optional comment, allowed once per paid bill. | Default |
+| D6 | Language | English only; all UI strings kept in one place per feature for later i18n. | Default |
+| D7 | Country / money | India, INR, GST. Tax rates configurable per restaurant. Money is `NUMERIC(12,2)`. | Default |
+
+## Ordering, SLA and discounts
+
+| # | Topic | Decision | Source |
+|---|---|---|---|
+| D8 | Walk-in "Order ID" (PRD §13) | Staff opening a table creates a **table session** with a short public code (e.g. `UB-4821`) and a 4-digit **PIN**. Customer enters code + PIN on the storefront to join. Code alone reveals nothing. | Default |
+| D9 | Session scope | The code identifies the whole table visit. All later orders join the same session and the same final bill. Several people at the table may join with the same code + PIN and share one cart. | Default |
+| D10 | Finish | Customer's **Finish** locks the session and produces the final bill. Staff can reopen, and staff can close a session the customer abandoned. | Default |
+| D11 | Timer granularity | Each order (kitchen ticket) has its own SLA timer; its discount applies only to that order's lines. Order-level SLA: served when all items are served (PRD §14). | Default |
+| D12 | Discount base | Food subtotal of the order **before tax and service charge**. Tax is then computed on the discounted amount. | Default |
+| D13 | Discount cap | Default maximum 20%; configurable per restaurant. | Default |
+| D14 | Discount formula | For `elapsed > serving_minutes`: `pct = min(max_pct, initial_pct + (ceil((elapsed − serving_minutes) / interval) − 1) × increment)`. With defaults (15, 2, 5, 2) this is exactly the PRD table. Edits/cancellations do not reset the timer. | Default |
+| D15 | Policy snapshot | The full discount policy is copied (JSON) onto the order's SLA row when the timer starts. Policy edits never change running or past orders. | PRD |
+
+## Reservations & payments
+
+| # | Topic | Decision | Source |
+|---|---|---|---|
+| D16 | Booking fee | Credited against the final bill. Refund/forfeit on no-show follows the restaurant's reservation policy. | Default |
+| D17 | Gateway | Razorpay behind a `PaymentGateway` interface; a **Mock gateway** is used in development so the whole flow works offline. | Default |
+| D18 | SaaS billing | Recurring charges via the same gateway, plus manual invoices by Super Admin; optional free trial (default 14 days). Completely separate tables from restaurant billing. | Default |
+
+## Identity
+
+| # | Topic | Decision | Source |
+|---|---|---|---|
+| D19 | Customer login | Phone + OTP primary, email optional. Guests can browse; queue, booking, ordering and payment need OTP verification. In development, OTPs are printed to the server log. | Default |
+| D20 | Staff roles | System roles Owner, Manager, Waiter, Kitchen Staff, Cashier; owners may create custom roles from the permission list. | Default |
+| D21 | Alcohol | Restaurant uploads its licence; Super Admin approves it before alcohol categories can be enabled. Customers self-declare legal age when ordering alcohol. | Default |
+
+## Operations
+
+| # | Topic | Decision | Source |
+|---|---|---|---|
+| D22 | Inventory deduction event | When the kitchen **Accepts** an order. Cancellation after acceptance writes a reversing movement. Exactly one deduction per order line, guarded by a unique constraint. | Default |
+| D23 | Wait-time estimate | Based on queue position, current occupancy and the branch's rolling average table-occupancy time (last 14 days, per party-size band). | Default |
+
+## Technical / environment
+
+| # | Topic | Decision | Source |
+|---|---|---|---|
+| D24 | Local environment | No Docker locally. Node 24, Python 3.13, PostgreSQL 18 (Windows service, database `waitless`), Memurai (Redis-compatible) on `localhost:6379`, Git. Docker/Compose files are still written for deployment. | Owner |
+| D25 | Maps | OpenStreetMap + Leaflet now (geocoding via Nominatim, server-side, cached). `MapProvider` interface so Google Maps can be swapped in when the key arrives. | Owner |
+| D26 | File storage | Local folder `backend/uploads/` behind a `StorageBackend` interface; S3 adapter later. | Owner |
+| D27 | Background jobs | APScheduler running in a separate **worker** process (`python -m app.worker`), Redis lock so only one worker runs each job. Works on Windows; same code in production. Satisfies PRD "Celery or equivalent". | Default |
+| D28 | Notifications | Adapter per channel. Development uses a log channel + in-app. MSG91/Twilio (SMS), Meta Cloud API (WhatsApp), SMTP/SES (email) plug in later. | Default |
+| D29 | IDs | UUID primary keys generated by PostgreSQL 18 `uuidv7()` (time-ordered, index-friendly). | Default |
+| D30 | Tenant isolation | Two layers: (1) every tenant query goes through a tenant-scoped repository; (2) PostgreSQL **Row-Level Security** on tenant tables using `SET LOCAL app.tenant_id`. Cross-tenant foreign keys are blocked by composite keys `(tenant_id, id)`. | Default |
+| D31 | UI libraries | Storefront and platform site: Bootstrap 5 grid + custom SCSS from the default theme. Admin dashboards: Angular Material. Charts: Chart.js. | Default |
+| D32 | Repository layout | Monorepo: `frontend/`, `backend/`, `docs/`, `design/`, `infra/`. The current template files move to `design/default-theme/` in Phase 1. | Default |
+| D33 | Angular version | **Angular 21** (satisfies PRD "20+"). Angular 22 requires Node ≥ 24.15; the machine has 24.14.1. Upgrading later is a routine `ng update` once Node is updated. Unit tests run on Vitest (no browser needed); e2e on Playwright using the installed Microsoft Edge. | Phase 1 |
+| D34 | RLS app role timing | The non-owner database role and Row-Level Security policies are created in **Phase 2** together with the first tenant tables, instead of Phase 1 (there is nothing to protect before tenants exist). | Phase 1 |

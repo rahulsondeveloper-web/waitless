@@ -1,0 +1,47 @@
+:host {
+  display: block;
+  height: 100dvh;
+}
+.ad-container {
+  height: 100%;
+  background: #f6f3ef;
+}
+.ad-sidenav {
+  width: 260px;
+  border-right: 1px solid var(--wl-line);
+  background: var(--wl-surface);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.ad-brand {
+  display: block;
+  padding: 1.1rem 1rem 0.4rem;
+  img {
+    height: 36px;
+    width: auto;
+  }
+}
+.ad-area {
+  margin: 0 1rem 0.5rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--wl-primary);
+  font-weight: 600;
+}
+.ad-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--wl-surface);
+  border-bottom: 1px solid var(--wl-line);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.ad-toolbar__title {
+  font: 600 1.3rem var(--wl-font-serif);
+}
+.ad-spacer {
+  flex: 1;
+}
+.ad-main {
+  padding: clamp(1rem, 3vw, 2rem);
+}

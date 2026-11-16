@@ -1,0 +1,62 @@
+<section class="hero">
+  <div class="wl-container hero__grid">
+    <div>
+      <p class="wl-eyebrow">Restaurant technology platform</p>
+      <h1 class="hero__title">Skip the wait.<br /><span class="wl-script">Dine delightfully.</span></h1>
+      <p class="hero__lead">
+        WaitLess gives every restaurant its own branded app for reservations, queues, ordering and billing — and
+        promises guests their food within 15 minutes.
+      </p>
+      <div class="hero__cta">
+        <a routerLink="/restaurants" class="wl-btn wl-btn--primary">Find a restaurant</a>
+        <a routerLink="/" fragment="for-restaurants" class="wl-btn wl-btn--ghost">Register your restaurant</a>
+      </div>
+    </div>
+    <div class="hero__mark" aria-hidden="true">
+      <img src="brand/waitless-mark.svg" alt="" width="320" height="320" />
+    </div>
+  </div>
+</section>
+
+<section class="section" id="how-it-works">
+  <div class="wl-container">
+    <p class="wl-eyebrow">How it works</p>
+    <h2 class="wl-h2">From kitchen to <span class="wl-script">your table</span></h2>
+    <div class="row g-4 mt-2">
+      @for (s of steps; track s.title) {
+        <div class="col-12 col-sm-6 col-lg-3">
+          <article class="wl-card step">
+            <span class="material-symbols-outlined step__icon">{{ s.icon }}</span>
+            <h3>{{ s.title }}</h3>
+            <p>{{ s.text }}</p>
+          </article>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="section section--tint" id="features">
+  <div class="wl-container">
+    <p class="wl-eyebrow">Features</p>
+    <h2 class="wl-h2">Everything a restaurant runs on</h2>
+    <p class="wl-muted">Branded storefront · Table &amp; queue management · Reservations · Digital menu · Kitchen display ·
+      Inventory · Billing &amp; POS · Analytics</p>
+  </div>
+</section>
+
+<section class="section" id="for-restaurants">
+  <div class="wl-container">
+    <p class="wl-eyebrow">For restaurants</p>
+    <h2 class="wl-h2">Your brand, <span class="wl-script">your app</span></h2>
+    <p class="wl-muted">Restaurant registration opens in Phase 2.</p>
+  </div>
+</section>
+
+<section class="section section--tint" id="contact">
+  <div class="wl-container">
+    <p class="wl-eyebrow">Contact</p>
+    <h2 class="wl-h2">Talk to us</h2>
+    <p class="wl-muted">Contact form arrives in Phase 4.</p>
+  </div>
+</section>

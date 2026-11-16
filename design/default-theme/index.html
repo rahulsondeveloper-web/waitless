@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Restaurant Remelle — Good Food Brings People Together</title>
+  <meta name="description" content="Restaurant Remelle — exceptional food, every time. Browse the menu, order to your table, and track your meal." />
+
+  <!-- Fonts: serif headings (main theme), display + script + handwritten accents (menu references) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Caveat:wght@500;700&family=Cormorant+Garamond:wght@500;600;700&family=Great+Vibes&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ================= NAVBAR ================= -->
+  <header class="nav" id="top">
+    <div class="container nav__inner">
+      <a href="#top" class="brand">
+        <i class="bi bi-flower1 brand__leaf"></i>
+        <span>Restaurant <b>Remelle</b></span>
+      </a>
+
+      <nav class="nav__links" id="navLinks">
+        <a href="#categories">Categories</a>
+        <a href="#menu">Menu</a>
+        <a href="#signature">Signature</a>
+        <a href="#order">Order</a>
+        <a href="#contact">Contact</a>
+      </nav>
+
+      <div class="nav__actions">
+        <a href="#order" class="icon-btn" aria-label="Cart">
+          <i class="bi bi-bag"></i>
+          <span class="badge" id="cartCount">0</span>
+        </a>
+        <a href="#reserve" class="btn btn--primary btn--sm hide-sm">Book a Table</a>
+        <button class="icon-btn nav__toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
+          <i class="bi bi-list"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ================= HERO ================= -->
+    <section class="hero">
+      <div class="container hero__grid">
+        <div class="hero__text">
+          <p class="eyebrow">Welcome to</p>
+          <h1 class="hero__title">Restaurant<br />Remelle</h1>
+          <p class="hero__tag">Good Food <span class="script">brings people together</span></p>
+          <p class="hero__lead">Exceptional food. Every time. Seasonal plates, wood-fired pizzas and handcrafted drinks, served at your table.</p>
+
+          <form class="search" role="search" onsubmit="return false;">
+            <input type="search" placeholder="Search for dishes..." aria-label="Search for dishes" />
+            <button type="submit" aria-label="Search"><i class="bi bi-search"></i></button>
+          </form>
+
+          <div class="hero__cta">
+            <a href="#menu" class="btn btn--primary">View Gallary <i class="bi bi-arrow-right"></i></a>
+            <a href="#reserve" class="btn btn--ghost">Reserve a Table</a>
+          </div>
+        </div>
+
+        <div class="hero__media">
+          <div class="hero__band" aria-hidden="true"></div>
+          <img class="hero__leaf" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cg fill='%234E7A4A'%3E%3Cpath d='M10 110 C40 80 70 50 110 10' stroke='%233D5E3A' stroke-width='2' fill='none'/%3E%3Cellipse cx='30' cy='86' rx='12' ry='5' transform='rotate(-50 30 86)'/%3E%3Cellipse cx='50' cy='66' rx='13' ry='5' transform='rotate(-20 50 66)'/%3E%3Cellipse cx='62' cy='52' rx='12' ry='5' transform='rotate(-75 62 52)'/%3E%3Cellipse cx='80' cy='38' rx='13' ry='5' transform='rotate(-25 80 38)'/%3E%3Cellipse cx='92' cy='24' rx='11' ry='4' transform='rotate(-80 92 24)'/%3E%3C/g%3E%3Ccircle cx='42' cy='80' r='4' fill='%23C2452D'/%3E%3Ccircle cx='72' cy='48' r='4' fill='%23C2452D'/%3E%3C/svg%3E" alt="" />
+          <figure class="hero__plate">
+            <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=900&q=80" alt="Plated signature dish" />
+          </figure>
+          <div class="hero__chip">
+            <i class="bi bi-star-fill"></i>
+            <div><b>4.9</b><span>2,300+ reviews</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CATEGORIES ================= -->
+    <section class="section" id="categories">
+      <div class="container">
+        <div class="section__head">
+          <div>
+            <p class="eyebrow">Explore</p>
+            <h2 class="h-serif">Menu Categories</h2>
+          </div>
+          <a href="#menu" class="link">See All <i class="bi bi-chevron-right"></i></a>
+        </div>
+
+        <div class="cat-grid">
+          <a href="#menu" class="cat-card">
+            <img src="https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?auto=format&fit=crop&w=600&q=80" alt="Starters" loading="lazy" />
+            <span>Starters</span>
+          </a>
+          <a href="#pastas" class="cat-card">
+            <img src="https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=600&q=80" alt="Main Course" loading="lazy" />
+            <span>Main Course</span>
+          </a>
+          <a href="#soups" class="cat-card">
+            <img src="https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=600&q=80" alt="Soups" loading="lazy" />
+            <span>Soups</span>
+          </a>
+          <a href="#soups" class="cat-card">
+            <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80" alt="Salads" loading="lazy" />
+            <span>Salads</span>
+          </a>
+          <a href="#desserts" class="cat-card">
+            <img src="https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=600&q=80" alt="Desserts" loading="lazy" />
+            <span>Desserts</span>
+          </a>
+          <a href="#beverages" class="cat-card">
+            <img src="https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=600&q=80" alt="Beverages" loading="lazy" />
+            <span>Beverages</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= MENU (magazine style) ================= -->
+    <section class="section menu" id="menu">
+      <div class="container">
+
+        <div class="menu__intro">
+          <p class="eyebrow">Our Menu</p>
+          <h2 class="h-serif">Crafted with love, <span class="script">served with joy</span></h2>
+          <ul class="legend">
+            <li><i class="bi bi-stars"></i> Chef's favourite</li>
+            <li><i class="bi bi-sun"></i> Fresh finds</li>
+            <li><i class="bi bi-infinity"></i> Classic</li>
+            <li><span class="dot-j">J</span> Jain option</li>
+            <li><i class="bi bi-sliders2"></i> Customise</li>
+          </ul>
+        </div>
+
+        <!-- Spread 1: Soups + Greens -->
+        <div class="spread" id="soups">
+          <div class="spread__page">
+            <div class="display-block">
+              <figure class="display-block__img">
+                <img src="https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=80" alt="Soup bowl" loading="lazy" />
+              </figure>
+              <h3 class="display display--overlay">Soup <span class="display__script">Bowls</span></h3>
+            </div>
+          </div>
+
+          <div class="spread__page">
+            <ul class="items">
+              <li class="item">
+                <div class="item__body">
+                  <h4>Italian Minestrone <span class="dot-j">J</span></h4>
+                  <p>Italian broth soup with diced pasta &amp; vegetables, scented with farm fresh basil.</p>
+                </div>
+                <div class="item__side"><span class="price">290</span><button class="add" data-add aria-label="Add Italian Minestrone"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body">
+                  <h4><i class="bi bi-stars mark"></i> Roasted Broccoli &amp; Almond Soup</h4>
+                  <p>Thin purée of roasted broccoli and almond, sprinkled with shredded almonds and pesto oil.</p>
+                  <p class="note">warm up with this cozy delight!</p>
+                </div>
+                <div class="item__side"><span class="price">290</span><button class="add" data-add aria-label="Add Roasted Broccoli Soup"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body">
+                  <h4>Tomato Basil Soup <i class="bi bi-infinity mark"></i></h4>
+                  <p>Slow-roasted tomatoes, fresh basil and a swirl of cream.</p>
+                </div>
+                <div class="item__side"><span class="price">290</span><button class="add" data-add aria-label="Add Tomato Basil Soup"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body">
+                  <h4>Lemon &amp; Coriander Soup <i class="bi bi-sun mark"></i></h4>
+                  <p>Minced vegetables in a thick soup, flavoured with lemon &amp; coriander.</p>
+                </div>
+                <div class="item__side"><span class="price">220</span><button class="add" data-add aria-label="Add Lemon Coriander Soup"><i class="bi bi-plus"></i></button></div>
+              </li>
+            </ul>
+
+            <div class="divider-wave" aria-hidden="true"></div>
+
+            <h3 class="display display--sm"><small>Garden</small>Greens</h3>
+            <ul class="items">
+              <li class="item">
+                <div class="item__body">
+                  <h4>The Greek Garden <i class="bi bi-infinity mark"></i></h4>
+                  <p>Mesclun mix with olives, cucumber, onions &amp; bell peppers in citrus vinaigrette with feta crumble.</p>
+                </div>
+                <div class="item__side"><span class="price">330</span><button class="add" data-add aria-label="Add The Greek Garden"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body">
+                  <h4>Mexican Quinoa Salad <i class="bi bi-sun mark"></i></h4>
+                  <p>Sautéed veggies, corn, chickpea purée and zesty orange dressing.</p>
+                </div>
+                <div class="item__side"><span class="price">330</span><button class="add" data-add aria-label="Add Mexican Quinoa Salad"><i class="bi bi-plus"></i></button></div>
+              </li>
+            </ul>
+          </div>
+
+          <footer class="spread__foot">
+            <span>Starters &amp; Soups</span>
+            <q>Life is soup-erb with you around.</q>
+          </footer>
+        </div>
+
+        <!-- Spread 2: Pastas + Pizzas -->
+        <div class="spread spread--reverse" id="pastas">
+          <div class="spread__page">
+            <h3 class="display">Pastas, <span class="text-accent">riso</span></h3>
+            <p class="display__sub">&amp; Nourishments</p>
+
+            <div class="panel">
+              <figure class="panel__img">
+                <img src="https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=900&q=80" alt="Fusilli pasta" loading="lazy" />
+                <figcaption class="note note--light">fiery attack on your taste buds!</figcaption>
+              </figure>
+              <ul class="items items--two items--onpanel">
+                <li class="item">
+                  <div class="item__body"><h4>Fusilli Alfredo <span class="dot-j">J</span></h4><p>Sautéed mushrooms, leeks &amp; cream cheese sauce.</p></div>
+                  <div class="item__side"><span class="price">490</span><button class="add" data-add aria-label="Add Fusilli Alfredo"><i class="bi bi-plus"></i></button></div>
+                </li>
+                <li class="item">
+                  <div class="item__body"><h4>Arrabbiata</h4><p>Penne, bell peppers, zucchini, olives &amp; spiced paprika sauce.</p></div>
+                  <div class="item__side"><span class="price">475</span><button class="add" data-add aria-label="Add Arrabbiata"><i class="bi bi-plus"></i></button></div>
+                </li>
+                <li class="item">
+                  <div class="item__body"><h4>Truffle Mushroom Pasta</h4><p>Creamy pasta with wild mushrooms and truffle oil.</p></div>
+                  <div class="item__side"><span class="price">420</span><button class="add" data-add aria-label="Add Truffle Mushroom Pasta"><i class="bi bi-plus"></i></button></div>
+                </li>
+                <li class="item">
+                  <div class="item__body"><h4><i class="bi bi-stars mark"></i> Ravioli Battle</h4><p>Sage butter ricotta ravioli over four-cheese sauce.</p></div>
+                  <div class="item__side"><span class="price">480</span><button class="add" data-add aria-label="Add Ravioli Battle"><i class="bi bi-plus"></i></button></div>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="spread__page">
+            <h3 class="display display--accent"><small>Wood Fire</small>Pizzas</h3>
+            <p class="tagline">Crust me, you are gonna regret not trying these!</p>
+
+            <h5 class="subhead"><span>napoletana style</span></h5>
+            <ul class="items">
+              <li class="item">
+                <div class="item__body"><h4>Cheese Burst</h4><p>Coloured peppers, zucchini, fresh onions, artichokes, basil &amp; olives.</p><p class="note">takes 35 minutes to prepare</p></div>
+                <div class="item__side"><span class="price">650</span><button class="add" data-add aria-label="Add Cheese Burst"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body"><h4>Pizza Mediterranea <span class="dot-j">J</span></h4><p>Sun-dried tomato, capers, artichoke, olives &amp; basil.</p></div>
+                <div class="item__side"><span class="price">550</span><button class="add" data-add aria-label="Add Pizza Mediterranea"><i class="bi bi-plus"></i></button></div>
+              </li>
+            </ul>
+
+            <h5 class="subhead"><span>sourdough style</span></h5>
+            <ul class="items">
+              <li class="item">
+                <div class="item__body"><h4>Pizza Margherita <span class="dot-j">J</span></h4><p>Hand-rolled sourdough, pomodoro, buffalo mozzarella, fresh basil, EVOO.</p></div>
+                <div class="item__side"><span class="price">580</span><button class="add" data-add aria-label="Add Pizza Margherita"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body"><h4>Quattro Formaggio</h4><p>Bocconcini, ricotta, blue cheese, aged parmesan &amp; cherry tomato confit.</p></div>
+                <div class="item__side"><span class="price">760</span><button class="add" data-add aria-label="Add Quattro Formaggio"><i class="bi bi-plus"></i></button></div>
+              </li>
+            </ul>
+
+            <aside class="fact">
+              <p class="fact__title">"Tomato terror flips to flavor!"</p>
+              <p>Before pizza became popular in Italy, <b>tomatoes were considered poisonous</b> by many Europeans.</p>
+            </aside>
+          </div>
+
+          <footer class="spread__foot">
+            <span>Mains</span>
+            <q>It's impastable not to love this!</q>
+          </footer>
+        </div>
+
+        <!-- Spread 3: Desserts + Beverages -->
+        <div class="spread" id="desserts">
+          <div class="spread__page">
+            <p class="kicker">Remelle Exclusive</p>
+            <h3 class="display display--xl">desserts</h3>
+            <div class="divider-wave" aria-hidden="true"></div>
+            <ul class="items items--two">
+              <li class="item">
+                <div class="item__body"><h4>Tiramisu</h4><p>Coffee scented, cocoa dusted &amp; fruit pearls.</p></div>
+                <div class="item__side"><span class="price">275</span><button class="add" data-add aria-label="Add Tiramisu"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body"><h4><i class="bi bi-stars mark"></i> Red Velvet Rolls</h4><p>Chef's own-style red velvet log.</p></div>
+                <div class="item__side"><span class="price">270</span><button class="add" data-add aria-label="Add Red Velvet Rolls"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body"><h4>Biscoff Cheesecake</h4><p>New York style no-bake cheesecake, caramel layered.</p></div>
+                <div class="item__side"><span class="price">330</span><button class="add" data-add aria-label="Add Biscoff Cheesecake"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body"><h4>Sizzling Brownie</h4><p>Nutella-stuffed brownie with vanilla ice cream.</p></div>
+                <div class="item__side"><span class="price">320</span><button class="add" data-add aria-label="Add Sizzling Brownie"><i class="bi bi-plus"></i></button></div>
+              </li>
+            </ul>
+            <figure class="plate-shot">
+              <img src="https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=800&q=80" alt="Dessert" loading="lazy" />
+            </figure>
+          </div>
+
+          <div class="spread__page" id="beverages">
+            <div class="label-box">
+              <b>Beverages:</b>
+              <span>Crafted to cool, made to remember.</span>
+            </div>
+
+            <h3 class="display display--thin">Mocktails <span class="display__script display__script--inline">no buzz, all brilliance</span></h3>
+            <ul class="items items--two">
+              <li class="item">
+                <div class="item__body"><h4>Virgin Mojito</h4><p>Lime, sugar &amp; house-churned mint.</p></div>
+                <div class="item__side"><span class="price">240</span><button class="add" data-add aria-label="Add Virgin Mojito"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body"><h4>Passion Tornado</h4><p>Orange, pineapple, passion fruit, mint.</p></div>
+                <div class="item__side"><span class="price">240</span><button class="add" data-add aria-label="Add Passion Tornado"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body"><h4>Mint Berry Smash</h4><p>Mint, blueberry, strawberry, fizz.</p></div>
+                <div class="item__side"><span class="price">260</span><button class="add" data-add aria-label="Add Mint Berry Smash"><i class="bi bi-plus"></i></button></div>
+              </li>
+              <li class="item">
+                <div class="item__body"><h4>Kiwi Basil Spritz</h4><p>Fresh basil, pineapple &amp; kiwi.</p></div>
+                <div class="item__side"><span class="price">260</span><button class="add" data-add aria-label="Add Kiwi Basil Spritz"><i class="bi bi-plus"></i></button></div>
+              </li>
+            </ul>
+
+            <div class="drink-feature">
+              <figure>
+                <img src="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=700&q=80" alt="Signature drink" loading="lazy" />
+                <figcaption class="note note--light">Berry Appline</figcaption>
+              </figure>
+              <div>
+                <h3 class="display display--thin display--sm">Signature <span class="display__script display__script--inline">cocktails</span></h3>
+                <ul class="items">
+                  <li class="item">
+                    <div class="item__body"><h4>Berry Appline</h4><p>Apple-berry cordial and sparkling water.</p><p class="note">bubbly, bright &amp; berry-powered</p></div>
+                    <div class="item__side"><span class="price">630</span><button class="add" data-add aria-label="Add Berry Appline"><i class="bi bi-plus"></i></button></div>
+                  </li>
+                  <li class="item">
+                    <div class="item__body"><h4>Chamomile Highball</h4><p>Vanilla, floral chamomile and citrus.</p></div>
+                    <div class="item__side"><span class="price">630</span><button class="add" data-add aria-label="Add Chamomile Highball"><i class="bi bi-plus"></i></button></div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <footer class="spread__foot">
+            <span>Desserts &amp; Drinks</span>
+            <q>Stressed spelled backward is desserts.</q>
+          </footer>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= SIGNATURE DISH (product detail) ================= -->
+    <section class="section section--tint" id="signature">
+      <div class="container dish">
+        <figure class="dish__img">
+          <img src="https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=1000&q=80" alt="Grilled Salmon" loading="lazy" />
+          <button class="fav" aria-label="Add to favourites" data-fav><i class="bi bi-heart"></i></button>
+        </figure>
+
+        <div class="dish__info">
+          <p class="eyebrow">Chef's Signature</p>
+          <div class="dish__title">
+            <h2 class="h-serif">Grilled Salmon</h2>
+            <span class="dish__price">₹ <span id="dishPrice">520</span></span>
+          </div>
+          <p class="muted">Fresh salmon fillet grilled to perfection with lemon butter sauce, served with seasonal vegetables and herbs.</p>
+
+          <h3 class="h-sub">Customize <span class="muted">(Optional)</span></h3>
+          <ul class="options">
+            <li><label><input type="checkbox" data-extra="30" /> Extra Sauce</label><span>₹ 30</span></li>
+            <li><label><input type="checkbox" data-extra="60" /> Add Mashed Potato</label><span>₹ 60</span></li>
+            <li><label><input type="checkbox" data-extra="40" /> Extra Vegetables</label><span>₹ 40</span></li>
+          </ul>
+
+          <div class="dish__qty">
+            <span class="h-sub">Quantity</span>
+            <div class="stepper" data-stepper>
+              <button type="button" data-step="-1" aria-label="Decrease"><i class="bi bi-dash"></i></button>
+              <output>1</output>
+              <button type="button" data-step="1" aria-label="Increase"><i class="bi bi-plus"></i></button>
+            </div>
+          </div>
+
+          <button class="btn btn--primary btn--block" data-add-dish>Add to Cart &nbsp;·&nbsp; ₹ <span id="dishTotal">520</span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ORDER: Checkout + Tracking ================= -->
+    <section class="section" id="order">
+      <div class="container">
+        <div class="section__head section__head--center">
+          <div>
+            <p class="eyebrow">Order at your table</p>
+            <h2 class="h-serif">From kitchen to <span class="script">your heart</span></h2>
+          </div>
+        </div>
+
+        <div class="order-grid">
+          <!-- Checkout -->
+          <div class="card" id="reserve">
+            <h3 class="card__title">Checkout</h3>
+
+            <p class="field-label">Delivery Type</p>
+            <div class="pills" role="radiogroup" aria-label="Delivery type">
+              <button class="pill is-active" role="radio" aria-checked="true">Dine In</button>
+              <button class="pill" role="radio" aria-checked="false">Takeaway</button>
+              <button class="pill" role="radio" aria-checked="false">Home Delivery</button>
+            </div>
+
+            <label class="field-label" for="table">Table Selection</label>
+            <select id="table" class="input">
+              <option>Table 5 - (Available)</option>
+              <option>Table 2 - (Available)</option>
+              <option>Table 8 - (Window)</option>
+            </select>
+
+            <label class="field-label" for="notes">Special Instructions <span class="muted">(Optional)</span></label>
+            <textarea id="notes" class="input" rows="3" placeholder="Any special requests?"></textarea>
+
+            <p class="field-label">Order Summary</p>
+            <dl class="summary">
+              <div><dt>Grilled Salmon <span>x1</span></dt><dd>₹ 520</dd></div>
+              <div><dt>Truffle Mushroom Pasta <span>x2</span></dt><dd>₹ 840</dd></div>
+              <div><dt>Tomato Basil Soup <span>x1</span></dt><dd>₹ 290</dd></div>
+              <div class="summary__sep"><dt>Subtotal</dt><dd>₹ 1,650</dd></div>
+              <div><dt>Service Charge (10%)</dt><dd>₹ 165</dd></div>
+              <div class="summary__total"><dt>Total</dt><dd>₹ 1,815</dd></div>
+            </dl>
+
+            <button class="btn btn--primary btn--block">Continue to Payment</button>
+          </div>
+
+          <!-- Payment + Tracking -->
+          <div class="stack">
+            <div class="card">
+              <h3 class="card__title">Payment Method</h3>
+              <div class="pay">
+                <label class="pay__opt"><input type="radio" name="pay" checked /><i class="bi bi-shop"></i><span><b>Pay at Restaurant</b><small>Pay when you dine</small></span></label>
+                <label class="pay__opt"><input type="radio" name="pay" /><i class="bi bi-credit-card"></i><span><b>Credit / Debit Card</b><small>Visa, MasterCard, etc.</small></span></label>
+                <label class="pay__opt"><input type="radio" name="pay" /><i class="bi bi-phone"></i><span><b>UPI / Mobile Banking</b><small>GPay, PhonePe, Paytm</small></span></label>
+              </div>
+              <p class="secure"><i class="bi bi-lock"></i> Your payment information is secure and encrypted.</p>
+            </div>
+
+            <div class="card">
+              <div class="card__row">
+                <h3 class="card__title">Order Tracking</h3>
+                <span class="order-no">#RR12543</span>
+              </div>
+              <ol class="track">
+                <li class="is-done"><b>Order Placed</b><span>Your order has been received.</span><time>7:15 PM</time></li>
+                <li class="is-done"><b>Preparing</b><span>Our chefs are preparing your order.</span><time>7:22 PM</time></li>
+                <li><b>Ready to Serve</b><span>Your order is ready!</span></li>
+                <li><b>Enjoy Your Meal</b><span>Thank you for dining with us!</span></li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="footer" id="contact">
+    <div class="container footer__grid">
+      <div>
+        <a href="#top" class="brand brand--light"><i class="bi bi-flower1 brand__leaf"></i><span>Restaurant <b>Remelle</b></span></a>
+        <p class="footer__quote">Good food <span class="script">brings people together</span></p>
+      </div>
+      <div>
+        <h4>Visit</h4>
+        <p>12 Olive Street, Old Town<br />Open daily · 12 PM – 11 PM</p>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <p>+91 98765 43210<br />hello@remelle.example</p>
+      </div>
+      <div>
+        <h4>Follow</h4>
+        <div class="social">
+          <a href="#" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
+          <a href="#" aria-label="Facebook"><i class="bi bi-facebook"></i></a>
+          <a href="#" aria-label="X"><i class="bi bi-twitter-x"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer__bottom">
+      <span>© 2026 Restaurant Remelle. All rights reserved.</span>
+      <a href="#top">Back to top <i class="bi bi-arrow-up"></i></a>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

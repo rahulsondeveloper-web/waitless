@@ -1,0 +1,42 @@
+<section class="wl-page wl-container">
+  <p class="wl-eyebrow">System status</p>
+  <h1 class="wl-h2">Is everything running?</h1>
+
+  @if (loading()) {
+    <wl-loading-state label="Checking services…" />
+  } @else if (error(); as e) {
+    <wl-error-state title="API not reachable" [message]="e.message" (retry)="load()" />
+  } @else if (health(); as h) {
+    <div class="status-banner" [class.is-ok]="h.status === 'ok'">
+      <span class="material-symbols-outlined">{{ h.status === 'ok' ? 'check_circle' : 'warning' }}</span>
+      <div>
+        <b>{{ h.status === 'ok' ? 'All core services are up' : 'Some services need attention' }}</b>
+        <small>API v{{ h.version }} · {{ h.environment }} · server time {{ h.server_time | date: 'medium' : 'UTC' }} UTC</small>
+      </div>
+    </div>
+
+    <ul class="checks">
+      @for (c of checks(h); track c.name) {
+        <li class="wl-card check" [attr.data-status]="c.status">
+          <span class="check__dot" aria-hidden="true"></span>
+          <div>
+            <b class="check__name">{{ c.name }}</b>
+            <small>{{ c.status }}@if (c.latency_ms != null) { · {{ c.latency_ms }} ms }</small>
+            @if (c.detail) {
+              <small class="check__detail">{{ c.detail }}</small>
+            }
+          </div>
+        </li>
+      }
+      <li class="wl-card check" [attr.data-status]="realtime.connected() ? 'ok' : 'down'">
+        <span class="check__dot" aria-hidden="true"></span>
+        <div>
+          <b class="check__name">real-time (Socket.IO)</b>
+          <small>{{ realtime.status() }} · clock offset {{ realtime.clockOffsetMs() }} ms</small>
+        </div>
+      </li>
+    </ul>
+
+    <button type="button" class="wl-btn wl-btn--ghost" (click)="load()">Refresh</button>
+  }
+</section>
