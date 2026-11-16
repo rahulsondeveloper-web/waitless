@@ -3,7 +3,9 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { map } from 'rxjs';
 
+import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService } from '../../core/theme/theme.service';
+import { UserMenuComponent } from '../../shared/ui/user-menu/user-menu.component';
 
 /**
  * Restaurant storefront shell (/r/:slug).
@@ -15,13 +17,14 @@ import { ThemeService } from '../../core/theme/theme.service';
  */
 @Component({
   selector: 'wl-storefront-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './storefront-layout.component.html',
   styleUrl: './storefront-layout.component.scss',
 })
 export class StorefrontLayoutComponent implements OnDestroy {
   private readonly theme = inject(ThemeService);
+  protected readonly auth = inject(AuthService);
   protected readonly slug = toSignal(inject(ActivatedRoute).paramMap.pipe(map((p) => p.get('slug') ?? '')), {
     initialValue: '',
   });

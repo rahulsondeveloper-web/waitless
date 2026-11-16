@@ -23,15 +23,11 @@ class Base(DeclarativeBase):
 
 class UUIDPkMixin:
     # uuidv7() is built into PostgreSQL 18: time-ordered, index friendly (decision D29)
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
 
 
 class CreatedAtMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class TimestampMixin(CreatedAtMixin):

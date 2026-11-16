@@ -37,7 +37,10 @@
       }
       <span class="ad-toolbar__title">{{ area() }}</span>
       <span class="ad-spacer"></span>
-      <a mat-button routerLink="/">WaitLess site</a>
+      @if (!isHandset()) {
+        <a mat-button routerLink="/">WaitLess site</a>
+      }
+      <wl-user-menu [compact]="isHandset()" />
     </mat-toolbar>
     <main class="ad-main">
       <router-outlet />

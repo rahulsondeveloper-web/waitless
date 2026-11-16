@@ -1,16 +1,16 @@
 """Alembic environment (async). Uses the same settings as the app.
 
-    alembic upgrade head                 # dev database (DB_NAME)
-    alembic -x test=1 upgrade head       # test database (DB_NAME_TEST)
+alembic upgrade head                 # dev database (DB_NAME)
+alembic -x test=1 upgrade head       # test database (DB_NAME_TEST)
 """
 
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from alembic import context
 from app.core.config import get_settings
 from app.models import Base
 
@@ -24,7 +24,8 @@ use_test_db = context.get_x_argument(as_dictionary=True).get("test") == "1"
 
 def _url():  # type: ignore[no-untyped-def]
     settings = get_settings()
-    return settings.database_url(test=use_test_db or settings.environment == "test")
+    # Migrations run as the database owner; the app itself runs as the non-owner role (RLS applies).
+    return settings.database_url(test=use_test_db or settings.environment == "test", migration=True)
 
 
 def run_migrations_offline() -> None:

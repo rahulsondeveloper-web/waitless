@@ -18,9 +18,13 @@
     </nav>
 
     <div class="sf-actions">
-      <a routerLink="/login" class="sf-icon" aria-label="Login or profile">
-        <span class="material-symbols-outlined">person</span>
-      </a>
+      @if (auth.isAuthenticated()) {
+        <wl-user-menu [compact]="true" />
+      } @else {
+        <a routerLink="/login" class="sf-icon" aria-label="Login">
+          <span class="material-symbols-outlined">person</span>
+        </a>
+      }
       <a routerLink="cart" class="sf-icon" aria-label="Cart">
         <span class="material-symbols-outlined">shopping_bag</span>
       </a>

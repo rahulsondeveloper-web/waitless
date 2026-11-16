@@ -33,7 +33,7 @@ Note: menu **management** (categories/items CRUD) moves up into Phase 4 in a min
 - Users, OTP (dev: printed to log), password login, JWT + refresh rotation, `/me`.
 - Tenants, branches, memberships, roles/permissions seeds, permission & branch dependencies, RLS policies.
 - Plans + plan features seeded (Starter/Professional/Enterprise), subscriptions with trial.
-- Restaurant registration flow (PRD §4 steps 1–7) incl. default menu taxonomy seed; Super Admin approve/reject/activate.
+- Restaurant registration flow (PRD §4 steps 1–7); Super Admin approve/reject/activate/suspend/deactivate. Default menu taxonomy moves to Phase 4 (decision D36).
 - Super Admin seed account via CLI command.
 - **Acceptance (PRD tests 1, 2, 16):** Super Admin registers and activates a restaurant; owner logs in; owner of A gets 404 on B's records (API and RLS level).
 
@@ -44,7 +44,7 @@ Note: menu **management** (categories/items CRUD) moves up into Phase 4 in a min
 ### Phase 4 — Dynamic storefront & platform site
 - WaitLess landing, about, how it works, features, for restaurants, contact; discovery with filters + OpenStreetMap map.
 - Storefront layout: header (logo, name, nav, login, cart, **WaitLess link**), home, menu, gallery (lightbox), about, contact (map), theme applied from API; `TenantContextService` switching & clearing.
-- Minimal menu management (categories, items, images) so storefront has real data.
+- Minimal menu management (categories, items, images) so storefront has real data, plus the PRD §7 default meal types/categories seeded for each restaurant (existing restaurants get them via a data migration).
 - **Acceptance (tests 4, 5, 6):** two seeded restaurants with different branding; Playwright switches A → B → A and asserts no logo/menu/gallery/contact leakage.
 
 ### Phase 5 — Restaurant administration

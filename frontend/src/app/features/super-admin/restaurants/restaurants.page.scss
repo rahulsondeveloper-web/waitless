@@ -1,0 +1,70 @@
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  h1 {
+    font: 600 2rem / 1.1 var(--wl-font-serif);
+  }
+}
+.muted {
+  color: var(--wl-muted);
+}
+.search {
+  width: min(100%, 320px);
+}
+.filters {
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--wl-line);
+  border-radius: 14px;
+  background: var(--wl-surface);
+  transition: opacity 0.2s;
+  &.is-loading {
+    opacity: 0.55;
+  }
+}
+table {
+  width: 100%;
+  min-width: 860px;
+}
+td small {
+  display: block;
+  color: var(--wl-muted);
+  font-size: 0.78rem;
+}
+.actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.status {
+  display: inline-block;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: #eee;
+  &[data-status='pending'] {
+    background: #fdf0d8;
+    color: #7a5310;
+  }
+  &[data-status='active'] {
+    background: #e3efe1;
+    color: #2f5a2c;
+  }
+  &[data-status='suspended'],
+  &[data-status='rejected'] {
+    background: #f8dcd4;
+    color: #7c2a17;
+  }
+  &[data-status='deactivated'] {
+    background: #e7e2dc;
+    color: #5a504a;
+  }
+}

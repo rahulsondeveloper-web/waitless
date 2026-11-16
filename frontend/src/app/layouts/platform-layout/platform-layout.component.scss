@@ -120,7 +120,7 @@ main {
   }
 }
 @media (max-width: 480px) {
-  .pl-actions .wl-btn {
+  .pl-user ::ng-deep .um-name {
     display: none;
   }
   .pl-brand img {

@@ -1,0 +1,95 @@
+@if (error(); as e) {
+  <wl-error-state title="Could not load your restaurant" [message]="e.message" (retry)="load()" />
+} @else if (!data()) {
+  <wl-loading-state label="Loading your restaurant…" />
+} @else {
+  @let d = data()!;
+  <header class="dash-head">
+    <div>
+      <p class="eyebrow">Welcome, {{ auth.user()?.full_name || 'there' }}</p>
+      <h1>{{ d.tenant.name }}</h1>
+      <p class="muted">/r/{{ d.tenant.slug }} · {{ d.tenant.restaurant_type }} · {{ d.tenant.cuisines.join(', ') }}</p>
+    </div>
+  </header>
+
+  @switch (d.tenant.status) {
+    @case ('pending') {
+      <div class="banner banner--info" role="status">
+        <mat-icon>hourglass_top</mat-icon>
+        <div>
+          <b>Awaiting WaitLess approval</b>
+          <p>You can set up your restaurant now. It becomes visible to guests once approved and published.</p>
+        </div>
+      </div>
+    }
+    @case ('active') {
+      <div class="banner banner--ok" role="status">
+        <mat-icon>verified</mat-icon>
+        <div>
+          <b>Approved</b>
+          <p>Approved on {{ d.tenant.approved_at | date: 'mediumDate' }}. Finish the setup steps to publish your storefront.</p>
+        </div>
+      </div>
+    }
+    @default {
+      <div class="banner banner--bad" role="alert">
+        <mat-icon>block</mat-icon>
+        <div>
+          <b>Restaurant {{ d.tenant.status }}</b>
+          <p>{{ d.tenant.status_reason || 'Contact WaitLess support for details.' }}</p>
+        </div>
+      </div>
+    }
+  }
+
+  <div class="cards">
+    <article class="card">
+      <h2>Plan</h2>
+      @if (d.subscription; as s) {
+        <p class="big">{{ s.plan_name }}</p>
+        @if (s.status === 'trialing') {
+          <p class="muted">Free trial · {{ trialDaysLeft() }} days left (ends {{ s.trial_ends_at | date: 'mediumDate' }})</p>
+        } @else {
+          <p class="muted">{{ s.status }} · renews {{ s.current_period_end | date: 'mediumDate' }}</p>
+        }
+      } @else {
+        <p class="muted">No active subscription</p>
+      }
+    </article>
+
+    <article class="card">
+      <h2>Branches</h2>
+      <ul class="branches">
+        @for (b of d.branches; track b.id) {
+          <li>
+            <b>{{ b.name }}</b>
+            @if (b.is_primary) { <span class="chip">Main</span> }
+            <small>{{ b.address_line }}, {{ b.city }}, {{ b.state }}</small>
+          </li>
+        }
+      </ul>
+    </article>
+
+    <article class="card">
+      <h2>Your role</h2>
+      <p class="big">{{ auth.activeTenant()?.role_name }}</p>
+      <p class="muted">{{ permissionCount() }} permissions</p>
+    </article>
+  </div>
+
+  <section class="setup">
+    <h2>Set up your restaurant</h2>
+    <ol>
+      @for (s of setupSteps; track s.label) {
+        <li>
+          <mat-icon>{{ s.icon }}</mat-icon>
+          <div>
+            <b>{{ s.label }}</b>
+            <small>{{ s.hint }}</small>
+          </div>
+          <span class="soon">Phase {{ s.phase }}</span>
+        </li>
+      }
+    </ol>
+  </section>
+}

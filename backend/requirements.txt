@@ -18,3 +18,7 @@ apscheduler>=3.10,<4
 
 # Media
 pillow>=10.4
+
+# Security
+pyjwt>=2.9
+argon2-cffi>=23.1

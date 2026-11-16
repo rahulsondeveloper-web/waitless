@@ -26,9 +26,7 @@ class OutboxEvent(UUIDPkMixin, CreatedAtMixin, Base):
     dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     attempts: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
 
-    __table_args__ = (
-        Index("ix_outbox_events_pending", "created_at", postgresql_where="dispatched_at IS NULL"),
-    )
+    __table_args__ = (Index("ix_outbox_events_pending", "created_at", postgresql_where="dispatched_at IS NULL"),)
 
 
 class IdempotencyKey(UUIDPkMixin, CreatedAtMixin, Base):

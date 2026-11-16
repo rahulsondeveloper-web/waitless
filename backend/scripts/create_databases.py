@@ -1,6 +1,6 @@
 """Create the dev and test databases if they do not exist yet.
 
-    python scripts/create_databases.py
+python scripts/create_databases.py
 """
 
 import asyncio
@@ -17,7 +17,11 @@ from app.core.config import get_settings  # noqa: E402
 async def main() -> None:
     s = get_settings()
     conn = await asyncpg.connect(
-        host=s.db_host, port=s.db_port, user=s.db_user, password=s.db_password or None, database="postgres"
+        host=s.db_host,
+        port=s.db_port,
+        user=s.db_migration_user,
+        password=s.db_migration_password or None,
+        database="postgres",
     )
     try:
         for name in (s.db_name, s.db_name_test):

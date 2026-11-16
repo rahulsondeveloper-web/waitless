@@ -1,0 +1,91 @@
+<section class="wl-page wl-container auth">
+  <div class="auth__intro">
+    <p class="wl-eyebrow">Welcome back</p>
+    <h1 class="wl-h2">Sign in to <span class="wl-script">WaitLess</span></h1>
+    <p class="wl-muted">
+      Restaurant owners and staff sign in with a password. Guests use a one-time code sent to their mobile.
+    </p>
+    <p class="auth__alt">
+      New restaurant? <a routerLink="/register-restaurant" class="link">Register your restaurant</a>
+    </p>
+  </div>
+
+  <div class="wl-card auth__card">
+    <mat-tab-group mat-stretch-tabs (selectedIndexChange)="error.set(null)" animationDuration="150ms">
+      <mat-tab label="Restaurant & Admin">
+        <form [formGroup]="passwordForm" (ngSubmit)="submitPassword()" class="auth__form" novalidate>
+          <mat-form-field appearance="outline">
+            <mat-label>Email or mobile number</mat-label>
+            <input matInput formControlName="identifier" autocomplete="username" />
+            @if (passwordForm.controls.identifier.invalid && passwordForm.controls.identifier.touched) {
+              <mat-error>Enter your email or mobile number</mat-error>
+            }
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Password</mat-label>
+            <input matInput type="password" formControlName="password" autocomplete="current-password" />
+            @if (passwordForm.controls.password.invalid && passwordForm.controls.password.touched) {
+              <mat-error>Enter your password</mat-error>
+            }
+          </mat-form-field>
+          @if (error()) {
+            <p class="auth__error" role="alert">{{ error() }}</p>
+          }
+          <button mat-flat-button type="submit" [disabled]="busy()">
+            @if (busy()) { <mat-spinner diameter="18" /> } Sign in
+          </button>
+        </form>
+      </mat-tab>
+
+      <mat-tab label="Guest (mobile)">
+        @if (!otpSentTo()) {
+          <form [formGroup]="phoneForm" (ngSubmit)="sendCode()" class="auth__form" novalidate>
+            <mat-form-field appearance="outline">
+              <mat-label>Mobile number</mat-label>
+              <span matTextPrefix>+91&nbsp;</span>
+              <input matInput type="tel" formControlName="phone" autocomplete="tel-national" inputmode="tel" />
+              @if (phoneForm.controls.phone.invalid && phoneForm.controls.phone.touched) {
+                <mat-error>Enter a valid mobile number</mat-error>
+              }
+            </mat-form-field>
+            @if (error()) {
+              <p class="auth__error" role="alert">{{ error() }}</p>
+            }
+            <button mat-flat-button type="submit" [disabled]="busy()">
+              @if (busy()) { <mat-spinner diameter="18" /> } Send code
+            </button>
+          </form>
+        } @else {
+          <form [formGroup]="codeForm" (ngSubmit)="verifyCode()" class="auth__form" novalidate>
+            <p class="wl-muted">
+              Code sent to <b>{{ otpSentTo() }}</b>.
+              <button type="button" class="link-btn" (click)="changeNumber()">Change</button>
+            </p>
+            @if (devCode()) {
+              <p class="auth__dev" role="note">
+                Development mode — no SMS provider yet. Your code is <b>{{ devCode() }}</b>.
+              </p>
+            }
+            <mat-form-field appearance="outline">
+              <mat-label>6-digit code</mat-label>
+              <input matInput formControlName="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+              @if (codeForm.controls.code.invalid && codeForm.controls.code.touched) {
+                <mat-error>Enter the 6-digit code</mat-error>
+              }
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Your name (first time only)</mat-label>
+              <input matInput formControlName="fullName" autocomplete="name" />
+            </mat-form-field>
+            @if (error()) {
+              <p class="auth__error" role="alert">{{ error() }}</p>
+            }
+            <button mat-flat-button type="submit" [disabled]="busy()">
+              @if (busy()) { <mat-spinner diameter="18" /> } Verify &amp; continue
+            </button>
+          </form>
+        }
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+</section>

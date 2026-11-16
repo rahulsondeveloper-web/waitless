@@ -3,11 +3,12 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { APP_CONFIG } from '../../core/config/app-config';
 import { ThemeService } from '../../core/theme/theme.service';
+import { UserMenuComponent } from '../../shared/ui/user-menu/user-menu.component';
 
 /** WaitLess public website: landing, about, discovery, auth, customer account. */
 @Component({
   selector: 'wl-platform-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './platform-layout.component.html',
   styleUrl: './platform-layout.component.scss',

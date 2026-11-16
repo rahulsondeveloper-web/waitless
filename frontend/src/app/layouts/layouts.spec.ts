@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -15,6 +17,8 @@ describe('layouts', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         provideRouter([
           { path: '', component: PlatformLayoutComponent, children: [{ path: '', component: BlankPage }] },
           { path: 'r/:slug', component: StorefrontLayoutComponent, children: [{ path: '', component: BlankPage }] },
@@ -30,6 +34,8 @@ describe('layouts', () => {
     const el = harness.routeNativeElement as HTMLElement;
     expect(el.querySelector('img[alt="WaitLess"]')).toBeTruthy();
     expect(theme.tokens().primary).toBe(DEFAULT_THEME.primary);
+    // Signed out → login entry point is visible.
+    expect(el.querySelector('wl-user-menu a[href="/login"]')).toBeTruthy();
   });
 
   it('storefront header shows the restaurant and always keeps the WaitLess link', async () => {

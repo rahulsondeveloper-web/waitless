@@ -15,11 +15,11 @@ test('restaurant storefront keeps the WaitLess link and returns to the platform'
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Skip the wait');
 });
 
-test('admin areas render their navigation', async ({ page }) => {
+test('admin areas require sign-in', async ({ page }) => {
   await page.goto('/restaurant-admin');
-  await expect(page.locator('.ad-toolbar__title')).toHaveText('Restaurant Admin');
-  await page.goto('/super-admin');
-  await expect(page.locator('.ad-toolbar__title')).toHaveText('Super Admin');
+  await expect(page).toHaveURL(/\/login\?returnUrl=%2Frestaurant-admin/);
+  await page.goto('/super-admin/restaurants');
+  await expect(page).toHaveURL(/\/login\?returnUrl=%2Fsuper-admin%2Frestaurants/);
 });
 
 test('unknown routes show the not-found page', async ({ page }) => {

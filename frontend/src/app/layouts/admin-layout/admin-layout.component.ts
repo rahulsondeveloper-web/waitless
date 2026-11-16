@@ -9,6 +9,8 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { map } from 'rxjs';
 
+import { UserMenuComponent } from '../../shared/ui/user-menu/user-menu.component';
+
 export interface AdminNavItem {
   label: string;
   icon: string;
@@ -30,6 +32,7 @@ export interface AdminNavItem {
     MatListModule,
     MatIconModule,
     MatButtonModule,
+    UserMenuComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-layout.component.html',

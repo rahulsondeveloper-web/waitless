@@ -1,6 +1,6 @@
 """One error envelope for the whole API:
 
-    { "error": { "code": "TABLE_ALREADY_ASSIGNED", "message": "...", "details": {...} } }
+{ "error": { "code": "TABLE_ALREADY_ASSIGNED", "message": "...", "details": {...} } }
 """
 
 import logging

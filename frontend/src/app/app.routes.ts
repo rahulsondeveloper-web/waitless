@@ -1,5 +1,6 @@
-import { Routes } from '@angular/router';
+import { Route, Routes } from '@angular/router';
 
+import { authGuard, guestGuard, staffGuard, superAdminGuard } from './core/auth/auth.guards';
 import type { AdminNavItem } from './layouts/admin-layout/admin-layout.component';
 
 /** Route map follows docs/01 + PRD §19. Each area is lazy-loaded with its own layout. */
@@ -48,9 +49,12 @@ const SUPER_ADMIN_NAV: AdminNavItem[] = [
   { label: 'Settings', icon: 'settings', path: 'settings' },
 ];
 
-/** Builds child routes for an admin area from its nav list, with the phase each one ships in. */
-const adminChildren = (nav: AdminNavItem[], phases: Record<string, number>) =>
-  nav.map((n) => page(n.path === '.' ? '' : n.path, n.label, phases[n.path] ?? 0));
+/**
+ * Builds child routes for an admin area from its nav list: real pages where built,
+ * otherwise a placeholder that names the phase it ships in.
+ */
+const adminChildren = (nav: AdminNavItem[], phases: Record<string, number>, built: Record<string, Route> = {}) =>
+  nav.map((n) => built[n.path] ?? page(n.path === '.' ? '' : n.path, n.label, phases[n.path] ?? 0));
 
 export const routes: Routes = [
   // WaitLess public website
@@ -71,10 +75,22 @@ export const routes: Routes = [
       },
       page('about', 'About WaitLess', 4),
       page('restaurants', 'Find Restaurants', 4),
-      page('login', 'Login / Register', 2),
-      page('register-restaurant', 'Register your restaurant', 2),
+      {
+        path: 'login',
+        title: 'Sign in · WaitLess',
+        canActivate: [guestGuard],
+        loadComponent: () => import('./features/auth/login/login.page').then((m) => m.LoginPage),
+      },
+      {
+        path: 'register-restaurant',
+        title: 'Register your restaurant · WaitLess',
+        canActivate: [guestGuard],
+        loadComponent: () =>
+          import('./features/auth/register-restaurant/register-restaurant.page').then((m) => m.RegisterRestaurantPage),
+      },
       {
         path: 'customer',
+        canActivate: [authGuard],
         children: [page('', 'My Account', 6), page('bookings', 'My Bookings', 6), page('orders', 'My Orders', 7)],
       },
     ],
@@ -100,23 +116,45 @@ export const routes: Routes = [
   // Restaurant admin dashboard
   {
     path: 'restaurant-admin',
+    canActivate: [staffGuard],
     loadComponent: () => import('./layouts/admin-layout/admin-layout.component').then((m) => m.AdminLayoutComponent),
     data: { area: 'Restaurant Admin', nav: RESTAURANT_ADMIN_NAV },
-    children: adminChildren(RESTAURANT_ADMIN_NAV, {
-      '.': 5, profile: 3, branding: 3, gallery: 3, branches: 5, employees: 5, tables: 5, queue: 6,
-      reservations: 6, orders: 7, kitchen: 7, menu: 4, inventory: 9, suppliers: 9, purchases: 9,
-      billing: 10, payments: 10, discounts: 8, reports: 11, settings: 5,
-    }),
+    children: adminChildren(
+      RESTAURANT_ADMIN_NAV,
+      {
+        profile: 3, branding: 3, gallery: 3, branches: 5, employees: 5, tables: 5, queue: 6,
+        reservations: 6, orders: 7, kitchen: 7, menu: 4, inventory: 9, suppliers: 9, purchases: 9,
+        billing: 10, payments: 10, discounts: 8, reports: 11, settings: 5,
+      },
+      {
+        '.': {
+          path: '',
+          title: 'Dashboard · WaitLess',
+          loadComponent: () =>
+            import('./features/restaurant-admin/dashboard/dashboard.page').then((m) => m.DashboardPage),
+        },
+      },
+    ),
   },
 
   // WaitLess Super Admin dashboard
   {
     path: 'super-admin',
+    canActivate: [superAdminGuard],
     loadComponent: () => import('./layouts/admin-layout/admin-layout.component').then((m) => m.AdminLayoutComponent),
     data: { area: 'Super Admin', nav: SUPER_ADMIN_NAV },
-    children: adminChildren(SUPER_ADMIN_NAV, {
-      '.': 11, restaurants: 2, plans: 11, subscriptions: 11, content: 11, support: 11, audit: 11, settings: 11,
-    }),
+    children: adminChildren(
+      SUPER_ADMIN_NAV,
+      { '.': 11, plans: 11, subscriptions: 11, content: 11, support: 11, audit: 11, settings: 11 },
+      {
+        restaurants: {
+          path: 'restaurants',
+          title: 'Restaurants · Super Admin',
+          loadComponent: () =>
+            import('./features/super-admin/restaurants/restaurants.page').then((m) => m.RestaurantsPage),
+        },
+      },
+    ),
   },
 
   {
