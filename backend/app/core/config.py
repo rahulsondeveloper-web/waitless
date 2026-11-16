@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     # SaaS
     trial_plan_code: str = "professional"
 
+    # Restaurant storefront (PRD §5.3: change only together with the DB check constraint)
+    gallery_max_photos: int = 5
+    storefront_cache_seconds: int = 60
+
     # Storage
     storage_backend: Literal["local"] = "local"
     media_root: Path = BACKEND_DIR / "uploads"

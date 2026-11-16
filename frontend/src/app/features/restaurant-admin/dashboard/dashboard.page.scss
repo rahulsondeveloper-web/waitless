@@ -109,8 +109,27 @@
     }
   }
 }
-.soon {
-  font-size: 0.75rem;
+.setup li.done mat-icon {
+  color: var(--wl-secondary);
+}
+.setup-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+  h2 {
+    margin-bottom: 0.1rem;
+  }
+}
+.optional {
+  margin-left: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 500;
   color: var(--wl-muted);
-  white-space: nowrap;
+}
+.small {
+  font-size: 0.8rem;
+  margin-top: 0.6rem;
 }

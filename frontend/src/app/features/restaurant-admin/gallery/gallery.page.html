@@ -1,0 +1,77 @@
+<header class="page-head">
+  <div>
+    <h1>Gallery</h1>
+    <p class="muted">
+      Up to {{ max() }} photos shown on your storefront's Gallery. Drag to reorder — the first photo is shown first.
+    </p>
+  </div>
+  @if (gallery()) {
+    <span class="count" [class.full]="free() === 0">{{ items().length }} / {{ max() }} photos</span>
+  }
+</header>
+
+@if (error(); as e) {
+  <wl-error-state title="Could not load the gallery" [message]="e.message" [retryable]="false" />
+} @else if (!gallery()) {
+  <wl-loading-state />
+} @else {
+  <div class="grid" cdkDropList cdkDropListOrientation="mixed" [cdkDropListData]="items()"
+       [cdkDropListDisabled]="!canEdit() || busy() !== null" (cdkDropListDropped)="drop($event)">
+    @for (item of items(); track item.id; let i = $index, first = $first, last = $last) {
+      <figure class="tile" cdkDrag [attr.aria-label]="'Photo ' + (i + 1) + (item.caption ? ': ' + item.caption : '')">
+        <div class="img-wrap">
+          <img [src]="item.url" [alt]="item.caption || 'Gallery photo ' + (i + 1)" loading="lazy" />
+          <span class="pos">{{ i + 1 }}</span>
+          @if (busy() === item.id) {
+            <div class="overlay"><mat-spinner diameter="28" /></div>
+          }
+          @if (canEdit()) {
+            <span class="handle" cdkDragHandle aria-hidden="true"><mat-icon>drag_indicator</mat-icon></span>
+          }
+        </div>
+        <figcaption>
+          <input class="caption" [value]="item.caption" maxlength="160" placeholder="Add a caption"
+                 [disabled]="!canEdit()" (blur)="saveCaption(item, $any($event.target).value)"
+                 (keydown.enter)="$any($event.target).blur()" [attr.aria-label]="'Caption for photo ' + (i + 1)" />
+          @if (canEdit()) {
+            <div class="tile-actions">
+              <button mat-icon-button type="button" (click)="move(i, -1)" [disabled]="first || busy() !== null"
+                      aria-label="Move earlier"><mat-icon>arrow_back</mat-icon></button>
+              <button mat-icon-button type="button" (click)="move(i, 1)" [disabled]="last || busy() !== null"
+                      aria-label="Move later"><mat-icon>arrow_forward</mat-icon></button>
+              <label class="icon-file" [attr.aria-label]="'Replace photo ' + (i + 1)">
+                <input type="file" accept="image/jpeg,image/png,image/webp" (change)="replace(item, $event)"
+                       [disabled]="busy() !== null" />
+                <mat-icon>swap_horiz</mat-icon>
+              </label>
+              <button mat-icon-button type="button" (click)="remove(item)" [disabled]="busy() !== null"
+                      aria-label="Delete photo"><mat-icon>delete</mat-icon></button>
+            </div>
+          }
+        </figcaption>
+      </figure>
+    }
+    @if (canEdit()) {
+      @for (slot of emptySlots(); track slot; let first = $first) {
+        @if (first) {
+          <label class="tile add" [class.busy]="busy() === 'new'">
+            <input type="file" accept="image/jpeg,image/png,image/webp" (change)="add($event)"
+                   [disabled]="busy() !== null" aria-label="Add a photo" />
+            @if (busy() === 'new') {
+              <mat-spinner diameter="28" />
+            } @else {
+              <mat-icon>add_photo_alternate</mat-icon>
+              <span>Add photo</span>
+              <small>JPEG, PNG or WebP · min 400 × 300 · max 5 MB</small>
+            }
+          </label>
+        } @else {
+          <div class="tile empty" aria-hidden="true"></div>
+        }
+      }
+    }
+  </div>
+  @if (free() === 0 && canEdit()) {
+    <p class="muted note">The gallery is full. Replace or delete a photo to add another.</p>
+  }
+}

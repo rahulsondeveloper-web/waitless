@@ -77,19 +77,43 @@
     </article>
   </div>
 
-  <section class="setup">
-    <h2>Set up your restaurant</h2>
-    <ol>
-      @for (s of setupSteps; track s.label) {
-        <li>
-          <mat-icon>{{ s.icon }}</mat-icon>
-          <div>
-            <b>{{ s.label }}</b>
-            <small>{{ s.hint }}</small>
-          </div>
-          <span class="soon">Phase {{ s.phase }}</span>
-        </li>
-      }
-    </ol>
-  </section>
+  @if (checklist(); as c) {
+    <section class="setup" aria-labelledby="h-setup">
+      <div class="setup-head">
+        <div>
+          <h2 id="h-setup">{{ c.is_published ? 'Your storefront is live' : 'Get ready to go live' }}</h2>
+          <p class="muted">
+            @if (c.is_published) {
+              Guests can find you at <b>/r/{{ d.tenant.slug }}</b>.
+            } @else if (c.can_publish) {
+              Everything required is done — publish when you are ready.
+            } @else {
+              {{ remaining() }} required step{{ remaining() === 1 ? '' : 's' }} left before you can publish.
+            }
+          </p>
+        </div>
+        @if (canPublish()) {
+          <button mat-flat-button type="button" (click)="togglePublished()"
+                  [disabled]="publishing() || (!c.is_published && !c.can_publish)">
+            {{ c.is_published ? 'Unpublish' : 'Publish storefront' }}
+          </button>
+        }
+      </div>
+      <ol>
+        @for (item of c.items; track item.key) {
+          <li [class.done]="item.done">
+            <mat-icon [attr.aria-label]="item.done ? 'Done' : 'To do'">{{ item.done ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+            <div>
+              <b>{{ item.label }} @if (!item.required) { <span class="optional">optional</span> }</b>
+              <small>{{ item.hint }}</small>
+            </div>
+            @if (!item.done && links[item.key]; as l) {
+              <a mat-button [routerLink]="l.path">Set up</a>
+            }
+          </li>
+        }
+      </ol>
+      <p class="muted small">Menu and tables join this checklist when those modules arrive (phases 4 and 5).</p>
+    </section>
+  }
 }

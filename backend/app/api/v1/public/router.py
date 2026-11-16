@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Query, status
+from typing import Annotated
+
+from fastapi import APIRouter, Path, Query, status
 
 from app.api.deps import ClientDep, SessionDep
 from app.core import rate_limit
 from app.core.config import get_settings
+from app.schemas.profile import BrandingOut, GalleryOut, StorefrontOut
 from app.schemas.tenancy import RegistrationResponse, RestaurantRegistration, SlugAvailability, TenantOut
+from app.services import profile as profile_service
 from app.services import registration
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -26,6 +30,25 @@ async def register_restaurant(
         tenant=TenantOut.model_validate(tenant),
         message="Registration received. You can sign in and complete your profile while WaitLess reviews it.",
     )
+
+
+@router.get(
+    "/restaurants/{slug}",
+    response_model=StorefrontOut,
+    summary="Public storefront: profile, branding, branches with hours, social links (published restaurants only)",
+)
+async def storefront(slug: Annotated[str, Path(max_length=60)], session: SessionDep) -> StorefrontOut:
+    return await profile_service.public_storefront(session, slug)
+
+
+@router.get("/restaurants/{slug}/branding", response_model=BrandingOut, summary="Logo and theme tokens")
+async def storefront_branding(slug: Annotated[str, Path(max_length=60)], session: SessionDep) -> BrandingOut:
+    return await profile_service.public_branding(session, slug)
+
+
+@router.get("/restaurants/{slug}/gallery", response_model=GalleryOut, summary="Gallery photos (up to 5)")
+async def storefront_gallery(slug: Annotated[str, Path(max_length=60)], session: SessionDep) -> GalleryOut:
+    return await profile_service.public_gallery(session, slug)
 
 
 @router.get("/slug-availability", response_model=SlugAvailability, summary="Check a restaurant web address")

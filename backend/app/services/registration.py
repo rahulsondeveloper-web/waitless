@@ -14,7 +14,7 @@ from app.core.db import use_system
 from app.core.errors import AppError, ConflictError
 from app.core.events import record_event
 from app.core.security import hash_password_async
-from app.models import Branch, Membership, Plan, Role, Subscription, Tenant, User
+from app.models import Branch, Membership, Plan, RestaurantBranding, RestaurantProfile, Role, Subscription, Tenant, User
 from app.schemas.tenancy import RestaurantRegistration
 from app.seeds.reference import DEFAULT_TENANT_SETTINGS
 from app.services.audit import write_audit
@@ -118,6 +118,9 @@ async def register_restaurant(
     )
     session.add(tenant)
     await session.flush()
+    # Empty profile + default (Remelle) branding — completed by the owner in the dashboard (PRD §4 step 7).
+    session.add(RestaurantProfile(tenant_id=tenant.id))
+    session.add(RestaurantBranding(tenant_id=tenant.id, tokens={}))
 
     # 2. Primary branch
     session.add(

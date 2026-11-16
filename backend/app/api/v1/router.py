@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.v1.auth.router import router as auth_router
 from app.api.v1.health.router import router as health_router
 from app.api.v1.public.router import router as public_router
+from app.api.v1.restaurant.profile_router import router as restaurant_profile_router
 from app.api.v1.restaurant.router import router as restaurant_router
 from app.api.v1.super_admin.router import router as super_admin_router
 
@@ -13,4 +14,5 @@ api_router.include_router(health_router)
 api_router.include_router(auth_router)
 api_router.include_router(public_router)
 api_router.include_router(restaurant_router)
+api_router.include_router(restaurant_profile_router)
 api_router.include_router(super_admin_router)

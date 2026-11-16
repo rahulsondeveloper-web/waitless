@@ -133,6 +133,22 @@ export const routes: Routes = [
           loadComponent: () =>
             import('./features/restaurant-admin/dashboard/dashboard.page').then((m) => m.DashboardPage),
         },
+        profile: {
+          path: 'profile',
+          title: 'Restaurant profile · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/profile/profile.page').then((m) => m.ProfilePage),
+        },
+        branding: {
+          path: 'branding',
+          title: 'Branding · WaitLess',
+          loadComponent: () =>
+            import('./features/restaurant-admin/branding/branding.page').then((m) => m.BrandingPage),
+        },
+        gallery: {
+          path: 'gallery',
+          title: 'Gallery · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/gallery/gallery.page').then((m) => m.GalleryPage),
+        },
       },
     ),
   },

@@ -71,6 +71,8 @@ export interface Branch {
   state: string;
   country: string;
   postal_code: string | null;
+  lat: string | null; // decimals arrive as strings (no float rounding)
+  lng: string | null;
   timezone: string;
   phone: string | null;
   is_primary: boolean;

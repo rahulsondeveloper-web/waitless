@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import EmailStr, Field, field_validator
@@ -60,6 +61,8 @@ class BranchOut(ApiModel):
     state: str
     country: str
     postal_code: str | None
+    lat: Decimal | None
+    lng: Decimal | None
     timezone: str
     phone: str | None
     is_primary: bool

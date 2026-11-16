@@ -4,6 +4,12 @@ import os
 os.environ["ENVIRONMENT"] = "test"
 os.environ["REDIS_URL"] = "redis://127.0.0.1:6379/15"  # isolated from the dev Redis database
 
+import tempfile  # noqa: E402
+
+# Uploaded files go to a throw-away folder, never backend/uploads.
+MEDIA_ROOT = tempfile.mkdtemp(prefix="waitless-test-media-")
+os.environ["MEDIA_ROOT"] = MEDIA_ROOT
+
 import random  # noqa: E402
 from collections.abc import AsyncIterator  # noqa: E402
 from typing import Any  # noqa: E402
@@ -120,6 +126,20 @@ async def login(client: httpx.AsyncClient, identifier: str, password: str = PASS
 
 def bearer(auth: dict[str, Any]) -> dict[str, str]:
     return {"Authorization": f"Bearer {auth['access_token']}"}
+
+
+def image_bytes(
+    width: int = 600, height: int = 400, fmt: str = "PNG", mode: str = "RGB", exif: bytes | None = None
+) -> bytes:
+    import io
+
+    from PIL import Image
+
+    img = Image.new(mode, (width, height), color=(185, 85, 58) if mode == "RGB" else None)
+    out = io.BytesIO()
+    kwargs = {"exif": exif} if exif else {}
+    img.save(out, fmt, **kwargs)
+    return out.getvalue()
 
 
 async def create_super_admin(email: str = "admin@waitless.test", password: str = PASSWORD) -> None:

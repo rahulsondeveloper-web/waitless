@@ -1,0 +1,134 @@
+<header class="page-head">
+  <div>
+    <h1>Branding</h1>
+    <p class="muted">Your logo, cover photo and colours — applied to your storefront instantly, no redeploy.</p>
+  </div>
+  @if (canEdit() && saved()) {
+    <div class="head-actions">
+      <button mat-stroked-button type="button" (click)="reset()" [disabled]="busy() !== null || saved()!.is_default">
+        <mat-icon>restart_alt</mat-icon> Reset to default
+      </button>
+      <button mat-flat-button type="button" (click)="save()" [disabled]="busy() !== null || !dirty()">
+        @if (busy() === 'save') { <mat-spinner diameter="16" /> } Save theme
+      </button>
+    </div>
+  }
+</header>
+
+@if (loadError(); as e) {
+  <wl-error-state title="Could not load branding" [message]="e.message" [retryable]="false" />
+} @else if (!saved()) {
+  <wl-loading-state />
+} @else {
+  <div class="layout">
+    <div class="controls">
+      <section class="card" aria-labelledby="h-images">
+        <h2 id="h-images">Logo & cover</h2>
+        <div class="images">
+          <div class="img-slot">
+            <div class="logo-box">
+              @if (saved()!.logo_url) {
+                <img [src]="saved()!.logo_url" alt="Current logo" />
+              } @else {
+                <span class="muted">No logo</span>
+              }
+            </div>
+            <p class="small muted">Square works best. PNG with transparency is kept. Min 64 × 64 px.</p>
+            @if (canEdit()) {
+              <div class="img-actions">
+                <label class="file-btn" [class.disabled]="busy() === 'logo'">
+                  <input type="file" accept="image/jpeg,image/png,image/webp" (change)="uploadLogo($event)"
+                         [disabled]="busy() === 'logo'" aria-label="Upload logo" />
+                  <mat-icon>upload</mat-icon> {{ saved()!.logo_url ? 'Replace logo' : 'Upload logo' }}
+                </label>
+                @if (saved()!.logo_url) {
+                  <button mat-button type="button" (click)="removeLogo()" [disabled]="busy() === 'logo'">Remove</button>
+                }
+                @if (busy() === 'logo') { <mat-spinner diameter="18" /> }
+              </div>
+            }
+          </div>
+
+          <div class="img-slot">
+            <div class="cover-box" [style.background-image]="profile()?.cover_url ? 'url(' + profile()!.cover_url + ')' : null">
+              @if (!profile()?.cover_url) { <span class="muted">No cover image</span> }
+            </div>
+            <p class="small muted">Wide photo for the top of your storefront. Min 800 × 300 px.</p>
+            @if (canEdit()) {
+              <div class="img-actions">
+                <label class="file-btn" [class.disabled]="busy() === 'cover'">
+                  <input type="file" accept="image/jpeg,image/png,image/webp" (change)="uploadCover($event)"
+                         [disabled]="busy() === 'cover'" aria-label="Upload cover image" />
+                  <mat-icon>upload</mat-icon> {{ profile()?.cover_url ? 'Replace cover' : 'Upload cover' }}
+                </label>
+                @if (profile()?.cover_url) {
+                  <button mat-button type="button" (click)="removeCover()" [disabled]="busy() === 'cover'">Remove</button>
+                }
+                @if (busy() === 'cover') { <mat-spinner diameter="18" /> }
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-colors">
+        <h2 id="h-colors">Colours</h2>
+        <div class="colors">
+          @for (f of fields; track f.key) {
+            <div class="color-row">
+              <input type="color" [value]="valueFor(f.key)" (input)="setColor(f.key, $any($event.target).value)"
+                     [disabled]="!canEdit()" [attr.aria-label]="f.label + ' colour'" />
+              <div class="color-text">
+                <b>{{ f.label }}</b>
+                <small class="muted">{{ f.hint }}</small>
+              </div>
+              <input class="hex" [value]="valueFor(f.key)" maxlength="7" spellcheck="false"
+                     (change)="setColor(f.key, $any($event.target).value)" [disabled]="!canEdit()"
+                     [attr.aria-label]="f.label + ' hex value'" />
+              @if (colors()[f.key]) {
+                <button mat-icon-button type="button" (click)="clearColor(f.key)" [disabled]="!canEdit()"
+                        [attr.aria-label]="'Use default ' + f.label">
+                  <mat-icon>undo</mat-icon>
+                </button>
+              } @else {
+                <span class="default-tag">default</span>
+              }
+            </div>
+          }
+        </div>
+        @for (w of warnings(); track w) {
+          <p class="warn" role="status"><mat-icon>warning</mat-icon> {{ w }}</p>
+        }
+      </section>
+
+      <section class="card" aria-labelledby="h-style">
+        <h2 id="h-style">Style</h2>
+        <p class="field-label" id="btn-style">Button shape</p>
+        <mat-button-toggle-group [value]="buttonStyle()" (change)="buttonStyle.set($event.value)"
+                                 aria-labelledby="btn-style" [disabled]="!canEdit()" hideSingleSelectionIndicator>
+          <mat-button-toggle value="pill">Pill</mat-button-toggle>
+          <mat-button-toggle value="rounded">Rounded</mat-button-toggle>
+          <mat-button-toggle value="square">Square</mat-button-toggle>
+        </mat-button-toggle-group>
+        <p class="field-label" id="theme-mode">Appearance</p>
+        <mat-button-toggle-group [value]="mode()" (change)="mode.set($event.value)" aria-labelledby="theme-mode"
+                                 [disabled]="!canEdit()" hideSingleSelectionIndicator>
+          <mat-button-toggle value="light">Light</mat-button-toggle>
+          <mat-button-toggle value="dark">Dark</mat-button-toggle>
+          <mat-button-toggle value="auto">Follow device</mat-button-toggle>
+        </mat-button-toggle-group>
+      </section>
+    </div>
+
+    <aside class="preview">
+      <p class="field-label">Live preview @if (dirty()) { <span class="unsaved">· unsaved changes</span> }</p>
+      <wl-storefront-preview
+        [tokens]="preview()"
+        [name]="profile()?.name ?? 'Your restaurant'"
+        [tagline]="profile()?.short_description ?? ''"
+        [logoUrl]="saved()!.logo_url"
+        [coverUrl]="profile()?.cover_url ?? null"
+      />
+    </aside>
+  </div>
+}

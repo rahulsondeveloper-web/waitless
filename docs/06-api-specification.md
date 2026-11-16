@@ -78,8 +78,11 @@ All paths prefixed `/restaurant`. Permission keys from [doc 04](04-roles-permiss
 
 | Method | Path | Permission |
 |---|---|---|
-| GET / PUT | `/profile` | `restaurant.profile.manage` |
-| PUT | `/profile/hours` · `/profile/social-links` | `restaurant.profile.manage` |
+| GET / PUT | `/profile` | GET `restaurant.profile.view`, PUT `restaurant.profile.manage` |
+| GET / PUT | `/branches/{id}/hours` | `restaurant.profile.manage` (all 7 days in one request) |
+| PATCH | `/branches/{id}` | `branches.manage` — address, phone, map coordinates |
+| GET / PUT | `/social-links` | `restaurant.profile.manage` (https links only) |
+| POST | `/publish` `{published}` | `restaurant.profile.manage` — 409 `PUBLISH_CHECKLIST_INCOMPLETE` |
 | GET / PUT | `/branding` | `restaurant.branding.manage` |
 | POST | `/branding/reset` | `restaurant.branding.manage` — restore default theme |
 | POST / DELETE | `/branding/logo` | `restaurant.branding.manage` |

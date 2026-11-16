@@ -129,4 +129,8 @@ async def change_status(
         room="platform:admin",
     )
     await session.commit()
+    # Suspending/deactivating must take the storefront offline immediately, not after the cache expires.
+    from app.services.profile import invalidate_storefront  # local import: profile imports access → no cycle here
+
+    await invalidate_storefront(tenant.slug)
     return await _row(session, tenant)

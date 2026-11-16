@@ -6,6 +6,7 @@
 """
 
 import logging
+import mimetypes
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -24,6 +25,10 @@ from app.core.redis import close_redis
 from app.websocket.server import create_socket_server
 
 log = logging.getLogger("waitless")
+
+# Windows' registry often lacks this mapping; without it /media serves WebP as application/octet-stream,
+# which browsers reject when X-Content-Type-Options: nosniff is set.
+mimetypes.add_type("image/webp", ".webp")
 
 
 @asynccontextmanager
