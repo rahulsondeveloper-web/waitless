@@ -133,3 +133,33 @@
   font-size: 0.8rem;
   margin-top: 0.6rem;
 }
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 1.2rem;
+}
+.kpi {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.8rem 1rem;
+  background: var(--wl-surface);
+  border: 1px solid var(--wl-line);
+  border-radius: 12px;
+  span {
+    font-size: 0.75rem;
+    color: var(--wl-muted);
+  }
+  b {
+    font: 700 1.6rem/1.1 var(--wl-font-serif);
+  }
+  small {
+    font-size: 0.75rem;
+    color: var(--wl-muted);
+    font-weight: 400;
+  }
+  &.soon {
+    opacity: 0.6;
+  }
+}

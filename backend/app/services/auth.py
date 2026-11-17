@@ -112,7 +112,9 @@ async def login_with_password(
     key = f"login:{identifier.strip().lower()}"
     await rate_limit.hit(key, limit=5, window_seconds=15 * 60)
     if client.ip:
-        await rate_limit.hit(f"login-ip:{client.ip}", limit=30, window_seconds=15 * 60)
+        await rate_limit.hit(
+            f"login-ip:{client.ip}", limit=get_settings().login_ip_limit_per_15min, window_seconds=15 * 60
+        )
 
     await use_system(session)
     user = await _find_user_by_identifier(session, identifier)

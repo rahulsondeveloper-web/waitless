@@ -8,8 +8,8 @@ test('WaitLess landing page shows platform branding', async ({ page }) => {
 });
 
 test('restaurant storefront keeps the WaitLess link and returns to the platform', async ({ page }) => {
-  await page.goto('/r/urban-bites');
-  await expect(page.locator('.sf-brand__name')).toHaveText('Urban Bites');
+  await page.goto('/r/e2e-urban-bites');
+  await expect(page.locator('.sf-brand__name')).toHaveText('Urban Bites E2E');
   await page.locator('a.sf-waitless').click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Skip the wait');

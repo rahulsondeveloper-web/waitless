@@ -55,7 +55,7 @@ test('wrong password shows a clear error', async ({ page }) => {
 
 test('guest signs in with a mobile one-time code', async ({ page }) => {
   await page.goto('/login');
-  await page.getByRole('tab', { name: 'Guest (mobile)' }).click();
+  await page.getByRole('tab', { name: 'Mobile code' }).click();
   await page.getByLabel('Mobile number', { exact: true }).fill(mobile());
   await page.getByRole('button', { name: 'Send code' }).click();
 

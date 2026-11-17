@@ -514,7 +514,18 @@ async def publish_checklist(session: AsyncSession, ctx: TenantContext) -> Publis
             hint="Guests need something to browse.",
         ),
     )
-    # Tables (Phase 5) join this list when that module exists.
+    from app.services.tables import tables_ready
+
+    items.insert(
+        7,
+        ChecklistItem(
+            key="tables",
+            label="At least one table",
+            done=await tables_ready(session),
+            required=True,
+            hint="Add your tables so guests can be seated and book.",
+        ),
+    )
     can_publish = all(i.done for i in items if i.required)
     return PublishChecklist(items=items, can_publish=can_publish, is_published=tenant.is_published)
 

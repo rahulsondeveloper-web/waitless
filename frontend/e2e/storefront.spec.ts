@@ -15,23 +15,23 @@ async function openMenu(page: Page, isMobile: boolean, label: string): Promise<v
 
 test('discovery finds published restaurants and filters by city', async ({ page }) => {
   await page.goto('/restaurants');
-  await expect(page.getByRole('link', { name: /Urban Bites/ }).first()).toBeVisible();
-  await expect(page.getByRole('link', { name: /Restaurant Remelle/ }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /Urban Bites E2E/ }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /Restaurant Remelle E2E/ }).first()).toBeVisible();
 
   await page.getByLabel('City').selectOption('Pune');
   await expect(page).toHaveURL(/city=Pune/);
-  await expect(page.getByRole('link', { name: /Urban Bites/ }).first()).toBeVisible();
-  await expect(page.getByRole('link', { name: /Restaurant Remelle/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Urban Bites E2E/ }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /Restaurant Remelle E2E/ })).toHaveCount(0);
 
-  await page.getByRole('link', { name: /Urban Bites/ }).first().click();
-  await expect(page).toHaveURL(/\/r\/urban-bites$/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Urban Bites');
+  await page.getByRole('link', { name: /Urban Bites E2E/ }).first().click();
+  await expect(page).toHaveURL(/\/r\/e2e-urban-bites$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Urban Bites E2E');
 });
 
 test('switching restaurants A → B → A never shows the other restaurant’s data', async ({ page, isMobile }) => {
   // A: Urban Bites
-  await page.goto('/r/urban-bites');
-  await expect(page.locator('.sf-brand__name')).toHaveText('Urban Bites');
+  await page.goto('/r/e2e-urban-bites');
+  await expect(page.locator('.sf-brand__name')).toHaveText('Urban Bites E2E');
   await expect(page.locator('.sf-brand__img')).toBeVisible(); // its own logo
   expect(await primary(page)).toBe('#0a7c86');
   await openMenu(page, isMobile, 'Menu');
@@ -44,10 +44,10 @@ test('switching restaurants A → B → A never shows the other restaurant’s d
   expect(await primary(page)).toBe('#b9553a'); // WaitLess branding restored
 
   // B: Restaurant Remelle via search
-  await page.getByLabel('Search restaurants').fill('Remelle');
+  await page.getByLabel('Search restaurants').fill('Remelle E2E');
   await page.getByRole('button', { name: 'Search' }).click();
-  await page.getByRole('link', { name: /Restaurant Remelle/ }).first().click();
-  await expect(page.locator('.sf-brand__name')).toHaveText('Restaurant Remelle');
+  await page.getByRole('link', { name: /Restaurant Remelle E2E/ }).first().click();
+  await expect(page.locator('.sf-brand__name')).toHaveText('Restaurant Remelle E2E');
   await openMenu(page, isMobile, 'Menu');
   await expect(page.getByRole('heading', { name: 'Grilled Salmon' })).toBeVisible();
   await expect(page.getByText('Pizza Margherita')).toHaveCount(0);
@@ -56,14 +56,14 @@ test('switching restaurants A → B → A never shows the other restaurant’s d
   await expect(page.getByText(/Koregaon Park/)).toHaveCount(0);
 
   // A again: everything is Urban Bites once more
-  await page.goto('/r/urban-bites/contact');
+  await page.goto('/r/e2e-urban-bites/contact');
   await expect(page.getByText(/Koregaon Park/).first()).toBeVisible();
   await expect(page.getByText(/Marine Drive/)).toHaveCount(0);
   expect(await primary(page)).toBe('#0a7c86');
 });
 
 test('gallery opens a lightbox with next / previous and closes with Escape', async ({ page }) => {
-  await page.goto('/r/urban-bites/gallery');
+  await page.goto('/r/e2e-urban-bites/gallery');
   const photos = page.getByRole('button', { name: /Enlarge photo/ });
   await expect(photos).toHaveCount(3);
   await photos.first().click();
@@ -78,7 +78,7 @@ test('gallery opens a lightbox with next / previous and closes with Escape', asy
 });
 
 test('menu filters: meal type, veg only and search', async ({ page }) => {
-  await page.goto('/r/remelle/menu');
+  await page.goto('/r/e2e-remelle/menu');
   await expect(page.getByRole('heading', { name: 'Grilled Salmon' })).toBeVisible();
   await page.getByLabel('Veg only').check();
   await expect(page.getByRole('heading', { name: 'Grilled Salmon' })).toHaveCount(0);

@@ -55,6 +55,9 @@ async def _publish(
         headers=h,
     )
     await client.put(f"/api/v1/restaurant/branches/{branch['id']}/hours", json={"days": WEEK}, headers=h)
+    await client.post(
+        "/api/v1/restaurant/tables", json={"branch_id": branch["id"], "label": "T1", "capacity": 4}, headers=h
+    )
     menu = await _menu(client, h)
     await client.post(
         "/api/v1/restaurant/menu/items",

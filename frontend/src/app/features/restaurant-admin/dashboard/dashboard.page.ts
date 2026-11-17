@@ -8,6 +8,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ApiError } from '../../../core/http/api-error';
 import { PublishChecklist } from '../../../core/restaurant/restaurant.models';
+import { Dashboard, OperationsService } from '../../../core/restaurant/operations.service';
 import { RestaurantService } from '../../../core/restaurant/restaurant.service';
 import { RestaurantMe } from '../../../core/tenancy/tenancy.models';
 import { TenancyService } from '../../../core/tenancy/tenancy.service';
@@ -27,6 +28,7 @@ import { ErrorStateComponent, LoadingStateComponent } from '../../../shared/ui/s
 export class DashboardPage implements OnInit {
   private readonly tenancy = inject(TenancyService);
   private readonly restaurant = inject(RestaurantService);
+  private readonly ops = inject(OperationsService);
   private readonly snack = inject(MatSnackBar);
   protected readonly auth = inject(AuthService);
 
@@ -40,6 +42,7 @@ export class DashboardPage implements OnInit {
   });
 
   protected readonly checklist = signal<PublishChecklist | null>(null);
+  protected readonly kpis = signal<Dashboard | null>(null);
   protected readonly publishing = signal(false);
   protected readonly canPublish = computed(() => this.auth.hasPermission('restaurant.profile.manage'));
   protected readonly remaining = computed(
@@ -55,6 +58,8 @@ export class DashboardPage implements OnInit {
     cover: { path: 'branding', icon: 'image' },
     logo: { path: 'branding', icon: 'palette' },
     gallery: { path: 'gallery', icon: 'photo_library' },
+    menu: { path: 'menu', icon: 'restaurant_menu' },
+    tables: { path: 'tables', icon: 'table_restaurant' },
   };
 
   ngOnInit(): void {
@@ -68,6 +73,9 @@ export class DashboardPage implements OnInit {
       next: (d) => this.data.set(d),
       error: (e: ApiError) => this.error.set(e),
     });
+    if (this.auth.hasPermission('tables.operate')) {
+      this.ops.dashboard().subscribe({ next: (k) => this.kpis.set(k), error: () => this.kpis.set(null) });
+    }
     if (this.auth.hasPermission('restaurant.profile.view')) {
       this.restaurant.checklist().subscribe({ next: (c) => this.checklist.set(c), error: () => this.checklist.set(null) });
     }

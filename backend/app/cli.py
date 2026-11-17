@@ -27,11 +27,11 @@ async def _seed() -> None:
     print(f"Reference data synced: {result}")
 
 
-async def _seed_demo() -> None:
+async def _seed_demo(e2e: bool) -> None:
     from app.seeds.demo import seed_demo
 
     async with get_sessionmaker()() as session:
-        for line in await seed_demo(session):
+        for line in await seed_demo(session, e2e=e2e):
             print(line)
 
 
@@ -62,7 +62,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("seed", help="Sync permissions, system roles and default plans")
-    sub.add_parser("seed-demo", help="Development only: two complete, published demo restaurants")
+    demo = sub.add_parser("seed-demo", help="Development only: two complete, published demo restaurants")
+    demo.add_argument("--e2e", action="store_true", help="Private copies for automated tests, reset on every run")
     sa = sub.add_parser("create-super-admin", help="Create or promote the WaitLess Super Admin")
     sa.add_argument("--email", required=True)
     sa.add_argument("--name", required=True)
@@ -74,7 +75,7 @@ def main() -> None:
             if args.command == "seed":
                 await _seed()
             elif args.command == "seed-demo":
-                await _seed_demo()
+                await _seed_demo(args.e2e)
             else:
                 phone = normalize_phone(args.phone) if args.phone else None
                 password = os.environ.get("WAITLESS_SUPER_ADMIN_PASSWORD") or getpass.getpass("Password: ")

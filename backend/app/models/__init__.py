@@ -7,6 +7,7 @@ from app.models.platform import AuditLog, IdempotencyKey, OutboxEvent
 from app.models.profile import BusinessHours, GalleryImage, MediaFile, RestaurantBranding, RestaurantProfile, SocialLink
 from app.models.saas import Plan, PlanFeature, Subscription
 from app.models.support import SupportTicket
+from app.models.tables import RestaurantTable, TableAssignment, TableSection, TableSession
 from app.models.tenancy import Branch, Membership, Permission, Role, RolePermission, Tenant, UserBranch
 
 __all__ = [
@@ -26,6 +27,10 @@ __all__ = [
     "RestaurantProfile",
     "SocialLink",
     "SupportTicket",
+    "RestaurantTable",
+    "TableAssignment",
+    "TableSection",
+    "TableSession",
     "Membership",
     "OtpChallenge",
     "OutboxEvent",

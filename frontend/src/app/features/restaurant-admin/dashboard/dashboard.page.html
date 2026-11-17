@@ -42,6 +42,19 @@
     }
   }
 
+  @if (kpis(); as k) {
+    <section class="kpis" aria-label="Today">
+      <div class="kpi"><span>Tables free</span><b>{{ k.tables_by_status.available }}<small> / {{ k.tables_total }}</small></b></div>
+      <div class="kpi"><span>Occupied</span><b>{{ k.tables_by_status.occupied }}</b></div>
+      <div class="kpi"><span>Guests seated</span><b>{{ k.guests_seated }}</b></div>
+      <div class="kpi"><span>Reserved / cleaning</span><b>{{ k.tables_by_status.reserved }} / {{ k.tables_by_status.cleaning }}</b></div>
+      <div class="kpi"><span>Dishes live</span><b>{{ k.dishes_live }}</b></div>
+      <div class="kpi"><span>Team</span><b>{{ k.staff_active }}</b></div>
+      <div class="kpi soon"><span>Today's revenue</span><b>—</b><small>with billing</small></div>
+      <div class="kpi soon"><span>Orders · queue</span><b>—</b><small>with ordering & queue</small></div>
+    </section>
+  }
+
   <div class="cards">
     <article class="card">
       <h2>Plan</h2>
@@ -113,7 +126,6 @@
           </li>
         }
       </ol>
-      <p class="muted small">Menu and tables join this checklist when those modules arrive (phases 4 and 5).</p>
     </section>
   }
 }

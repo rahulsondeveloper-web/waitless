@@ -1,0 +1,110 @@
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+  h1 {
+    font: 600 2rem/1.1 var(--wl-font-serif);
+  }
+}
+.muted {
+  color: var(--wl-muted);
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.table-wrap {
+  overflow-x: auto;
+  margin-top: 1rem;
+  border: 1px solid var(--wl-line);
+  border-radius: 14px;
+  background: var(--wl-surface);
+}
+.list {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  th {
+    text-align: left;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--wl-muted);
+    padding: 0.7rem 0.8rem;
+    border-bottom: 1px solid var(--wl-line);
+  }
+  td {
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px dashed var(--wl-line);
+    font-size: 0.9rem;
+    vertical-align: middle;
+  }
+  small {
+    color: var(--wl-muted);
+  }
+  .off td {
+    opacity: 0.55;
+  }
+  .actions {
+    text-align: right;
+  }
+}
+.you,
+.custom {
+  margin-left: 0.3rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: var(--wl-primary-soft);
+  color: var(--wl-primary-dark);
+  font-size: 0.7rem;
+}
+.status {
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: #e3efe1;
+  color: #2f5a2c;
+  &[data-status='disabled'] {
+    background: #eee;
+    color: #666;
+  }
+  &[data-status='invited'] {
+    background: #fdf0d8;
+    color: #7a5310;
+  }
+}
+.roles-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1rem 0 0.6rem;
+}
+.roles {
+  display: grid;
+  gap: 0.5rem;
+}
+.role {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  background: var(--wl-surface);
+  border: 1px solid var(--wl-line);
+  border-radius: 12px;
+  div:first-child {
+    display: grid;
+  }
+  small {
+    color: var(--wl-muted);
+  }
+}

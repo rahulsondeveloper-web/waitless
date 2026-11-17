@@ -3,7 +3,7 @@
     <p class="wl-eyebrow">Welcome back</p>
     <h1 class="wl-h2">Sign in to <span class="wl-script">WaitLess</span></h1>
     <p class="wl-muted">
-      Restaurant owners and staff sign in with a password. Guests use a one-time code sent to their mobile.
+      Restaurant owners sign in with a password. Guests and restaurant staff can use a one-time code sent to their mobile.
     </p>
     <p class="auth__alt">
       New restaurant? <a routerLink="/register-restaurant" class="link">Register your restaurant</a>
@@ -37,7 +37,7 @@
         </form>
       </mat-tab>
 
-      <mat-tab label="Guest (mobile)">
+      <mat-tab label="Mobile code">
         @if (!otpSentTo()) {
           <form [formGroup]="phoneForm" (ngSubmit)="sendCode()" class="auth__form" novalidate>
             <mat-form-field appearance="outline">

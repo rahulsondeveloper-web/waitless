@@ -9,7 +9,7 @@ Images are drawn procedurally with Pillow, so no third-party photos are involved
 import io
 import random
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, time
 from decimal import Decimal
 
@@ -30,6 +30,7 @@ from app.models.profile import (
     RestaurantProfile,
     SocialLink,
 )
+from app.models.tables import RestaurantTable, TableSection
 from app.schemas.tenancy import RestaurantRegistration
 from app.services.media import process_image
 from app.services.registration import register_restaurant
@@ -263,13 +264,47 @@ async def _media(session: AsyncSession, tenant_id: uuid.UUID, kind: str, data: b
     return m
 
 
+async def _ensure_tables(session: AsyncSession, tenant_id: uuid.UUID, branch_id: uuid.UUID) -> int:
+    """Two sections and eight tables per demo restaurant (added once)."""
+    if (await session.execute(select(RestaurantTable.id).where(RestaurantTable.tenant_id == tenant_id))).first():
+        return 0
+    layout = {
+        "Indoor": [("T1", 2), ("T2", 2), ("T3", 4), ("T4", 4), ("T5", 6)],
+        "Terrace": [("P1", 2), ("P2", 4), ("P3", 8)],
+    }
+    n = 0
+    for order, (section_name, tables) in enumerate(layout.items()):
+        section = TableSection(tenant_id=tenant_id, branch_id=branch_id, name=section_name, sort_order=order)
+        session.add(section)
+        await session.flush()
+        for label, capacity in tables:
+            session.add(
+                RestaurantTable(
+                    tenant_id=tenant_id,
+                    branch_id=branch_id,
+                    section_id=section.id,
+                    label=label,
+                    capacity=capacity,
+                    sort_order=n,
+                )
+            )
+            n += 1
+    return n
+
+
 # ---------- seeding ----------
 
 
 async def _seed_one(session: AsyncSession, demo: DemoRestaurant, idx: int) -> str:
     await use_system(session)
-    if (await session.execute(select(Tenant.id).where(Tenant.slug == demo.slug))).first():
-        return f"{demo.slug}: already exists (skipped)"
+    existing = (await session.execute(select(Tenant.id).where(Tenant.slug == demo.slug))).scalar_one_or_none()
+    if existing:
+        branch_id = (
+            await session.execute(select(Branch.id).where(Branch.tenant_id == existing, Branch.is_primary))
+        ).scalar_one()
+        added = await _ensure_tables(session, existing, branch_id)
+        await session.commit()
+        return f"{demo.slug}: already exists" + (f" (added {added} tables)" if added else " (skipped)")
     tenant, _ = await register_restaurant(
         session,
         RestaurantRegistration(
@@ -356,6 +391,8 @@ async def _seed_one(session: AsyncSession, demo: DemoRestaurant, idx: int) -> st
                 )
             )
 
+    await _ensure_tables(session, tid, branch.id)
+
     tenant.status = "active"
     tenant.approved_at = datetime.now(UTC)
     tenant.is_published = True
@@ -364,7 +401,45 @@ async def _seed_one(session: AsyncSession, demo: DemoRestaurant, idx: int) -> st
     return f"{demo.slug}: created - owner {demo.email} / {DEMO_PASSWORD}"
 
 
-async def seed_demo(session: AsyncSession) -> list[str]:
+def _e2e_variant(demo: DemoRestaurant, idx: int) -> DemoRestaurant:
+    """Private copy for automated tests, so manual experiments on the demos never break them."""
+    return replace(
+        demo,
+        slug=f"e2e-{demo.slug}",
+        name=f"{demo.name} E2E",
+        owner=f"{demo.owner} (tests)",
+        email=f"e2e.{demo.email}",
+        mobile=f"90000002{idx:02d}",
+    )
+
+
+async def _reset_e2e(session: AsyncSession, demo: DemoRestaurant) -> None:
+    """Undo whatever earlier test runs changed: every dish live and available, original theme, published."""
+    await use_system(session)
+    tenant = (await session.execute(select(Tenant).where(Tenant.slug == demo.slug))).scalar_one()
+    for item in (await session.execute(select(MenuItem).where(MenuItem.tenant_id == tenant.id))).scalars():
+        item.archived_at = None
+        item.is_available = True
+    names = set(demo.menu)
+    for cat in (await session.execute(select(MenuCategory).where(MenuCategory.tenant_id == tenant.id))).scalars():
+        if cat.name in names:
+            cat.is_active = True
+    branding = await session.get(RestaurantBranding, tenant.id)
+    if branding is not None:
+        branding.tokens, branding.button_style, branding.mode = demo.tokens, demo.button_style, "light"
+    tenant.status, tenant.is_published = "active", True
+    await session.commit()
+    await invalidate_storefront(demo.slug)
+
+
+async def seed_demo(session: AsyncSession, *, e2e: bool = False) -> list[str]:
     if get_settings().is_production:
         raise RuntimeError("seed-demo is for development only")
-    return [await _seed_one(session, d, i + 1) for i, d in enumerate(DEMOS)]
+    if not e2e:
+        return [await _seed_one(session, d, i + 1) for i, d in enumerate(DEMOS)]
+    out = []
+    for i, d in enumerate(DEMOS):
+        variant = _e2e_variant(d, i + 1)
+        out.append(await _seed_one(session, variant, i + 11))
+        await _reset_e2e(session, variant)
+    return out

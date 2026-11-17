@@ -149,9 +149,9 @@ export const routes: Routes = [
     children: adminChildren(
       RESTAURANT_ADMIN_NAV,
       {
-        profile: 3, branding: 3, gallery: 3, branches: 5, employees: 5, tables: 5, queue: 6,
+        profile: 3, branding: 3, gallery: 3, queue: 6,
         reservations: 6, orders: 7, kitchen: 7, inventory: 9, suppliers: 9, purchases: 9,
-        billing: 10, payments: 10, discounts: 8, reports: 11, settings: 5,
+        billing: 10, payments: 10, discounts: 8, reports: 11, settings: 10,
       },
       {
         '.': {
@@ -170,6 +170,22 @@ export const routes: Routes = [
           title: 'Branding · WaitLess',
           loadComponent: () =>
             import('./features/restaurant-admin/branding/branding.page').then((m) => m.BrandingPage),
+        },
+        branches: {
+          path: 'branches',
+          title: 'Branches · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/branches/branches.page').then((m) => m.BranchesPage),
+        },
+        employees: {
+          path: 'employees',
+          title: 'Employees · WaitLess',
+          loadComponent: () =>
+            import('./features/restaurant-admin/employees/employees.page').then((m) => m.EmployeesPage),
+        },
+        tables: {
+          path: 'tables',
+          title: 'Tables · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/tables/tables.page').then((m) => m.TablesPage),
         },
         menu: {
           path: 'menu',

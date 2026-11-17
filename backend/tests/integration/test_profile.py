@@ -278,6 +278,9 @@ async def _complete_setup(client: httpx.AsyncClient, h: dict[str, str]) -> None:
         headers=h,
     )
     await client.put(f"/api/v1/restaurant/branches/{branch['id']}/hours", json={"days": WEEK}, headers=h)
+    await client.post(
+        "/api/v1/restaurant/tables", json={"branch_id": branch["id"], "label": "T1", "capacity": 4}, headers=h
+    )
     menu = (await client.get("/api/v1/restaurant/menu", headers=h)).json()
     starters = next(c for c in menu["categories"] if c["name"] == "Starters")
     await client.post(
@@ -294,7 +297,7 @@ async def test_publish_flow_and_public_storefront(client: httpx.AsyncClient) -> 
 
     checklist = (await client.get("/api/v1/restaurant/publish-checklist", headers=h)).json()
     missing = {i["key"] for i in checklist["items"] if i["required"] and not i["done"]}
-    assert missing == {"approved", "description", "cover", "location", "hours", "menu"}
+    assert missing == {"approved", "description", "cover", "location", "hours", "menu", "tables"}
     blocked = await client.post("/api/v1/restaurant/publish", json={"published": True}, headers=h)
     assert blocked.status_code == 409 and set(blocked.json()["error"]["details"]["missing"]) == missing
 
