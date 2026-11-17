@@ -168,6 +168,11 @@ async def test_free_booking_arrive_and_complete(client: httpx.AsyncClient) -> No
     assert res["status"] == "confirmed" and res["type"] == "free" and res["table_labels"] == ["T2"]  # smallest fit
     assert r.json()["payment"] is None and res["can_cancel"] is True
 
+    board = (await client.get(f"{B}/tables/board", params={"branch_id": branch["id"]}, headers=h)).json()
+    t2 = next(t for t in board["tables"] if t["label"] == "T2")
+    # Before the booking the table stays available, but the board shows what is coming.
+    assert t2["status"] == "available" and t2["next_booking"]["code"] == res["code"]
+
     dup = await _book(client, slug, guest, branch, _tomorrow_at(19, 30))
     assert dup.status_code == 409 and dup.json()["error"]["code"] == "DUPLICATE_BOOKING"
     odd = await _book(client, slug, await _otp_login(client), branch, _tomorrow_at(19, 10))

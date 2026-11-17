@@ -35,6 +35,7 @@ function tomorrowInIndia(): string {
 }
 
 test('guest joins the queue; staff says "table ready" and seats them — live', async ({ page, browser }) => {
+  test.setTimeout(60_000); // guest + staff devices
   const name = `Queue Guest ${unique()}`;
   await page.goto(`/r/${SLUG}/queue`);
   await page.getByRole('button', { name: 'Sign in with your mobile to join' }).click();
@@ -66,6 +67,7 @@ test('guest joins the queue; staff says "table ready" and seats them — live', 
 });
 
 test('paid booking: policy → slot → mock payment (webhook) → staff confirms arrival', async ({ page, browser }) => {
+  test.setTimeout(60_000); // guest + staff devices
   // Owner turns on paid bookings.
   const staff = await ownerPage(browser, '/restaurant-admin/reservations');
   await staff.getByRole('tab', { name: 'Booking policy' }).click();
@@ -81,6 +83,7 @@ test('paid booking: policy → slot → mock payment (webhook) → staff confirm
   await page.getByRole('button', { name: 'Sign in with your mobile to book' }).click();
   await guestSignIn(page, name);
   await expect(page).toHaveURL(new RegExp(`/r/${SLUG}/reservations$`), { timeout: 15_000 });
+  await expect(page.getByTestId('signed-in-as')).toContainText(name); // who the booking is for, always visible
   const day = tomorrowInIndia();
   await page.getByTestId('res-date').fill(day);
   await page.getByRole('option', { name: '13:00' }).click();
@@ -95,8 +98,12 @@ test('paid booking: policy → slot → mock payment (webhook) → staff confirm
   const mine = page.getByTestId('my-reservation').first();
   await expect(mine).toContainText('Confirmed');
 
+  // The floor board shows the upcoming booking on its table before it turns "reserved".
+  await staff.goto('/restaurant-admin/tables');
+  await expect(staff.getByTestId('next-booking').filter({ hasText: name })).toContainText('Booked tomorrow 13:00');
+
   // Staff sees it on that day and confirms the arrival → table session code + PIN.
-  await staff.getByRole('tab', { name: 'Bookings' }).click();
+  await staff.goto('/restaurant-admin/reservations');
   await staff.getByTestId('admin-res-date').fill(day);
   await staff.getByTestId('admin-res-date').dispatchEvent('change');
   const row = staff.getByTestId('admin-reservation').filter({ hasText: name });

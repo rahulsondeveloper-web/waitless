@@ -132,6 +132,12 @@
         <p class="summary">{{ when(s.starts_at, tz()) }} · {{ party() }} guests</p>
       }
 
+      @if (auth.user(); as u) {
+        <p class="bk-muted signed-in" data-testid="signed-in-as">
+          Booking as <b>{{ u.full_name }}</b>{{ u.phone ? ' · ' + u.phone : '' }} ·
+          <button type="button" class="bk-link" (click)="switchAccount()">Not you? Sign out</button>
+        </p>
+      }
       @if (error(); as msg) { <p class="bk-error" role="alert">{{ msg }}</p> }
 
       <div class="bk-actions">

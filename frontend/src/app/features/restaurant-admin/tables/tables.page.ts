@@ -125,6 +125,19 @@ export class TablesPage implements OnInit {
     if (this.canConfigure()) this.ops.tables(id).subscribe((t) => this.setupTables.set(t));
   }
 
+  /** "17:30" today, "tomorrow 13:00", else "Wed 13:00" — in the branch time zone. */
+  protected bookingWhen(iso: string): string {
+    const tz = this.branches().find((b) => b.id === this.branchId())?.timezone ?? 'Asia/Kolkata';
+    const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d);
+    const time = new Intl.DateTimeFormat('en-IN', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(
+      new Date(iso),
+    );
+    const target = day(new Date(iso));
+    if (target === day(new Date(this.now()))) return time;
+    if (target === day(new Date(this.now() + 86_400_000))) return `tomorrow ${time}`;
+    return `${new Intl.DateTimeFormat('en-IN', { timeZone: tz, weekday: 'short' }).format(new Date(iso))} ${time}`;
+  }
+
   protected minutesSince(iso: string): number {
     return Math.max(0, Math.floor((this.now() - Date.parse(iso)) / 60_000));
   }

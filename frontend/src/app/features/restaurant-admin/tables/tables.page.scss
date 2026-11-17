@@ -128,6 +128,14 @@ $status: (
 .guest {
   font-size: 0.78rem;
 }
+.booked {
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  padding: 0.1rem 0.35rem;
+  color: #8a6a00;
+}
 .empty {
   display: grid;
   justify-items: center;

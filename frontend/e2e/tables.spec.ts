@@ -83,6 +83,7 @@ test('owner sets up the floor, seats guests (code + PIN), closes the table', asy
 });
 
 test('the floor board updates live on another device', async ({ browser, page }) => {
+  test.setTimeout(60_000); // two signed-in devices + floor setup
   const { email } = await registerOwner(page.request);
   await signIn(page, email);
   await setupFloor(page);

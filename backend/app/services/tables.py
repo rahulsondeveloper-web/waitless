@@ -7,7 +7,7 @@ at the same moment get one success and one 409 TABLE_ALREADY_ASSIGNED.
 
 import secrets
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -19,6 +19,7 @@ from app.models import Branch, Membership
 from app.models.menu import MenuCategory, MenuItem
 from app.models.tables import RestaurantTable, TableAssignment, TableSection, TableSession
 from app.schemas.tables import (
+    BoardBooking,
     BoardOut,
     BoardSession,
     BoardTable,
@@ -255,6 +256,47 @@ async def set_status(session: AsyncSession, ctx: TenantContext, table_id: uuid.U
 # ---------- board ----------
 
 
+async def _next_bookings(session: AsyncSession, table_ids: list[uuid.UUID]) -> dict[uuid.UUID, BoardBooking]:
+    """Upcoming reservation per table (Phase 6), so staff see "Booked 19:30" before the table turns reserved."""
+    from app.models.booking import Reservation, ReservationTable  # local: keeps model imports one-way
+
+    if not table_ids:
+        return {}
+    now = datetime.now(UTC)
+    rows = (
+        (
+            await session.execute(
+                select(ReservationTable.table_id, Reservation)
+                .join(Reservation, Reservation.id == ReservationTable.reservation_id)
+                .where(
+                    ReservationTable.table_id.in_(table_ids),
+                    ReservationTable.active,
+                    Reservation.status.in_(("confirmed", "pending_payment")),
+                    Reservation.arrival_deadline >= now,
+                    Reservation.starts_at <= now + timedelta(hours=48),
+                )
+                .order_by(Reservation.starts_at)
+            )
+        )
+        .tuples()
+        .all()
+    )
+    out: dict[uuid.UUID, BoardBooking] = {}
+    for table_id, r in rows:
+        out.setdefault(
+            table_id,
+            BoardBooking(
+                reservation_id=r.id,
+                code=r.code,
+                starts_at=r.starts_at,
+                guest_name=r.guest_name,
+                party_size=r.party_size,
+                status=r.status,
+            ),
+        )
+    return out
+
+
 async def board(session: AsyncSession, ctx: TenantContext, branch_id: uuid.UUID) -> BoardOut:
     await _branch(session, ctx, branch_id, "tables.operate")
     sections = (
@@ -292,6 +334,7 @@ async def board(session: AsyncSession, ctx: TenantContext, branch_id: uuid.UUID)
         .all()
     )
     by_table = {tid: s for tid, s in open_rows}
+    next_booking = await _next_bookings(session, [t.id for t in tables])
     counts = {s: 0 for s in ("available", "reserved", "occupied", "cleaning")}
     out = []
     for t in tables:
@@ -311,6 +354,7 @@ async def board(session: AsyncSession, ctx: TenantContext, branch_id: uuid.UUID)
                 )
                 if s
                 else None,
+                next_booking=next_booking.get(t.id),
             )
         )
     return BoardOut(

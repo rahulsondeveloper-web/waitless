@@ -94,13 +94,14 @@ export class AuthService {
       .pipe(catchError(rethrow));
   }
 
-  logout(): void {
+  /** Signs out on the server (refresh cookie revoked) and goes to `redirectTo`. */
+  logout(redirectTo = '/'): void {
     this.http
       .post(`${this.base}/logout`, {})
       .pipe(catchError(() => of(null)))
       .subscribe(() => {
         this.clearSession();
-        void this.router.navigateByUrl('/');
+        void this.router.navigateByUrl(redirectTo);
       });
   }
 

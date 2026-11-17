@@ -90,6 +90,15 @@ export interface BoardTable extends Table {
     opened_at: string;
     source: string;
   } | null;
+  /** Next reservation holding this table (within 48 h). */
+  next_booking?: {
+    reservation_id: string;
+    code: string;
+    starts_at: string;
+    guest_name: string;
+    party_size: number;
+    status: string;
+  } | null;
 }
 
 export interface Board {

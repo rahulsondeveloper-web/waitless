@@ -96,6 +96,11 @@ export class StorefrontQueuePage implements OnInit {
     this.loadWait();
   }
 
+  /** Shared/incognito windows share one sign-in: let the guest switch to their own account. */
+  protected switchAccount(): void {
+    this.auth.logout(`/login?returnUrl=${encodeURIComponent(`/r/${this.ctx.slug()}/queue`)}`);
+  }
+
   protected signIn(): void {
     void this.router.navigate(['/login'], { queryParams: { returnUrl: `/r/${this.ctx.slug()}/queue` } });
   }

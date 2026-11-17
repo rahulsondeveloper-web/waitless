@@ -48,6 +48,11 @@
                     <span class="session">{{ s.public_code }} · {{ minutesSince(s.opened_at) }} min</span>
                     @if (s.guest_name) { <span class="guest">{{ s.guest_name }}</span> }
                   }
+                  @if (t.next_booking; as nb) {
+                    <span class="booked" data-testid="next-booking">
+                      Booked {{ bookingWhen(nb.starts_at) }} · {{ nb.guest_name }} ({{ nb.party_size }})
+                    </span>
+                  }
                 </button>
                 <mat-menu #menu="matMenu">
                   @switch (t.status) {

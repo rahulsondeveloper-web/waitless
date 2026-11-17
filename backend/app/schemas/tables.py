@@ -66,9 +66,19 @@ class BoardSession(ApiModel):
     source: str
 
 
+class BoardBooking(ApiModel):
+    reservation_id: uuid.UUID
+    code: str
+    starts_at: datetime
+    guest_name: str
+    party_size: int
+    status: str  # confirmed | pending_payment
+
+
 class BoardTable(TableOut):
     section_name: str | None
     session: BoardSession | None
+    next_booking: BoardBooking | None = None  # next reservation holding this table (within 48 h)
 
 
 class BoardOut(ApiModel):

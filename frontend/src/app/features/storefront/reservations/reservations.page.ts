@@ -112,6 +112,11 @@ export class StorefrontReservationsPage implements OnInit {
     if (s.available) this.slot.set(s);
   }
 
+  /** Shared/incognito windows share one sign-in: let the guest switch to their own account. */
+  protected switchAccount(): void {
+    this.auth.logout(`/login?returnUrl=${encodeURIComponent(`/r/${this.ctx.slug()}/reservations`)}`);
+  }
+
   protected signIn(): void {
     void this.router.navigate(['/login'], { queryParams: { returnUrl: `/r/${this.ctx.slug()}/reservations` } });
   }
