@@ -4,7 +4,12 @@
     <h1 class="title">Crafted with love, <span class="script">served with joy</span></h1>
     <p class="note">
       <span class="material-symbols-outlined" aria-hidden="true">timer</span>
-      Every dish comes with our 15-minute serving promise. Online ordering opens soon.
+      Every dish comes with our 15-minute serving promise.
+      @if (canOrder()) {
+        @if (cart.tableToken()) { Order straight from your table. }
+        @else if (cart.preorderFor()) { You are pre-ordering for your booking. }
+        @else { At the restaurant? <a routerLink="../session">Enter your order ID</a> to order from your table. }
+      }
     </p>
   </header>
 
@@ -50,7 +55,7 @@
         @if (c.description) { <p class="cat-desc">{{ c.description }}</p> }
         <ul class="items">
           @for (i of c.items; track i.id) {
-            <li class="item" [class.item--off]="!i.is_available">
+            <li class="item" [class.item--off]="!!unavailable(i)">
               @if (i.image_url) {
                 <img class="item__img" [src]="i.image_url" [alt]="i.name" loading="lazy" />
               }
@@ -69,8 +74,14 @@
                 @if (i.allergens.length) { <p class="allergens">Contains: {{ i.allergens.join(', ') }}</p> }
               </div>
               <div class="item__side">
-                <span class="price">{{ price(i.price) }}</span>
-                @if (!i.is_available) { <span class="sold">Sold out</span> }
+                <span class="price">{{ shownPrice(i) }}</span>
+                @if (unavailable(i); as why) {
+                  <span class="sold">{{ why }}</span>
+                } @else if (canOrder()) {
+                  <button type="button" class="add" (click)="picking.set(i)" [attr.aria-label]="'Add ' + i.name">
+                    <span class="material-symbols-outlined" aria-hidden="true">add</span> Add
+                  </button>
+                }
               </div>
             </li>
           }
@@ -81,3 +92,18 @@
     }
   }
 </section>
+
+@if (picking(); as item) {
+  <wl-dish-picker [item]="item" [currency]="menu()?.currency ?? 'INR'" [basePrice]="basePrice(item)"
+                  (added)="added($event)" (closed)="picking.set(null)" />
+}
+
+@if (toast(); as t) { <p class="toast" role="status">{{ t }}</p> }
+
+@if (canOrder() && cart.count()) {
+  <a routerLink="../cart" class="cart-bar" data-testid="cart-bar">
+    <span class="material-symbols-outlined" aria-hidden="true">shopping_bag</span>
+    <span>{{ cart.count() }} {{ cart.count() === 1 ? 'item' : 'items' }} · {{ price(cart.total()) }}</span>
+    <b>View cart</b>
+  </a>
+}

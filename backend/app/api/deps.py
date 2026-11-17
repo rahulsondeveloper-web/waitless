@@ -48,6 +48,23 @@ async def get_current_user(session: SessionDep, claims: ClaimsDep) -> User:
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+async def get_optional_user(
+    session: SessionDep, creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
+) -> User | None:
+    """Signed-in user if a valid token was sent, otherwise None (guests at a table need no account)."""
+    if creds is None or creds.scheme.lower() != "bearer":
+        return None
+    try:
+        claims = decode_access_token(creds.credentials)
+    except AppError:
+        return None
+    user = await session.get(User, claims.user_id)
+    return user if user is not None and user.is_active else None
+
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
+
+
 async def require_super_admin(session: SessionDep, user: CurrentUser, claims: ClaimsDep) -> User:
     if not (user.is_super_admin and claims.is_super_admin):
         raise ForbiddenError("Super Admin access required.", code="SUPER_ADMIN_REQUIRED")

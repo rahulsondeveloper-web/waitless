@@ -2,7 +2,7 @@
 windows, taxes and branch overrides on top of these tables."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -15,6 +15,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    Time,
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
@@ -115,6 +116,9 @@ class MenuItem(UUIDPkMixin, TimestampMixin, Base):
     is_available: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")  # "sold out" toggle
     sort_order: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Phase 7
+    tax_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("5"), server_default="5")
+    tags: Mapped[list[str]] = mapped_column(ARRAY(String(30)), default=list, server_default="{}")
 
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="CASCADE"),
@@ -134,5 +138,105 @@ class MenuItem(UUIDPkMixin, TimestampMixin, Base):
         CheckConstraint(f"food_class IN {FOOD_CLASSES}", name="food_class"),
         CheckConstraint("spice_level BETWEEN 0 AND 3", name="spice_level"),
         CheckConstraint("prep_minutes BETWEEN 0 AND 240", name="prep_minutes"),
+        CheckConstraint("tax_pct BETWEEN 0 AND 40", name="tax_pct"),
         Index("ix_menu_items_category", "tenant_id", "category_id"),
+    )
+
+
+def _item_fk() -> ForeignKeyConstraint:
+    return ForeignKeyConstraint(["tenant_id", "item_id"], ["menu_items.tenant_id", "menu_items.id"], ondelete="CASCADE")
+
+
+class MenuItemVariant(UUIDPkMixin, Base):
+    """Sizes / portions ("Half", "Full"). When an item has variants, the guest must pick one; its price
+    replaces the item's base price."""
+
+    __tablename__ = "menu_item_variants"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    name: Mapped[str] = mapped_column(String(40))
+    price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    sort_order: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+
+    __table_args__ = (
+        _item_fk(),
+        UniqueConstraint("item_id", "name", name="uq_menu_item_variants_item_name"),
+        CheckConstraint("price >= 0", name="price_non_negative"),
+        Index("ix_menu_item_variants_item", "item_id"),
+    )
+
+
+class MenuAddonGroup(UUIDPkMixin, Base):
+    """ "Extra toppings" (choose 0–3), "Choose a dip" (exactly 1)…"""
+
+    __tablename__ = "menu_addon_groups"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    name: Mapped[str] = mapped_column(String(60))
+    min_select: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+    max_select: Mapped[int] = mapped_column(SmallInteger, default=1, server_default="1")
+    sort_order: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+
+    __table_args__ = (
+        _item_fk(),
+        UniqueConstraint("tenant_id", "id", name="uq_menu_addon_groups_tenant_id_id"),
+        CheckConstraint("min_select >= 0 AND max_select >= 1 AND min_select <= max_select", name="select_range"),
+        Index("ix_menu_addon_groups_item", "item_id"),
+    )
+
+
+class MenuAddon(UUIDPkMixin, Base):
+    __tablename__ = "menu_addons"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    name: Mapped[str] = mapped_column(String(60))
+    price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), server_default="0")
+    sort_order: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "group_id"], ["menu_addon_groups.tenant_id", "menu_addon_groups.id"], ondelete="CASCADE"
+        ),
+        CheckConstraint("price >= 0", name="price_non_negative"),
+        Index("ix_menu_addons_group", "group_id"),
+    )
+
+
+class MenuItemAvailability(UUIDPkMixin, Base):
+    """Optional time windows. No rows = available whenever the restaurant is open."""
+
+    __tablename__ = "menu_item_availability"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    weekday: Mapped[int] = mapped_column(SmallInteger)  # 0 = Monday
+    from_time: Mapped[time] = mapped_column(Time)
+    to_time: Mapped[time] = mapped_column(Time)
+
+    __table_args__ = (
+        _item_fk(),
+        CheckConstraint("weekday BETWEEN 0 AND 6", name="weekday"),
+        CheckConstraint("from_time < to_time", name="window_order"),
+        Index("ix_menu_item_availability_item", "item_id"),
+    )
+
+
+class MenuItemBranchOverride(Base):
+    """Per-branch price and availability ("not served at the airport outlet")."""
+
+    __tablename__ = "menu_item_branch_overrides"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    branch_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    price_override: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    is_available: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+
+    __table_args__ = (
+        _item_fk(),
+        ForeignKeyConstraint(["tenant_id", "branch_id"], ["branches.tenant_id", "branches.id"], ondelete="CASCADE"),
+        CheckConstraint("price_override IS NULL OR price_override >= 0", name="price_non_negative"),
     )

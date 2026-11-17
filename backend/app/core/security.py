@@ -128,3 +128,37 @@ def hash_otp(phone: str, code: str) -> str:
 
 def constant_time_equals(a: str, b: str) -> bool:
     return hmac.compare_digest(a, b)
+
+
+# ---------- table-session tokens (guests at a table, PRD §13) ----------
+
+TABLE_TOKEN_HOURS = 12
+
+
+@dataclass(frozen=True)
+class TableClaims:
+    session_id: uuid.UUID
+    tenant_id: uuid.UUID
+    pin_version: str  # changes when staff issue a new PIN → older tokens stop working
+
+
+def create_table_token(session_id: uuid.UUID, tenant_id: uuid.UUID, pin_hash: str) -> tuple[str, datetime]:
+    s = get_settings()
+    exp = datetime.now(UTC) + timedelta(hours=TABLE_TOKEN_HOURS)
+    payload = {"typ": "table", "sub": str(session_id), "tid": str(tenant_id), "pv": pin_hash[:12], "exp": exp}
+    return jwt.encode(payload, s.jwt_secret, algorithm=s.jwt_algorithm), exp
+
+
+def decode_table_token(token: str) -> TableClaims:
+    s = get_settings()
+    try:
+        data = jwt.decode(token, s.jwt_secret, algorithms=[s.jwt_algorithm], options={"require": ["exp", "sub"]})
+        if data.get("typ") != "table":
+            raise jwt.PyJWTError("wrong type")
+        return TableClaims(session_id=uuid.UUID(data["sub"]), tenant_id=uuid.UUID(data["tid"]), pin_version=data["pv"])
+    except jwt.ExpiredSignatureError as exc:
+        raise UnauthorizedError(
+            "Your table link has expired. Enter the code and PIN again.", code="TABLE_TOKEN_EXPIRED"
+        ) from exc
+    except (jwt.PyJWTError, KeyError, ValueError, TypeError) as exc:
+        raise UnauthorizedError("Enter your table code and PIN again.", code="TABLE_TOKEN_INVALID") from exc

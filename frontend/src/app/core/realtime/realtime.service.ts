@@ -61,6 +61,15 @@ export class RealtimeService implements OnDestroy {
     this.leave(`queue:${branchId}`, { kind: 'branch_queue', tenant_id: tenantId, branch_id: branchId });
   }
 
+  /** Guests at a table: live order updates, authorised by the table token (no account needed). */
+  subscribeTableSession(token: string): Promise<boolean> {
+    return this.join('table', { kind: 'table_session', token }, false);
+  }
+
+  unsubscribeTableSession(token: string): void {
+    this.leave('table', { kind: 'table_session', token });
+  }
+
   private async join(key: string, payload: Record<string, string>, needsAuth: boolean): Promise<boolean> {
     if (!this.socket || (needsAuth && !this.authed)) {
       const withAuth = needsAuth || this.authed; // never downgrade a signed-in connection

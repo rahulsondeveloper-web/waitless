@@ -4,6 +4,7 @@ import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, Ro
 import { filter, map } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
+import { CartService } from '../../core/ordering/cart.service';
 import { SOCIAL_LABELS } from '../../core/storefront/storefront.models';
 import { TenantContextService } from '../../core/storefront/tenant-context.service';
 import { ErrorStateComponent, LoadingStateComponent } from '../../shared/ui/state/state.components';
@@ -24,6 +25,7 @@ import { UserMenuComponent } from '../../shared/ui/user-menu/user-menu.component
 export class StorefrontLayoutComponent implements OnDestroy {
   protected readonly ctx = inject(TenantContextService);
   protected readonly auth = inject(AuthService);
+  protected readonly cart = inject(CartService);
   private readonly router = inject(Router);
 
   protected readonly slug = toSignal(inject(ActivatedRoute).paramMap.pipe(map((p) => p.get('slug') ?? '')), {

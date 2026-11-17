@@ -51,6 +51,10 @@
               @if (r.status === 'pending_payment') {
                 <button type="button" class="wl-btn wl-btn--primary wl-btn--sm" (click)="pay(r)">Pay now</button>
               }
+              @if (r.can_preorder && r.status === 'confirmed' && r.restaurant_slug) {
+                <a [routerLink]="['/r', r.restaurant_slug, 'menu']" [queryParams]="{ preorder: r.id }"
+                   class="wl-btn wl-btn--primary wl-btn--sm" data-testid="preorder-link">Pre-order food</a>
+              }
               @if (r.can_cancel) {
                 <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="cancel(r)">Cancel</button>
               }

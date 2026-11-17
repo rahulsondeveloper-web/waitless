@@ -23,6 +23,7 @@ from app.core.storage import get_storage
 from app.models import Branch, Tenant
 from app.models.booking import QueueEntry, Reservation, ReservationPolicy
 from app.models.menu import CategoryMealType, MealType, MenuCategory, MenuItem, MenuSubcategory
+from app.models.orders import Order
 from app.models.profile import (
     BusinessHours,
     GalleryImage,
@@ -431,6 +432,7 @@ async def _reset_e2e(session: AsyncSession, demo: DemoRestaurant) -> None:
     tenant.status, tenant.is_published = "active", True
     # Phase 6: empty queue, no bookings, default policy, every table free.
     tid = tenant.id
+    await session.execute(delete(Order).where(Order.tenant_id == tid))
     await session.execute(delete(QueueEntry).where(QueueEntry.tenant_id == tid))
     await session.execute(delete(Reservation).where(Reservation.tenant_id == tid))
     await session.execute(delete(ReservationPolicy).where(ReservationPolicy.tenant_id == tid))

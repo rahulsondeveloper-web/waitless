@@ -604,6 +604,35 @@ async def dashboard(session: AsyncSession, ctx: TenantContext, branch_id: uuid.U
             .where(MenuItem.archived_at.is_(None), MenuCategory.is_active)
         )
     ).scalar_one()
+    # Phase 6/7 counters (branch-local "today"; tenant-wide uses the primary branch's zone)
+    from zoneinfo import ZoneInfo
+
+    from app.models.booking import QUEUE_ACTIVE, QueueEntry, Reservation
+    from app.services.orders import today_counts
+
+    tz_name = (
+        await session.execute(
+            select(Branch.timezone).where(Branch.id == branch_id)
+            if branch_id
+            else select(Branch.timezone).order_by(Branch.is_primary.desc()).limit(1)
+        )
+    ).scalar_one_or_none() or "Asia/Kolkata"
+    today = datetime.now(UTC).astimezone(ZoneInfo(tz_name)).date()
+    orders_today, active_orders = await today_counts(session, branch_id, today)
+    q = select(func.count()).select_from(QueueEntry).where(QueueEntry.status.in_(QUEUE_ACTIVE))
+    r = (
+        select(func.count())
+        .select_from(Reservation)
+        .where(
+            Reservation.status.in_(("confirmed", "pending_payment")),
+            Reservation.starts_at >= datetime.now(UTC),
+            Reservation.starts_at < datetime.now(UTC) + timedelta(hours=24),
+        )
+    )
+    if branch_id:
+        q, r = q.where(QueueEntry.branch_id == branch_id), r.where(Reservation.branch_id == branch_id)
+    queue_length = (await session.execute(q)).scalar_one()
+    upcoming = (await session.execute(r)).scalar_one()
     return DashboardOut(
         branch_id=branch_id,
         tables_total=sum(by_status.values()),
@@ -613,6 +642,10 @@ async def dashboard(session: AsyncSession, ctx: TenantContext, branch_id: uuid.U
         branches_active=branches_active,
         staff_active=staff_active,
         dishes_live=dishes,
+        orders_today=orders_today,
+        active_orders=active_orders,
+        active_reservations=upcoming,
+        queue_length=queue_length,
     )
 
 

@@ -2,7 +2,13 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { ApiService } from '../http/api.service';
-import { FoodClass } from '../storefront/storefront.models';
+import {
+  FoodClass,
+  MenuAddonGroup,
+  MenuBranchOverride,
+  MenuVariant,
+  MenuWindow,
+} from '../storefront/storefront.models';
 
 /** Mirrors backend app/schemas/menu.py (admin side). */
 export const ALLERGENS = [
@@ -36,6 +42,19 @@ export interface AdminItem {
   is_available: boolean;
   is_archived: boolean;
   sort_order: number;
+  tax_pct: string;
+  tags: string[];
+  variants: MenuVariant[];
+  addon_groups: MenuAddonGroup[];
+  availability: MenuWindow[];
+  branch_overrides: MenuBranchOverride[];
+}
+
+/** PUT /menu/items/{id}/options — replaces all sizes, extras and serving times. */
+export interface ItemOptionsInput {
+  variants: { name: string; price: string }[];
+  addon_groups: { name: string; min_select: number; max_select: number; addons: { name: string; price: string }[] }[];
+  availability: { weekday: number; from_time: string; to_time: string }[];
 }
 
 export interface AdminCategory {
@@ -76,6 +95,8 @@ export interface ItemInput {
   prep_minutes: number;
   is_bestseller: boolean;
   is_todays_special: boolean;
+  tax_pct?: string;
+  tags?: string[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -118,6 +139,12 @@ export class MenuService {
     const fd = new FormData();
     fd.append('file', file, file.name);
     return this.api.post(`restaurant/menu/items/${id}/image`, fd);
+  }
+  setOptions(id: string, body: ItemOptionsInput): Observable<AdminItem> {
+    return this.api.put(`restaurant/menu/items/${id}/options`, body);
+  }
+  setBranchOverride(id: string, branchId: string, body: { is_available: boolean; price_override: string | null }): Observable<AdminItem> {
+    return this.api.put(`restaurant/menu/items/${id}/branches/${branchId}`, body);
   }
   removeImage(id: string): Observable<AdminItem> {
     return this.api.delete(`restaurant/menu/items/${id}/image`);

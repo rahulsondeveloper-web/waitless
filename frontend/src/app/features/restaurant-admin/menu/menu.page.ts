@@ -4,6 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { Observable, filter } from 'rxjs';
 
@@ -11,16 +12,18 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { ApiError } from '../../../core/http/api-error';
 import { AdminItem, AdminMenu, MenuService } from '../../../core/restaurant/menu.service';
 import { formatPrice } from '../../../core/storefront/storefront.models';
+import { TenancyService } from '../../../core/tenancy/tenancy.service';
 import { ConfirmData, ConfirmDialogComponent } from '../../../shared/ui/confirm-dialog/confirm-dialog.component';
 import { checkImageFile, takeFile } from '../../../shared/ui/image-check';
 import { ErrorStateComponent, LoadingStateComponent } from '../../../shared/ui/state/state.components';
 import { CategoryDialogComponent, CategoryDialogData } from './category-dialog.component';
 import { ItemDialogComponent, ItemDialogData } from './item-dialog.component';
+import { OptionsDialogComponent, OptionsDialogData } from './options-dialog.component';
 
 /** Menu management (PRD §7): categories, subcategories, dishes, photos, sold-out, archive. */
 @Component({
   selector: 'wl-menu-admin-page',
-  imports: [RouterLink, MatButtonModule, MatIconModule, MatSlideToggleModule, LoadingStateComponent, ErrorStateComponent],
+  imports: [RouterLink, MatButtonModule, MatIconModule, MatSlideToggleModule, MatTooltipModule, LoadingStateComponent, ErrorStateComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './menu.page.html',
   styleUrl: './menu.page.scss',
@@ -29,6 +32,7 @@ export class MenuAdminPage implements OnInit {
   private readonly svc = inject(MenuService);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
+  private readonly tenancy = inject(TenancyService);
   protected readonly auth = inject(AuthService);
 
   protected readonly menu = signal<AdminMenu | null>(null);
@@ -148,6 +152,20 @@ export class MenuAdminPage implements OnInit {
         this.upsertItem(saved);
         this.snack.open(item ? 'Dish updated.' : 'Dish added.', undefined, { duration: 2000 });
       });
+  }
+
+  protected openOptions(item: AdminItem): void {
+    this.tenancy.restaurantMe().subscribe((me) => {
+      const data: OptionsDialogData = { item, branches: me.branches.filter((b) => b.is_active) };
+      this.dialog
+        .open<OptionsDialogComponent, OptionsDialogData, AdminItem>(OptionsDialogComponent, { data, width: '720px', maxWidth: '96vw' })
+        .afterClosed()
+        .pipe(filter((r): r is AdminItem => !!r))
+        .subscribe((saved) => {
+          this.upsertItem(saved);
+          this.snack.open('Options saved.', undefined, { duration: 2000 });
+        });
+    });
   }
 
   protected setStock(item: AdminItem, available: boolean): void {

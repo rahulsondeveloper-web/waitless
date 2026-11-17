@@ -1,0 +1,95 @@
+<section class="wl-container bk-page">
+  <header class="bk-head">
+    <h1>Your order</h1>
+  </header>
+
+  @if (placed(); as o) {
+    <article class="bk-card done" role="status" data-testid="preorder-placed">
+      <span class="material-symbols-outlined done__icon" aria-hidden="true">check_circle</span>
+      <h2>Pre-order #{{ o.number }} placed</h2>
+      <p>{{ price(o.total) }} · for your booking {{ o.reservation_code }}
+        @if (o.reservation_starts_at) { on {{ when(o.reservation_starts_at) }} }</p>
+      <p class="bk-muted">The kitchen starts when you arrive and the staff confirm your arrival — your 15-minute promise starts then.</p>
+      <div class="bk-actions">
+        <a routerLink="/customer/orders" class="wl-btn wl-btn--ghost wl-btn--sm">My orders</a>
+        <a routerLink="../menu" class="wl-btn wl-btn--primary wl-btn--sm">Add more</a>
+      </div>
+    </article>
+  } @else if (!cart.count()) {
+    <article class="bk-card center">
+      <p>Your cart is empty.</p>
+      <div class="bk-actions"><a routerLink="../menu" class="wl-btn wl-btn--primary">Browse the menu</a></div>
+    </article>
+  } @else {
+    <article class="bk-card">
+      <ul class="lines">
+        @for (l of cart.lines(); track l.key) {
+          <li data-testid="cart-line">
+            <div class="line__main">
+              <b>{{ l.name }}{{ l.variant_name ? ' (' + l.variant_name + ')' : '' }}</b>
+              @if (l.addon_names.length) { <small>+ {{ l.addon_names.join(', ') }}</small> }
+              @if (l.instructions) { <small>“{{ l.instructions }}”</small> }
+              <small>{{ price(l.unit_price) }} each</small>
+            </div>
+            <div class="qty" role="group" [attr.aria-label]="'Quantity of ' + l.name">
+              <button type="button" (click)="setQty(l, l.quantity - 1)" [attr.aria-label]="'One less ' + l.name">−</button>
+              <span>{{ l.quantity }}</span>
+              <button type="button" (click)="setQty(l, l.quantity + 1)" [attr.aria-label]="'One more ' + l.name">+</button>
+            </div>
+            <b class="line__total">{{ price(l.unit_price * l.quantity) }}</b>
+          </li>
+        }
+      </ul>
+      <div class="totals">
+        <div><span>Food</span><span>{{ price(cart.subtotal()) }}</span></div>
+        <div><span>Taxes</span><span>{{ price(cart.tax()) }}</span></div>
+        <div class="grand"><span>Total</span><span>{{ price(cart.total()) }}</span></div>
+        <p class="bk-muted">Prices are confirmed by the restaurant when you place the order.</p>
+      </div>
+      <label class="bk-field">
+        <span>Note for the kitchen (optional)</span>
+        <input type="text" maxlength="300" [(ngModel)]="notes" name="notes" />
+      </label>
+    </article>
+
+    <article class="bk-card">
+      @switch (target()) {
+        @case ('table') {
+          <p><span class="material-symbols-outlined icon" aria-hidden="true">table_restaurant</span>
+            This order goes straight to the kitchen for your table.</p>
+        }
+        @case ('preorder') {
+          <p><span class="material-symbols-outlined icon" aria-hidden="true">event_available</span>
+            Pre-order for your paid booking
+            @if (preorderBooking(); as r) { <b>{{ r.code }}</b> on {{ when(r.starts_at) }} }.
+            The kitchen starts when you arrive.</p>
+        }
+        @default {
+          <p><b>Where should we send this order?</b></p>
+          <ul class="choices">
+            <li>At the restaurant? <a routerLink="../session">Enter your order ID and PIN</a> from your waiter.</li>
+            @if (!auth.isAuthenticated()) {
+              <li>Booked a paid table? <button type="button" class="bk-link" (click)="signIn()">Sign in</button> to pre-order.</li>
+            } @else if (paidBookings().length) {
+              @for (r of paidBookings(); track r.id) {
+                <li><button type="button" class="bk-link" (click)="chooseBooking(r.id)">Pre-order for {{ r.code }} · {{ when(r.starts_at) }}</button></li>
+              }
+            } @else {
+              <li>Pre-ordering comes with a <a routerLink="../reservations">paid table booking</a>.</li>
+            }
+          </ul>
+        }
+      }
+
+      @if (error(); as e) { <p class="bk-error" role="alert">{{ e }}</p> }
+
+      @if (target() !== 'none') {
+        <div class="bk-actions">
+          <button type="button" class="wl-btn wl-btn--primary" [disabled]="busy()" (click)="place()" data-testid="place-order">
+            {{ target() === 'table' ? 'Send to kitchen' : 'Place pre-order' }} · {{ price(cart.total()) }}
+          </button>
+        </div>
+      }
+    </article>
+  }
+</section>

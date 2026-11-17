@@ -1,0 +1,86 @@
+.center {
+  text-align: center;
+}
+.lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.8rem;
+  li {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.8rem;
+    align-items: center;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px dashed var(--wl-line);
+  }
+}
+.line__main {
+  display: grid;
+  gap: 0.1rem;
+  small {
+    color: var(--wl-muted);
+  }
+}
+.line__total {
+  min-width: 4.5rem;
+  text-align: right;
+}
+.qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  button {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1.5px solid var(--wl-line);
+    background: #fff;
+    font-size: 1.1rem;
+    cursor: pointer;
+  }
+  span {
+    min-width: 1.4rem;
+    text-align: center;
+    font-weight: 600;
+  }
+}
+.totals {
+  display: grid;
+  gap: 0.3rem;
+  div {
+    display: flex;
+    justify-content: space-between;
+  }
+  .grand {
+    font: 600 1.25rem var(--wl-font-serif);
+    border-top: 1px dashed var(--wl-line);
+    padding-top: 0.5rem;
+  }
+}
+.icon {
+  vertical-align: middle;
+  color: var(--wl-primary);
+}
+.choices {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.4rem;
+  a {
+    color: var(--wl-primary);
+    font-weight: 600;
+  }
+}
+.done {
+  text-align: center;
+  justify-items: center;
+  h2 {
+    font: 600 1.7rem var(--wl-font-serif);
+  }
+}
+.done__icon {
+  font-size: 3rem;
+  color: var(--wl-secondary);
+}

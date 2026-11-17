@@ -7,6 +7,7 @@ match the caller's own rows — a foreign id simply is "not found".
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from fastapi import UploadFile
 from sqlalchemy import delete, func, select
@@ -14,14 +15,31 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, ConflictError, NotFoundError
 from app.models import Tenant
-from app.models.menu import CategoryMealType, MealType, MenuCategory, MenuItem, MenuSubcategory
+from app.models.menu import (
+    CategoryMealType,
+    MealType,
+    MenuAddon,
+    MenuAddonGroup,
+    MenuCategory,
+    MenuItem,
+    MenuItemAvailability,
+    MenuItemBranchOverride,
+    MenuItemVariant,
+    MenuSubcategory,
+)
 from app.models.profile import MediaFile
 from app.schemas.menu import (
+    AddonGroupOut,
+    AddonOut,
     AdminMenu,
+    AvailabilityOut,
+    BranchOverrideIn,
+    BranchOverrideOut,
     CategoryIn,
     CategoryOut,
     CategoryPatch,
     ItemIn,
+    ItemOptionsIn,
     ItemOut,
     ItemPatch,
     MealTypeIn,
@@ -34,6 +52,7 @@ from app.schemas.menu import (
     SubcategoryIn,
     SubcategoryOut,
     SubcategoryPatch,
+    VariantOut,
 )
 from app.services.access import TenantContext
 from app.services.media import delete_files, media_url, store_image
@@ -65,8 +84,78 @@ async def _media_urls(session: AsyncSession, ids: set[uuid.UUID]) -> dict[uuid.U
     return {m.id: media_url(m) for m in rows}
 
 
-def _item_out(i: MenuItem, urls: dict[uuid.UUID, str | None]) -> ItemOut:
+class ItemOptions:
+    """Variants, add-on groups, time windows and branch overrides of a set of dishes."""
+
+    def __init__(self) -> None:
+        self.variants: dict[uuid.UUID, list[VariantOut]] = defaultdict(list)
+        self.groups: dict[uuid.UUID, list[AddonGroupOut]] = defaultdict(list)
+        self.windows: dict[uuid.UUID, list[AvailabilityOut]] = defaultdict(list)
+        self.overrides: dict[uuid.UUID, list[BranchOverrideOut]] = defaultdict(list)
+
+    def fields(self, item_id: uuid.UUID) -> dict:
+        return {
+            "variants": self.variants.get(item_id, []),
+            "addon_groups": self.groups.get(item_id, []),
+            "availability": self.windows.get(item_id, []),
+            "branch_overrides": self.overrides.get(item_id, []),
+        }
+
+
+async def load_options(session: AsyncSession, item_ids: list[uuid.UUID] | None = None) -> ItemOptions:
+    """None = every dish of the restaurant (RLS scopes the query)."""
+    opts = ItemOptions()
+
+    def scoped(stmt, col):  # type: ignore[no-untyped-def]
+        return stmt if item_ids is None else stmt.where(col.in_(item_ids))
+
+    variants = await session.execute(
+        scoped(select(MenuItemVariant), MenuItemVariant.item_id).order_by(MenuItemVariant.sort_order)
+    )
+    for v in variants.scalars():
+        opts.variants[v.item_id].append(VariantOut(id=v.id, name=v.name, price=v.price))
+    groups = (
+        (
+            await session.execute(
+                scoped(select(MenuAddonGroup), MenuAddonGroup.item_id).order_by(MenuAddonGroup.sort_order)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    addons: dict[uuid.UUID, list[AddonOut]] = defaultdict(list)
+    if groups:
+        rows = await session.execute(
+            select(MenuAddon).where(MenuAddon.group_id.in_([g.id for g in groups])).order_by(MenuAddon.sort_order)
+        )
+        for a in rows.scalars():
+            addons[a.group_id].append(AddonOut(id=a.id, name=a.name, price=a.price))
+    for g in groups:
+        opts.groups[g.item_id].append(
+            AddonGroupOut(
+                id=g.id, name=g.name, min_select=g.min_select, max_select=g.max_select, addons=addons.get(g.id, [])
+            )
+        )
+    windows = await session.execute(
+        scoped(select(MenuItemAvailability), MenuItemAvailability.item_id).order_by(
+            MenuItemAvailability.weekday, MenuItemAvailability.from_time
+        )
+    )
+    for w in windows.scalars():
+        opts.windows[w.item_id].append(AvailabilityOut(weekday=w.weekday, from_time=w.from_time, to_time=w.to_time))
+    overrides = await session.execute(scoped(select(MenuItemBranchOverride), MenuItemBranchOverride.item_id))
+    for o in overrides.scalars():
+        opts.overrides[o.item_id].append(
+            BranchOverrideOut(branch_id=o.branch_id, is_available=o.is_available, price_override=o.price_override)
+        )
+    return opts
+
+
+def _item_out(i: MenuItem, urls: dict[uuid.UUID, str | None], opts: ItemOptions | None = None) -> ItemOut:
     return ItemOut(
+        tax_pct=i.tax_pct,
+        tags=i.tags,
+        **(opts.fields(i.id) if opts else {}),
         id=i.id,
         category_id=i.category_id,
         subcategory_id=i.subcategory_id,
@@ -109,6 +198,7 @@ async def admin_menu(session: AsyncSession, ctx: TenantContext) -> AdminMenu:
     items = (await session.execute(select(MenuItem).order_by(MenuItem.sort_order, MenuItem.name))).scalars().all()
     links = await _meal_links(session)
     urls = await _media_urls(session, {i.image_media_id for i in items if i.image_media_id})
+    opts = await load_options(session)
 
     subs_by_cat: dict[uuid.UUID, list[SubcategoryOut]] = defaultdict(list)
     for s in subs:
@@ -134,7 +224,7 @@ async def admin_menu(session: AsyncSession, ctx: TenantContext) -> AdminMenu:
             )
             for c in cats
         ],
-        items=[_item_out(i, urls) for i in items],
+        items=[_item_out(i, urls, opts) for i in items],
         alcohol_licensed=bool(tenant and tenant.alcohol_licensed),
     )
 
@@ -323,7 +413,79 @@ async def _check_placement(session: AsyncSession, category_id: uuid.UUID, subcat
 
 async def _one_item(session: AsyncSession, item: MenuItem) -> ItemOut:
     urls = await _media_urls(session, {item.image_media_id} if item.image_media_id else set())
-    return _item_out(item, urls)
+    return _item_out(item, urls, await load_options(session, [item.id]))
+
+
+async def set_options(session: AsyncSession, ctx: TenantContext, item_id: uuid.UUID, data: ItemOptionsIn) -> ItemOut:
+    """Replace variants, add-on groups and time windows. Past orders are unaffected (they keep snapshots)."""
+    item = await _get(session, MenuItem, item_id, "Dish")
+    await session.execute(delete(MenuItemVariant).where(MenuItemVariant.item_id == item.id))
+    await session.execute(delete(MenuAddonGroup).where(MenuAddonGroup.item_id == item.id))  # cascades add-ons
+    await session.execute(delete(MenuItemAvailability).where(MenuItemAvailability.item_id == item.id))
+    tid = ctx.tenant_id
+    for n, v in enumerate(data.variants):
+        session.add(
+            MenuItemVariant(
+                tenant_id=tid,
+                item_id=item.id,
+                name=v.name.strip(),
+                price=v.price.quantize(Decimal("0.01")),
+                sort_order=n,
+            )
+        )
+    for n, g in enumerate(data.addon_groups):
+        group = MenuAddonGroup(
+            id=uuid.uuid4(),
+            tenant_id=tid,
+            item_id=item.id,
+            name=g.name.strip(),
+            min_select=g.min_select,
+            max_select=min(g.max_select, len(g.addons)),
+            sort_order=n,
+        )
+        session.add(group)
+        await session.flush()
+        for m, a in enumerate(g.addons):
+            session.add(
+                MenuAddon(
+                    tenant_id=tid,
+                    group_id=group.id,
+                    name=a.name.strip(),
+                    price=a.price.quantize(Decimal("0.01")),
+                    sort_order=m,
+                )
+            )
+    seen = set()
+    for w in data.availability:
+        key = (w.weekday, w.from_time, w.to_time)
+        if key not in seen:
+            seen.add(key)
+            session.add(MenuItemAvailability(tenant_id=tid, item_id=item.id, **w.model_dump()))
+    await session.commit()
+    await _changed(ctx)
+    return await _one_item(session, item)
+
+
+async def set_branch_override(
+    session: AsyncSession, ctx: TenantContext, item_id: uuid.UUID, branch_id: uuid.UUID, data: BranchOverrideIn
+) -> ItemOut:
+    from app.models import Branch
+
+    item = await _get(session, MenuItem, item_id, "Dish")
+    await _get(session, Branch, branch_id, "Branch")
+    row = await session.get(MenuItemBranchOverride, (item.id, branch_id))
+    if data.is_available and data.price_override is None:
+        if row is not None:
+            await session.delete(row)  # back to the dish defaults
+    else:
+        if row is None:
+            row = MenuItemBranchOverride(tenant_id=ctx.tenant_id, item_id=item.id, branch_id=branch_id)
+            session.add(row)
+        price = data.price_override.quantize(Decimal("0.01")) if data.price_override is not None else None
+        row.is_available, row.price_override = data.is_available, price
+    await session.commit()
+    await _changed(ctx)
+    return await _one_item(session, item)
 
 
 async def create_item(session: AsyncSession, ctx: TenantContext, data: ItemIn) -> ItemOut:
@@ -429,8 +591,11 @@ async def menu_ready(session: AsyncSession) -> bool:
 # ---------- public ----------
 
 
-async def build_public_menu(session: AsyncSession, currency: str = "INR") -> PublicMenu:
+async def build_public_menu(session: AsyncSession, tenant: Tenant) -> PublicMenu:
     """Session must already be scoped to the restaurant (use_tenant)."""
+    from app.api.deps import feature_enabled  # local: avoid import cycle
+
+    currency = str((tenant.settings or {}).get("currency", "INR"))
     meals = (
         (await session.execute(select(MealType).where(MealType.is_active).order_by(MealType.sort_order, MealType.name)))
         .scalars()
@@ -457,6 +622,7 @@ async def build_public_menu(session: AsyncSession, currency: str = "INR") -> Pub
     sub_names = dict((await session.execute(select(MenuSubcategory.id, MenuSubcategory.name))).tuples().all())
     links = await _meal_links(session)
     urls = await _media_urls(session, {i.image_media_id for i in items if i.image_media_id})
+    opts = await load_options(session, [i.id for i in items])
     active_meals = {m.id for m in meals}
 
     by_cat: dict[uuid.UUID, list[PublicItem]] = defaultdict(list)
@@ -476,6 +642,9 @@ async def build_public_menu(session: AsyncSession, currency: str = "INR") -> Pub
                 is_todays_special=i.is_todays_special,
                 is_available=i.is_available,
                 subcategory=sub_names.get(i.subcategory_id) if i.subcategory_id else None,
+                tax_pct=i.tax_pct,
+                tags=i.tags,
+                **opts.fields(i.id),
             )
         )
     categories = []
@@ -492,4 +661,5 @@ async def build_public_menu(session: AsyncSession, currency: str = "INR") -> Pub
         currency=currency,
         meal_types=[PublicMealType(id=m.id, name=m.name) for m in meals if m.id in used_meals],
         categories=categories,
+        ordering_enabled=await feature_enabled(session, tenant.id, "ordering"),
     )

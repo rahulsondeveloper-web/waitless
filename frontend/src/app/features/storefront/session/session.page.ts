@@ -1,0 +1,138 @@
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { interval } from 'rxjs';
+
+import { ApiError } from '../../../core/http/api-error';
+import { CartService } from '../../../core/ordering/cart.service';
+import { ORDER_STATUS_LABEL, Order, OrderingService, TableView } from '../../../core/ordering/ordering.service';
+import { RealtimeService } from '../../../core/realtime/realtime.service';
+import { formatPrice } from '../../../core/storefront/storefront.models';
+import { TenantContextService } from '../../../core/storefront/tenant-context.service';
+
+const STEPS = ['placed', 'accepted', 'preparing', 'ready', 'served'] as const;
+
+/**
+ * "Have an order ID?" (PRD §13): guests enter the code + PIN the waiter gave them, then see their
+ * orders, times and running total live, and can order more from the menu.
+ */
+@Component({
+  selector: 'wl-storefront-session',
+  imports: [FormsModule, RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './session.page.html',
+  styleUrls: ['../booking-shared.scss', './session.page.scss'],
+})
+export class StorefrontSessionPage implements OnInit {
+  protected readonly ctx = inject(TenantContextService);
+  protected readonly cart = inject(CartService);
+  private readonly api = inject(OrderingService);
+  private readonly realtime = inject(RealtimeService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  protected readonly statusLabel = ORDER_STATUS_LABEL;
+  protected readonly steps = STEPS;
+  protected readonly view = signal<TableView | null>(null);
+  protected readonly error = signal<string | null>(null);
+  protected readonly busy = signal(false);
+  protected readonly loading = signal(false);
+  protected readonly now = signal(Date.now());
+  protected code = '';
+  protected pin = '';
+  private watching: string | null = null;
+
+  protected readonly active = computed(() => (this.view()?.orders ?? []).filter((o) => o.status !== 'cancelled'));
+
+  ngOnInit(): void {
+    if (this.cart.tableToken()) this.load();
+    const off = this.realtime.on<{ order_id: string }>('orders.changed', () => this.load(false));
+    interval(30_000)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.now.set(Date.now());
+        if (this.cart.tableToken()) this.load(false);
+      });
+    this.destroyRef.onDestroy(() => {
+      off();
+      if (this.watching) this.realtime.unsubscribeTableSession(this.watching);
+    });
+  }
+
+  protected join(): void {
+    const slug = this.ctx.slug();
+    if (!slug) return;
+    this.busy.set(true);
+    this.error.set(null);
+    this.api.joinTable(slug, this.code.trim().toUpperCase(), this.pin.trim()).subscribe({
+      next: (r) => {
+        this.busy.set(false);
+        this.cart.setPreorder(null);
+        this.cart.setTableToken(r.token);
+        this.pin = '';
+        this.load();
+      },
+      error: (e: ApiError) => {
+        this.busy.set(false);
+        this.error.set(e.code === 'RATE_LIMITED' ? 'Too many tries. Please ask your waiter for help.' : e.message);
+      },
+    });
+  }
+
+  protected leave(): void {
+    if (this.watching) this.realtime.unsubscribeTableSession(this.watching);
+    this.watching = null;
+    this.cart.setTableToken(null);
+    this.view.set(null);
+  }
+
+  protected cancel(o: Order): void {
+    const token = this.cart.tableToken();
+    if (!token || !confirm(`Cancel order #${o.number}?`)) return;
+    this.api.tableCancel(token, o.id).subscribe({ next: () => this.load(false), error: (e: ApiError) => this.error.set(e.message) });
+  }
+
+  protected price(v: string | number): string {
+    return formatPrice(v, this.ctx.restaurant()?.currency ?? 'INR');
+  }
+
+  protected minutes(o: Order): number {
+    const end = o.served_at ? Date.parse(o.served_at) : this.now();
+    return Math.max(0, Math.floor((end - Date.parse(o.placed_at)) / 60_000));
+  }
+
+  protected addonNames(l: Order['items'][number]): string {
+    return l.addons.map((a) => a.name).join(', ');
+  }
+
+  protected stepIndex(o: Order): number {
+    return STEPS.indexOf(o.status as (typeof STEPS)[number]);
+  }
+
+  private load(showSpinner = true): void {
+    const token = this.cart.tableToken();
+    if (!token) return;
+    if (showSpinner) this.loading.set(true);
+    this.api.tableView(token).subscribe({
+      next: (v) => {
+        this.loading.set(false);
+        if (v.restaurant_slug !== this.ctx.slug()) {
+          this.leave(); // a token from another restaurant never shows here
+          return;
+        }
+        this.view.set(v);
+        if (this.watching !== token) {
+          this.watching = token;
+          void this.realtime.subscribeTableSession(token);
+        }
+      },
+      error: (e: ApiError) => {
+        this.loading.set(false);
+        if (e.status === 401) {
+          this.leave();
+          this.error.set('Your table link has ended. Enter the code and PIN again.');
+        } else this.error.set(e.message);
+      },
+    });
+  }
+}

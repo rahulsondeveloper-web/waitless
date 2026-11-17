@@ -60,10 +60,12 @@ Auth column legend: **P** public · **C** customer · **S:perm** staff with perm
 | POST | `/me/reservations/{id}/pay` | C | New gateway order for an unpaid booking *(Phase 6)* |
 | GET | `/me/bookings` · `/me/reservations/{id}` | C | All my reservations + queue tokens across restaurants / one booking *(Phase 6)* |
 | POST | `/me/reservations/{id}/cancel` | C | Cancel (refund per policy, D58) *(Phase 6)* |
-| PUT | `/customer/reservations/{id}/pre-order` | C 🔁 | Create/replace pre-order (paid bookings only → else 403 `PREORDER_NOT_ALLOWED`) |
-| POST | `/customer/table-sessions/join` | C | `{ code, pin }` → session access token |
-| GET | `/customer/table-sessions/{id}` | C (joined) | Orders, SLA timers, discounts, running total |
-| POST | `/customer/table-sessions/{id}/orders` | C 🔁 | Place order into session |
+| POST | `/public/restaurants/{slug}/table-sessions/join` | — | `{ code, pin }` → table token (12 h). 401 `INVALID_TABLE_PIN`, 429 after 5 tries *(Phase 7)* |
+| GET | `/table-session` | header `X-Table-Token` | Orders, statuses, times, running total *(Phase 7; SLA timers & discounts Phase 8)* |
+| POST | `/table-session/orders` | `X-Table-Token` 🔁 | Order from the table; same `Idempotency-Key` → original order (200) *(Phase 7)* |
+| POST | `/table-session/orders/{id}/cancel` | `X-Table-Token` | Only while "placed" *(Phase 7)* |
+| POST · GET | `/me/reservations/{id}/orders` | C 🔁 | Pre-order (paid bookings only → 403 `PREORDER_NOT_ALLOWED`) / list *(Phase 7)* |
+| GET | `/me/orders` · POST `/me/orders/{id}/cancel` | C | My orders across restaurants / cancel while "placed" *(Phase 7)* |
 | POST | `/customer/table-sessions/{id}/finish` | C | Lock session → final bill |
 | GET | `/customer/table-sessions/{id}/bill` | C | Final invoice view |
 | POST | `/customer/bills/{id}/payment` | C 🔁 | Pay bill online |
@@ -134,6 +136,21 @@ All paths prefixed `/restaurant`. Permission keys from [doc 04](04-roles-permiss
 | CRUD | `/tax-rates` | `settings.manage` |
 
 ### Orders, kitchen, SLA
+
+Implemented in Phase 7 (plan feature `ordering`):
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/orders?branch_id=&active=&date=` | `orders.view` or `kitchen.operate` — active tickets, or all orders of a day |
+| POST | `/orders` 🔁 `{table_session_id, items, notes}` | `orders.create` — waiter order for a seated table |
+| POST | `/orders/{id}/status` `{status}` | accepted/preparing/ready: `kitchen.operate`; served: `orders.mark_served`. 409 `INVALID_TRANSITION`, 409 `PREORDER_NOT_ARRIVED` |
+| POST | `/orders/{id}/cancel` `{reason}` | `orders.cancel` (until Ready) |
+| PUT | `/menu/items/{id}/options` | `menu.manage` — replace sizes, extra groups, serving times |
+| PUT | `/menu/items/{id}/branches/{branch_id}` | `menu.manage` — served here / price here |
+
+Order errors: 422 `VARIANT_REQUIRED` · `INVALID_VARIANT` · `INVALID_ADDON` · `ADDON_RULES`; 409 `ITEM_UNAVAILABLE` · `ITEM_NOT_AVAILABLE_NOW` · `SESSION_CLOSED`.
+
+Planned (later phases):
 
 | Method | Path | Permission |
 |---|---|---|
@@ -216,7 +233,7 @@ Prefix `/super-admin`. All writes audited.
 
 Namespace `/rt`. Connect with `auth: { token }` (staff/customer JWT or table-session token). Client emits `subscribe { room }`; server authorises each room (see [doc 01 §6](01-system-architecture.md#6-real-time-design)).
 
-**Implemented so far (Phase 6):** `subscribe {kind}` with `branch_staff` (`branch_id`; membership + branch access checked), `user` (always the caller's own room) and `branch_queue` (`tenant_id, branch_id`; public, no personal data). Events: `tables.changed`, `queue.changed`, `reservations.changed` (payload `{branch_id}` — clients refetch) and `notification` (`{event, title, body, link}`) to the user room.
+**Implemented so far (Phases 6–7):** `subscribe {kind}` with `branch_staff` (`branch_id`; membership + branch access checked), `user` (always the caller's own room), `branch_queue` (`tenant_id, branch_id`; public, no personal data) and `table_session` (`token` = table token from order ID + PIN). Events: `tables.changed`, `queue.changed`, `reservations.changed`, `orders.changed` (payload `{branch_id[, order_id, status]}` — clients refetch) and `notification` (`{event, title, body, link}`) to the user room.
 
 | Event | Room | Payload (key fields) |
 |---|---|---|

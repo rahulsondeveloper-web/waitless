@@ -59,6 +59,45 @@ export interface PublicItem {
   is_todays_special: boolean;
   is_available: boolean;
   subcategory: string | null;
+  // Phase 7
+  tax_pct: string;
+  tags: string[];
+  variants: MenuVariant[];
+  addon_groups: MenuAddonGroup[];
+  availability: MenuWindow[]; // empty = whenever the restaurant is open
+  branch_overrides: MenuBranchOverride[];
+}
+
+export interface MenuVariant {
+  id: string;
+  name: string;
+  price: string;
+}
+
+export interface MenuAddon {
+  id: string;
+  name: string;
+  price: string;
+}
+
+export interface MenuAddonGroup {
+  id: string;
+  name: string;
+  min_select: number;
+  max_select: number;
+  addons: MenuAddon[];
+}
+
+export interface MenuWindow {
+  weekday: number; // 0 = Monday
+  from_time: string; // "12:00:00"
+  to_time: string;
+}
+
+export interface MenuBranchOverride {
+  branch_id: string;
+  is_available: boolean;
+  price_override: string | null;
 }
 
 export interface PublicCategory {
@@ -73,6 +112,7 @@ export interface PublicMenu {
   currency: string;
   meal_types: { id: string; name: string }[];
   categories: PublicCategory[];
+  ordering_enabled: boolean;
 }
 
 export interface DiscoveryCard {

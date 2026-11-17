@@ -105,6 +105,8 @@
                     <button mat-icon-button type="button" (click)="removeImage(i)" [attr.aria-label]="'Remove photo of ' + i.name"><mat-icon>hide_image</mat-icon></button>
                   }
                   <button mat-icon-button type="button" (click)="openItem(i)" [attr.aria-label]="'Edit ' + i.name"><mat-icon>edit</mat-icon></button>
+                  <button mat-icon-button type="button" (click)="openOptions(i)" [attr.aria-label]="'Sizes, extras and times of ' + i.name"
+                          matTooltip="Sizes, extras & serving times"><mat-icon>tune</mat-icon></button>
                   <button mat-icon-button type="button" (click)="archive(i, true)" [attr.aria-label]="'Archive ' + i.name"><mat-icon>archive</mat-icon></button>
                 } @else {
                   <button mat-button type="button" (click)="archive(i, false)">Restore</button>

@@ -276,7 +276,7 @@ async def test_table_lifecycle(client: httpx.AsyncClient) -> None:
 
     dash = (await client.get(f"{B}/dashboard", headers=h)).json()
     assert dash["open_sessions"] == 1 and dash["guests_seated"] == 3 and dash["tables_total"] == 2
-    assert dash["orders_today"] is None  # arrives with ordering
+    assert dash["orders_today"] == 0 and dash["active_orders"] == 0  # Phase 7 counters
 
     bad = await client.patch(f"{B}/tables/{t1['id']}/status", json={"status": "reserved"}, headers=h)
     assert bad.status_code == 409 and bad.json()["error"]["code"] == "INVALID_TABLE_STATUS"

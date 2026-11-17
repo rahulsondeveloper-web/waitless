@@ -656,7 +656,7 @@ async def public_menu(session: AsyncSession, slug: str) -> PublicMenu:
     if cached := await _cache_get(key):
         return PublicMenu.model_validate_json(cached)
     tenant = await _public_tenant(session, slug)
-    out = await build_public_menu(session, str((tenant.settings or {}).get("currency", "INR")))
+    out = await build_public_menu(session, tenant)
     await _cache_set(key, out.model_dump_json())
     return out
 
@@ -672,4 +672,4 @@ async def preview_menu(session: AsyncSession, ctx: TenantContext) -> PublicMenu:
     from app.services.menu import build_public_menu
 
     tenant = await _tenant(session, ctx)
-    return await build_public_menu(session, str((tenant.settings or {}).get("currency", "INR")))
+    return await build_public_menu(session, tenant)

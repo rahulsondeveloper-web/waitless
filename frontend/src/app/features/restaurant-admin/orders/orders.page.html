@@ -1,0 +1,77 @@
+<header class="page-head">
+  <div>
+    <h1>Orders</h1>
+    <p class="muted">
+      @if (live()) {
+        <span class="live" role="status"><span class="dot"></span> Live</span> ·
+      }
+      {{ totals().count }} orders · {{ price(totals().amount) }}
+    </p>
+  </div>
+  <div class="head-tools">
+    @if (branches().length > 1) {
+      <label class="field">
+        <span>Branch</span>
+        <select [value]="branchId() ?? ''" (change)="selectBranch($any($event.target).value)" aria-label="Branch">
+          @for (b of branches(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+        </select>
+      </label>
+    }
+    <div class="seg" role="group" aria-label="Show">
+      <button type="button" [class.on]="!showAll()" (click)="toggleAll(false)">In progress</button>
+      <button type="button" [class.on]="showAll()" (click)="toggleAll(true)">All today</button>
+    </div>
+    @if (canCreate()) {
+      <button mat-flat-button (click)="newOrder()" [disabled]="!seated().length" data-testid="new-order">
+        <mat-icon>add</mat-icon>New order
+      </button>
+    }
+  </div>
+</header>
+
+@if (canCreate() && !seated().length && orders()) {
+  <p class="muted hint">Seat guests on the Tables page first — orders belong to a table.</p>
+}
+
+@if (error(); as e) {
+  <wl-error-state title="Could not load orders" [message]="e.message" [retryable]="false" />
+} @else if (!orders()) {
+  <wl-loading-state />
+} @else {
+  @if (!orders()!.length) { <p class="empty">{{ showAll() ? 'No orders yet today.' : 'Nothing in progress.' }}</p> }
+  <ul class="rows">
+    @for (o of orders()!; track o.id) {
+      <li class="row" [attr.data-status]="o.status === 'ready' ? 'notified' : o.status" data-testid="order-row">
+        <span class="row__lead">#{{ o.number }}</span>
+        <div class="row__main">
+          <div>
+            <b>{{ where(o) }}</b>{{ o.guest_name ? ' · ' + o.guest_name : '' }}
+            <span class="badge" [attr.data-status]="o.status === 'ready' ? 'notified' : o.status === 'served' ? 'seated' : o.status === 'cancelled' ? 'cancelled' : 'waiting'">{{ label[o.status] }}</span>
+            <span class="badge">{{ o.source === 'staff' ? 'Waiter' : 'Guest' }}</span>
+          </div>
+          <span class="muted">
+            {{ time(o.placed_at) }}
+            @if (o.session_code) { · order ID {{ o.session_code }} }
+            · {{ price(o.total) }}
+          </span>
+          <span class="items">
+            @for (l of o.items; track l.id) { {{ l.quantity }}× {{ l.name }}{{ l.variant_name ? ' (' + l.variant_name + ')' : '' }}{{ $last ? '' : ', ' }} }
+          </span>
+          @if (o.cancel_reason) { <span class="muted">{{ o.cancel_reason }}</span> }
+        </div>
+        <div class="row__actions">
+          @if (o.status === 'ready' && canServe()) {
+            <button mat-flat-button (click)="serve(o)" [disabled]="busy() === o.id" data-testid="mark-served">
+              <mat-icon>room_service</mat-icon>Served</button>
+          }
+          @if (canCancel() && o.can_cancel) {
+            <button mat-icon-button [matMenuTriggerFor]="more" aria-label="More actions"><mat-icon>more_vert</mat-icon></button>
+            <mat-menu #more="matMenu">
+              <button mat-menu-item (click)="cancel(o)"><mat-icon>block</mat-icon>Cancel order</button>
+            </mat-menu>
+          }
+        </div>
+      </li>
+    }
+  </ul>
+}

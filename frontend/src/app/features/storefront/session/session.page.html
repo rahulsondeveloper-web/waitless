@@ -1,0 +1,105 @@
+<section class="wl-container bk-page">
+  <header class="bk-head">
+    <h1>My table</h1>
+    <p>Follow your order, see the time and order more — right from your phone.</p>
+  </header>
+
+  @if (error(); as e) { <p class="bk-error" role="alert">{{ e }}</p> }
+
+  @if (view(); as v) {
+    <article class="bk-card summary" data-testid="table-view">
+      <div class="summary__head">
+        <div>
+          <p class="bk-muted">Order ID</p>
+          <p class="code">{{ v.code }}</p>
+        </div>
+        <div class="right">
+          <p class="bk-muted">{{ v.table_labels.length ? 'Table ' + v.table_labels.join(', ') : v.branch_name }}</p>
+          <p>{{ v.party_size }} guests{{ v.guest_name ? ' · ' + v.guest_name : '' }}</p>
+        </div>
+      </div>
+      <div class="bk-actions">
+        @if (v.ordering_open) {
+          <a routerLink="../menu" class="wl-btn wl-btn--primary" data-testid="order-more">
+            {{ active().length ? 'Order more' : 'Order from the menu' }}
+          </a>
+        } @else {
+          <p class="bk-muted">This table is closed for new orders.</p>
+        }
+        <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="leave()">Not my table</button>
+      </div>
+    </article>
+
+    @for (o of v.orders; track o.id) {
+      <article class="bk-card order" [class.order--off]="o.status === 'cancelled'" data-testid="table-order">
+        <header class="order__head">
+          <b>Order #{{ o.number }}</b>
+          <span class="bk-badge" [attr.data-status]="o.status === 'ready' ? 'notified' : o.status === 'served' ? 'seated' : o.status === 'cancelled' ? 'cancelled' : 'waiting'">
+            {{ statusLabel[o.status] }}
+          </span>
+          <span class="bk-muted time">{{ minutes(o) }} min{{ o.served_at ? ' to serve' : ' ago' }}</span>
+        </header>
+        @if (o.status !== 'cancelled') {
+          <ol class="steps" aria-label="Progress">
+            @for (s of steps; track s; let i = $index) {
+              <li [class.done]="i <= stepIndex(o)">{{ statusLabel[s] }}</li>
+            }
+          </ol>
+        }
+        <ul class="lines">
+          @for (l of o.items; track l.id) {
+            <li>
+              <span>{{ l.quantity }} × {{ l.name }}{{ l.variant_name ? ' (' + l.variant_name + ')' : '' }}
+                @if (l.addons.length) { <small>+ {{ addonNames(l) }}</small> }
+                @if (l.instructions) { <small>“{{ l.instructions }}”</small> }
+              </span>
+              <span>{{ price(l.line_total) }}</span>
+            </li>
+          }
+        </ul>
+        <footer class="order__foot">
+          <span class="bk-muted">{{ o.source === 'staff' ? 'Placed by your waiter' : 'Placed from your phone' }}</span>
+          <b>{{ price(o.total) }}</b>
+          @if (o.can_cancel) {
+            <button type="button" class="bk-link" (click)="cancel(o)">Cancel</button>
+          }
+        </footer>
+        @if (o.cancel_reason) { <p class="bk-muted">{{ o.cancel_reason }}</p> }
+      </article>
+    } @empty {
+      <p class="bk-muted center">No orders yet.</p>
+    }
+
+    @if (active().length) {
+      <article class="bk-card totals">
+        <div><span>Food</span><span>{{ price(v.subtotal) }}</span></div>
+        <div><span>Taxes</span><span>{{ price(v.tax_total) }}</span></div>
+        <div class="grand"><span>Total so far</span><span data-testid="table-total">{{ price(v.total) }}</span></div>
+        <p class="bk-muted">The final bill with any serving-time discount comes when you finish.</p>
+      </article>
+    }
+  } @else if (loading()) {
+    <div class="wl-state"><span class="wl-spinner" aria-label="Loading"></span></div>
+  } @else {
+    <article class="bk-card">
+      <p>Your waiter gives you an <b>order ID</b> (like <b>UB-4821</b>) and a <b>4-digit PIN</b> when you are seated.</p>
+      <form class="bk-row" (ngSubmit)="join()">
+        <label class="bk-field">
+          <span>Order ID</span>
+          <input name="code" [(ngModel)]="code" autocomplete="off" autocapitalize="characters" placeholder="UB-4821"
+                 required data-testid="join-code" />
+        </label>
+        <label class="bk-field">
+          <span>PIN</span>
+          <input name="pin" [(ngModel)]="pin" inputmode="numeric" maxlength="4" pattern="\d{4}" autocomplete="off"
+                 required data-testid="join-pin" />
+        </label>
+        <div class="bk-actions join">
+          <button type="submit" class="wl-btn wl-btn--primary" [disabled]="busy() || code.length < 4 || pin.length !== 4">
+            Open my table
+          </button>
+        </div>
+      </form>
+    </article>
+  }
+</section>

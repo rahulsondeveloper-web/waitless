@@ -1,0 +1,81 @@
+<header class="page-head">
+  <div>
+    <h1>Kitchen</h1>
+    <p class="muted">
+      @if (live()) {
+        <span class="live" role="status"><span class="dot"></span> Live — new orders appear instantly</span>
+      } @else {
+        Order tickets
+      }
+    </p>
+  </div>
+  @if (branches().length > 1) {
+    <label class="field">
+      <span>Branch</span>
+      <select [value]="branchId() ?? ''" (change)="selectBranch($any($event.target).value)" aria-label="Branch">
+        @for (b of branches(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+      </select>
+    </label>
+  }
+</header>
+
+@if (error(); as e) {
+  <wl-error-state title="Could not load orders" [message]="e.message" [retryable]="false" />
+} @else if (!orders()) {
+  <wl-loading-state />
+} @else {
+  <div class="board">
+    @for (lane of lanes; track lane.key) {
+      <section class="lane" [attr.data-lane]="lane.key" [attr.aria-label]="lane.title">
+        <h2>{{ lane.title }} <span class="count">{{ byLane()[lane.key].length }}</span></h2>
+        @for (o of byLane()[lane.key]; track o.id) {
+          <article class="ticket" [class.late]="minutes(o) >= 15 && lane.key !== 'ready'" data-testid="ticket">
+            <header>
+              <b>#{{ o.number }}</b>
+              <span>{{ where(o) }}</span>
+              <span class="mins" [attr.aria-label]="minutes(o) + ' minutes since ordered'">{{ minutes(o) }}′</span>
+            </header>
+            <ul>
+              @for (l of o.items; track l.id) {
+                <li>
+                  <b>{{ l.quantity }}×</b> {{ l.name }}{{ l.variant_name ? ' · ' + l.variant_name : '' }}
+                  @for (a of l.addons; track a.name) { <small>+ {{ a.name }}</small> }
+                  @if (l.instructions) { <em>“{{ l.instructions }}”</em> }
+                </li>
+              }
+            </ul>
+            @if (o.notes) { <p class="note">Note: {{ o.notes }}</p> }
+            <footer>
+              <span class="muted">{{ o.source === 'staff' ? 'Waiter' : 'Guest' }}{{ o.guest_name ? ' · ' + o.guest_name : '' }}</span>
+              @if (allowed(lane)) {
+                <button mat-flat-button (click)="advance(o, lane)" [disabled]="busy() === o.id">{{ lane.action }}</button>
+              }
+            </footer>
+          </article>
+        } @empty {
+          <p class="empty">—</p>
+        }
+      </section>
+    }
+  </div>
+
+  @if (waiting().length) {
+    <section class="panel preorders" aria-labelledby="h-pre">
+      <h2 id="h-pre">Pre-orders waiting for arrival</h2>
+      <p class="muted">Start these after staff confirm the guests' arrival — the 15-minute promise starts then.</p>
+      <ul class="rows">
+        @for (o of waiting(); track o.id) {
+          <li class="row">
+            <span class="row__lead">#{{ o.number }}</span>
+            <div class="row__main">
+              <b>{{ o.guest_name }} · booking {{ o.reservation_code }}</b>
+              <span class="muted">{{ o.reservation_starts_at ? 'Arrives ' + when(o.reservation_starts_at) : '' }}</span>
+              <span>@for (l of o.items; track l.id) { {{ l.quantity }}× {{ l.name }}{{ $last ? '' : ', ' }} }</span>
+            </div>
+            <span></span>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+}

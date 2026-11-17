@@ -1,8 +1,9 @@
 import uuid
+from datetime import time
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.models.menu import ALLERGENS
 from app.schemas.common import ApiModel
@@ -10,6 +11,13 @@ from app.schemas.common import ApiModel
 FoodClass = Literal["veg", "non_veg", "egg"]
 Allergen = Literal[ALLERGENS]  # type: ignore[valid-type]
 NameStr = Annotated[str, Field(min_length=1, max_length=80)]
+Money = Annotated[Decimal, Field(ge=0, le=999999, max_digits=8, decimal_places=2)]
+TaxPct = Annotated[Decimal, Field(ge=0, le=40, max_digits=4, decimal_places=2)]
+Tag = Annotated[str, Field(min_length=1, max_length=30)]
+
+
+def _clean_tags(v: list[str]) -> list[str]:
+    return list(dict.fromkeys(t.strip().lower() for t in v if t.strip()))
 
 
 # ---------- admin: structure ----------
@@ -66,11 +74,18 @@ class ItemIn(ApiModel):
     is_bestseller: bool = False
     is_todays_special: bool = False
     is_available: bool = True
+    tax_pct: TaxPct = Decimal("5")
+    tags: list[Tag] = Field(default_factory=list, max_length=10)
 
     @field_validator("allergens")
     @classmethod
     def _unique(cls, v: list[str]) -> list[str]:
         return list(dict.fromkeys(v))
+
+    @field_validator("tags")
+    @classmethod
+    def _tags(cls, v: list[str]) -> list[str]:
+        return _clean_tags(v)
 
 
 class ItemPatch(ApiModel):
@@ -87,6 +102,105 @@ class ItemPatch(ApiModel):
     is_todays_special: bool | None = None
     is_available: bool | None = None
     sort_order: int | None = Field(default=None, ge=0, le=9999)
+    tax_pct: TaxPct | None = None
+    tags: list[Tag] | None = Field(default=None, max_length=10)
+
+    @field_validator("tags")
+    @classmethod
+    def _tags(cls, v: list[str] | None) -> list[str] | None:
+        return None if v is None else _clean_tags(v)
+
+
+# ---------- admin: item options (Phase 7) ----------
+
+
+class VariantIn(ApiModel):
+    name: str = Field(min_length=1, max_length=40)
+    price: Money
+
+
+class AddonIn(ApiModel):
+    name: str = Field(min_length=1, max_length=60)
+    price: Money = Decimal("0")
+
+
+class AddonGroupIn(ApiModel):
+    name: str = Field(min_length=1, max_length=60)
+    min_select: int = Field(default=0, ge=0, le=20)
+    max_select: int = Field(default=1, ge=1, le=20)
+    addons: list[AddonIn] = Field(min_length=1, max_length=30)
+
+    @model_validator(mode="after")
+    def _range(self) -> "AddonGroupIn":
+        if self.min_select > self.max_select:
+            raise ValueError("Minimum choices cannot exceed the maximum.")
+        if self.min_select > len(self.addons):
+            raise ValueError("Minimum choices cannot exceed the number of add-ons.")
+        return self
+
+
+class AvailabilityIn(ApiModel):
+    weekday: int = Field(ge=0, le=6)
+    from_time: time
+    to_time: time
+
+    @model_validator(mode="after")
+    def _order(self) -> "AvailabilityIn":
+        if self.from_time >= self.to_time:
+            raise ValueError("The window must end after it starts (same day).")
+        return self
+
+
+class ItemOptionsIn(ApiModel):
+    """Replaces all variants, add-on groups and time windows of a dish in one go."""
+
+    variants: list[VariantIn] = Field(default_factory=list, max_length=10)
+    addon_groups: list[AddonGroupIn] = Field(default_factory=list, max_length=10)
+    availability: list[AvailabilityIn] = Field(default_factory=list, max_length=21)
+
+    @model_validator(mode="after")
+    def _unique(self) -> "ItemOptionsIn":
+        names = [v.name.strip().lower() for v in self.variants]
+        if len(names) != len(set(names)):
+            raise ValueError("Variant names must be unique.")
+        return self
+
+
+class BranchOverrideIn(ApiModel):
+    is_available: bool = True
+    price_override: Money | None = None
+
+
+class VariantOut(ApiModel):
+    id: uuid.UUID
+    name: str
+    price: Decimal
+
+
+class AddonOut(ApiModel):
+    id: uuid.UUID
+    name: str
+    price: Decimal
+
+
+class AddonGroupOut(ApiModel):
+    id: uuid.UUID
+    name: str
+    min_select: int
+    max_select: int
+    addons: list[AddonOut]
+
+
+class AvailabilityOut(ApiModel):
+    weekday: int
+    from_time: time
+    to_time: time
+
+
+class BranchOverrideOut(ApiModel):
+    branch_id: uuid.UUID
+    is_available: bool
+    price_override: Decimal | None
 
 
 class StockPatch(ApiModel):
@@ -110,6 +224,12 @@ class ItemOut(ApiModel):
     is_available: bool
     is_archived: bool
     sort_order: int
+    tax_pct: Decimal = Decimal("5")
+    tags: list[str] = Field(default_factory=list)
+    variants: list[VariantOut] = Field(default_factory=list)
+    addon_groups: list[AddonGroupOut] = Field(default_factory=list)
+    availability: list[AvailabilityOut] = Field(default_factory=list)
+    branch_overrides: list[BranchOverrideOut] = Field(default_factory=list)
 
 
 class SubcategoryOut(ApiModel):
@@ -161,6 +281,12 @@ class PublicItem(ApiModel):
     is_todays_special: bool
     is_available: bool
     subcategory: str | None
+    tax_pct: Decimal = Decimal("5")
+    tags: list[str] = Field(default_factory=list)
+    variants: list[VariantOut] = Field(default_factory=list)
+    addon_groups: list[AddonGroupOut] = Field(default_factory=list)
+    availability: list[AvailabilityOut] = Field(default_factory=list)  # empty = whenever open
+    branch_overrides: list[BranchOverrideOut] = Field(default_factory=list)
 
 
 class PublicCategory(ApiModel):
@@ -182,3 +308,4 @@ class PublicMenu(ApiModel):
     currency: str
     meal_types: list[PublicMealType]
     categories: list[PublicCategory]
+    ordering_enabled: bool = False  # plan includes digital ordering (Phase 7)

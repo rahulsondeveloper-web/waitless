@@ -16,6 +16,10 @@ export class ApiService {
     return this.http.get<T>(this.url(path), { params: toParams(params) }).pipe(catchError(rethrow));
   }
 
+  getWithHeaders<T>(path: string, headers: Record<string, string>, params?: Params): Observable<T> {
+    return this.http.get<T>(this.url(path), { params: toParams(params), headers }).pipe(catchError(rethrow));
+  }
+
   post<T>(path: string, body: unknown, headers?: Record<string, string>): Observable<T> {
     return this.http.post<T>(this.url(path), body, { headers }).pipe(catchError(rethrow));
   }

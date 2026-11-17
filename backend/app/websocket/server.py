@@ -14,10 +14,11 @@ import socketio
 from app.core.config import get_settings
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, decode_table_token
 from app.models import Branch
 from app.services.access import load_tenant_context
 from app.services.notify import user_room
+from app.services.orders import table_session_room
 from app.websocket.bus import NAMESPACE, branch_queue_room, branch_staff_room, set_server
 
 log = logging.getLogger(__name__)
@@ -90,6 +91,15 @@ def create_socket_server() -> socketio.AsyncServer:
                 return {"ok": False, "error": "INVALID_BRANCH"}
             await sio.enter_room(sid, room, namespace=NAMESPACE)
             return {"ok": True, "room": room}
+        if kind == "table_session":
+            # Guests at a table: authorised by their table token (code + PIN), no account needed.
+            try:
+                claims = decode_table_token(str(data.get("token") or ""))
+            except AppError:
+                return {"ok": False, "error": "TABLE_TOKEN_INVALID"}
+            room = table_session_room(claims.tenant_id, claims.session_id)
+            await sio.enter_room(sid, room, namespace=NAMESPACE)
+            return {"ok": True, "room": room}
         if not identity.get("user_id"):
             return {"ok": False, "error": "NOT_AUTHENTICATED"}
         if kind == "user":
@@ -118,11 +128,14 @@ def create_socket_server() -> socketio.AsyncServer:
         try:
             if data.get("kind") == "branch_queue":
                 room = branch_queue_room(uuid.UUID(str(data.get("tenant_id"))), uuid.UUID(str(data.get("branch_id"))))
+            elif data.get("kind") == "table_session":
+                claims = decode_table_token(str(data.get("token") or ""))
+                room = table_session_room(claims.tenant_id, claims.session_id)
             elif data.get("kind") == "user":
                 room = user_room(uuid.UUID(identity["user_id"]))
             else:
                 room = branch_staff_room(uuid.UUID(identity["tenant_id"]), uuid.UUID(str(data.get("branch_id"))))
-        except (ValueError, TypeError, KeyError):
+        except (ValueError, TypeError, KeyError, AppError):
             return {"ok": False}
         await sio.leave_room(sid, room, namespace=NAMESPACE)
         return {"ok": True}

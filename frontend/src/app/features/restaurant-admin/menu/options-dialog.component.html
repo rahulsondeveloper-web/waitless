@@ -1,0 +1,79 @@
+<h2 mat-dialog-title>{{ data.item.name }} — options</h2>
+<mat-dialog-content>
+  <mat-tab-group animationDuration="150ms">
+    <mat-tab label="Sizes">
+      <p class="hint">E.g. Half / Full. When a dish has sizes, guests must pick one and its price replaces the base price.</p>
+      @for (v of variants; track $index; let i = $index) {
+        <div class="row">
+          <label class="field grow"><span>Size name</span><input [(ngModel)]="v.name" [name]="'vn' + i" maxlength="40" data-testid="variant-name" /></label>
+          <label class="field"><span>Price</span><input type="number" min="0" step="1" [(ngModel)]="v.price" [name]="'vp' + i" class="narrow" data-testid="variant-price" /></label>
+          <button mat-icon-button type="button" (click)="removeVariant(i)" aria-label="Remove size"><mat-icon>delete</mat-icon></button>
+        </div>
+      }
+      <button mat-stroked-button type="button" (click)="addVariant()" data-testid="add-variant"><mat-icon>add</mat-icon>Add size</button>
+    </mat-tab>
+
+    <mat-tab label="Extras">
+      <p class="hint">Groups like "Toppings (choose up to 3)" or "Choose a dip (exactly 1)".</p>
+      @for (g of groups; track $index; let gi = $index) {
+        <fieldset class="group">
+          <div class="row">
+            <label class="field grow"><span>Group name</span><input [(ngModel)]="g.name" [name]="'gn' + gi" maxlength="60" /></label>
+            <label class="field"><span>Min</span><input type="number" min="0" max="20" [(ngModel)]="g.min_select" [name]="'gmin' + gi" class="tiny" /></label>
+            <label class="field"><span>Max</span><input type="number" min="1" max="20" [(ngModel)]="g.max_select" [name]="'gmax' + gi" class="tiny" /></label>
+            <button mat-icon-button type="button" (click)="removeGroup(gi)" aria-label="Remove group"><mat-icon>delete</mat-icon></button>
+          </div>
+          @for (a of g.addons; track $index; let ai = $index) {
+            <div class="row sub">
+              <label class="field grow"><span>Extra</span><input [(ngModel)]="a.name" [name]="'an' + gi + '-' + ai" maxlength="60" /></label>
+              <label class="field"><span>+ Price</span><input type="number" min="0" [(ngModel)]="a.price" [name]="'ap' + gi + '-' + ai" class="narrow" /></label>
+              <button mat-icon-button type="button" (click)="removeAddon(g, ai)" aria-label="Remove extra"><mat-icon>close</mat-icon></button>
+            </div>
+          }
+          <button mat-button type="button" (click)="addAddon(g)"><mat-icon>add</mat-icon>Add extra</button>
+        </fieldset>
+      }
+      <button mat-stroked-button type="button" (click)="addGroup()"><mat-icon>add</mat-icon>Add group</button>
+    </mat-tab>
+
+    <mat-tab label="Serving times">
+      <label class="check"><input type="checkbox" [checked]="limited" (change)="setLimited($any($event.target).checked)" />
+        Only serve this dish at certain times (e.g. breakfast 08:00–11:00)</label>
+      @if (limited) {
+        @for (w of windows; track $index; let i = $index) {
+          <div class="row">
+            <label class="field"><span>Day</span>
+              <select [(ngModel)]="w.weekday" [name]="'wd' + i">
+                @for (d of days; track d; let n = $index) { <option [ngValue]="n">{{ d }}</option> }
+              </select></label>
+            <label class="field"><span>From</span><input type="time" [(ngModel)]="w.from_time" [name]="'wf' + i" /></label>
+            <label class="field"><span>To</span><input type="time" [(ngModel)]="w.to_time" [name]="'wt' + i" /></label>
+            <button mat-icon-button type="button" (click)="removeWindow(i)" aria-label="Remove time"><mat-icon>delete</mat-icon></button>
+          </div>
+        }
+        <button mat-stroked-button type="button" (click)="addWindow()"><mat-icon>add</mat-icon>Add time</button>
+      } @else {
+        <p class="hint">Served whenever the restaurant is open.</p>
+      }
+    </mat-tab>
+
+    @if (branchRows.length) {
+      <mat-tab label="Branches">
+        <p class="hint">Hide the dish at a branch or charge a different price there (sizes keep their own prices).</p>
+        @for (r of branchRows; track r.branch.id) {
+          <div class="row">
+            <span class="grow"><b>{{ r.branch.name }}</b></span>
+            <label class="check"><input type="checkbox" [(ngModel)]="r.is_available" [name]="'ba' + r.branch.id" /> Served here</label>
+            <label class="field"><span>Price here</span>
+              <input type="number" min="0" [(ngModel)]="r.price_override" [name]="'bp' + r.branch.id" [placeholder]="data.item.base_price" class="narrow" /></label>
+          </div>
+        }
+      </mat-tab>
+    }
+  </mat-tab-group>
+  @if (error(); as e) { <p class="err" role="alert">{{ e }}</p> }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="undefined">Cancel</button>
+  <button mat-flat-button type="button" (click)="save()" [disabled]="saving()" data-testid="save-options">Save</button>
+</mat-dialog-actions>

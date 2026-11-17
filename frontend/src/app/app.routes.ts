@@ -106,7 +106,11 @@ export const routes: Routes = [
             title: 'My bookings · WaitLess',
             loadComponent: () => import('./features/customer/bookings.page').then((m) => m.MyBookingsPage),
           },
-          page('orders', 'My Orders', 7),
+          {
+            path: 'orders',
+            title: 'My orders · WaitLess',
+            loadComponent: () => import('./features/customer/orders.page').then((m) => m.MyOrdersPage),
+          },
         ],
       },
       {
@@ -153,8 +157,14 @@ export const routes: Routes = [
         path: 'contact',
         loadComponent: () => import('./features/storefront/contact/contact.page').then((m) => m.StorefrontContactPage),
       },
-      page('cart', 'Cart', 7),
-      page('session', 'My Table', 7),
+      {
+        path: 'cart',
+        loadComponent: () => import('./features/storefront/cart/cart.page').then((m) => m.StorefrontCartPage),
+      },
+      {
+        path: 'session',
+        loadComponent: () => import('./features/storefront/session/session.page').then((m) => m.StorefrontSessionPage),
+      },
     ],
   },
 
@@ -167,7 +177,7 @@ export const routes: Routes = [
     children: adminChildren(
       RESTAURANT_ADMIN_NAV,
       {
-        profile: 3, branding: 3, gallery: 3, orders: 7, kitchen: 7, inventory: 9, suppliers: 9, purchases: 9,
+        profile: 3, branding: 3, gallery: 3, inventory: 9, suppliers: 9, purchases: 9,
         billing: 10, payments: 10, discounts: 8, reports: 11, settings: 10,
       },
       {
@@ -214,6 +224,16 @@ export const routes: Routes = [
           title: 'Reservations · WaitLess',
           loadComponent: () =>
             import('./features/restaurant-admin/reservations/reservations.page').then((m) => m.ReservationsAdminPage),
+        },
+        orders: {
+          path: 'orders',
+          title: 'Orders · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/orders/orders.page').then((m) => m.OrdersPage),
+        },
+        kitchen: {
+          path: 'kitchen',
+          title: 'Kitchen · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/kitchen/kitchen.page').then((m) => m.KitchenPage),
         },
         menu: {
           path: 'menu',

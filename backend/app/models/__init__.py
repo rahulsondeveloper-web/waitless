@@ -3,7 +3,19 @@
 from app.models.base import Base
 from app.models.booking import QueueEntry, Reservation, ReservationPayment, ReservationPolicy, ReservationTable
 from app.models.identity import OtpChallenge, RefreshToken, User
-from app.models.menu import CategoryMealType, MealType, MenuCategory, MenuItem, MenuSubcategory
+from app.models.menu import (
+    CategoryMealType,
+    MealType,
+    MenuAddon,
+    MenuAddonGroup,
+    MenuCategory,
+    MenuItem,
+    MenuItemAvailability,
+    MenuItemBranchOverride,
+    MenuItemVariant,
+    MenuSubcategory,
+)
+from app.models.orders import Order, OrderItem, OrderStatusHistory
 from app.models.platform import AuditLog, IdempotencyKey, OutboxEvent
 from app.models.profile import BusinessHours, GalleryImage, MediaFile, RestaurantBranding, RestaurantProfile, SocialLink
 from app.models.saas import Plan, PlanFeature, Subscription
@@ -28,6 +40,14 @@ __all__ = [
     "MenuCategory",
     "MenuItem",
     "MenuSubcategory",
+    "MenuAddon",
+    "MenuAddonGroup",
+    "MenuItemAvailability",
+    "MenuItemBranchOverride",
+    "MenuItemVariant",
+    "Order",
+    "OrderItem",
+    "OrderStatusHistory",
     "MediaFile",
     "RestaurantBranding",
     "RestaurantProfile",

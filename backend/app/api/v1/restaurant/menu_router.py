@@ -8,9 +8,11 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from app.api.deps import SessionDep, require_permission
 from app.schemas.menu import (
     AdminMenu,
+    BranchOverrideIn,
     CategoryIn,
     CategoryPatch,
     ItemIn,
+    ItemOptionsIn,
     ItemOut,
     ItemPatch,
     MealTypeIn,
@@ -95,6 +97,20 @@ async def create_item(body: ItemIn, session: SessionDep, ctx: MenuManage) -> Ite
 @router.patch("/menu/items/{item_id}", response_model=ItemOut, summary="Edit a dish")
 async def update_item(item_id: uuid.UUID, body: ItemPatch, session: SessionDep, ctx: MenuManage) -> ItemOut:
     return await svc.update_item(session, ctx, item_id, body)
+
+
+@router.put("/menu/items/{item_id}/options", response_model=ItemOut, summary="Variants, add-ons and time windows")
+async def set_options(item_id: uuid.UUID, body: ItemOptionsIn, session: SessionDep, ctx: MenuManage) -> ItemOut:
+    return await svc.set_options(session, ctx, item_id, body)
+
+
+@router.put(
+    "/menu/items/{item_id}/branches/{branch_id}", response_model=ItemOut, summary="Price / availability at one branch"
+)
+async def set_branch_override(
+    item_id: uuid.UUID, branch_id: uuid.UUID, body: BranchOverrideIn, session: SessionDep, ctx: MenuManage
+) -> ItemOut:
+    return await svc.set_branch_override(session, ctx, item_id, branch_id, body)
 
 
 @router.patch("/menu/items/{item_id}/stock", response_model=ItemOut, summary="Mark sold out / available")

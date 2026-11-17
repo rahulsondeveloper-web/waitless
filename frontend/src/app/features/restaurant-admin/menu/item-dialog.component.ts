@@ -98,6 +98,16 @@ export interface ItemDialogData {
             }
           </mat-chip-listbox>
         </div>
+        <mat-form-field appearance="outline">
+          <mat-label>Tax %</mat-label>
+          <input matInput type="number" min="0" max="40" step="0.5" formControlName="tax_pct" />
+          <mat-hint>GST on this dish (default 5%)</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Tags</mat-label>
+          <input matInput formControlName="tags" placeholder="chef pick, kids" />
+          <mat-hint>Comma separated</mat-hint>
+        </mat-form-field>
         <mat-checkbox formControlName="is_bestseller">Bestseller</mat-checkbox>
         <mat-checkbox formControlName="is_todays_special">Today's special</mat-checkbox>
       </form>
@@ -161,6 +171,8 @@ export class ItemDialogComponent {
     allergens: [this.data.item?.allergens ?? ([] as string[])],
     is_bestseller: [this.data.item?.is_bestseller ?? false],
     is_todays_special: [this.data.item?.is_todays_special ?? false],
+    tax_pct: [this.data.item ? Number(this.data.item.tax_pct) : 5, [Validators.min(0), Validators.max(40)]],
+    tags: [(this.data.item?.tags ?? []).join(', ')],
   });
 
   private readonly categoryId = toSignal(
@@ -178,7 +190,13 @@ export class ItemDialogComponent {
   protected save(): void {
     if (this.form.invalid) return this.form.markAllAsTouched();
     const v = this.form.getRawValue();
-    const body: ItemInput = { ...v, name: v.name.trim(), base_price: String(v.base_price ?? 0) };
+    const body: ItemInput = {
+      ...v,
+      name: v.name.trim(),
+      base_price: String(v.base_price ?? 0),
+      tax_pct: String(v.tax_pct ?? 5),
+      tags: v.tags.split(',').map((t) => t.trim()).filter(Boolean).slice(0, 10),
+    };
     this.saving.set(true);
     const req = this.data.item ? this.menu.updateItem(this.data.item.id, body) : this.menu.createItem(body);
     req.subscribe({

@@ -36,8 +36,14 @@
           <span class="material-symbols-outlined">person</span>
         </a>
       }
-      <a routerLink="cart" class="sf-icon" aria-label="Cart">
+      @if (cart.tableToken()) {
+        <a routerLink="session" class="sf-icon" aria-label="My table" title="My table">
+          <span class="material-symbols-outlined">table_restaurant</span>
+        </a>
+      }
+      <a routerLink="cart" class="sf-icon sf-cart" [attr.aria-label]="'Cart, ' + cart.count() + ' items'">
         <span class="material-symbols-outlined">shopping_bag</span>
+        @if (cart.count()) { <span class="sf-badge" data-testid="cart-count">{{ cart.count() }}</span> }
       </a>
       <a routerLink="/" class="sf-waitless" title="Back to WaitLess">
         <img src="brand/waitless-mark.svg" alt="" width="26" height="26" />
