@@ -1,0 +1,80 @@
+<section class="wl-container bk-page">
+  <header class="bk-head">
+    <h1>My bookings</h1>
+    <p>Your tables and queue tokens, at every restaurant.</p>
+  </header>
+
+  @if (toast(); as t) { <p class="bk-note" role="status">{{ t }}</p> }
+  @if (error(); as e) { <p class="bk-error" role="alert">{{ e }}</p> }
+
+  @if (!data()) {
+    <div class="wl-state"><span class="wl-spinner" aria-label="Loading"></span></div>
+  } @else {
+    @if (queue().length) {
+      <article class="bk-card">
+        <h2 class="bk-sub">In the queue</h2>
+        <ul class="list">
+          @for (q of queue(); track q.id) {
+            <li>
+              <div>
+                <b class="token">{{ q.token }}</b> at {{ q.restaurant_name }}
+                <span class="bk-badge" [attr.data-status]="q.status">{{ queueLabel[q.status] }}</span>
+                <div class="bk-muted">
+                  Place {{ q.position }} · {{ q.estimated_wait_minutes === null ? '' : '~' + q.estimated_wait_minutes + ' min' }}
+                </div>
+              </div>
+              <a [routerLink]="['/r', q.restaurant_slug, 'queue']" class="wl-btn wl-btn--ghost wl-btn--sm">Follow live</a>
+            </li>
+          }
+        </ul>
+      </article>
+    }
+
+    <article class="bk-card">
+      <h2 class="bk-sub">Upcoming</h2>
+      @if (!upcoming().length) {
+        <p class="bk-muted">No upcoming bookings. <a routerLink="/restaurants">Find a restaurant</a></p>
+      }
+      <ul class="list">
+        @for (r of upcoming(); track r.id) {
+          <li data-testid="upcoming-booking">
+            <div>
+              <b>{{ r.restaurant_name }}</b>
+              <span class="bk-badge" [attr.data-status]="r.status">{{ resLabel[r.status] }}</span>
+              <div>{{ when(r.starts_at) }} · {{ r.party_size }} guests · {{ r.branch_name }}</div>
+              <div class="bk-muted">
+                Ref {{ r.code }}{{ r.type === 'paid' ? ' · paid booking ₹' + r.booking_fee : ' · free booking' }}
+                @if (r.status === 'pending_payment' && r.payment_due_at) { · pay by {{ when(r.payment_due_at) }} }
+              </div>
+            </div>
+            <div class="actions">
+              @if (r.status === 'pending_payment') {
+                <button type="button" class="wl-btn wl-btn--primary wl-btn--sm" (click)="pay(r)">Pay now</button>
+              }
+              @if (r.can_cancel) {
+                <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="cancel(r)">Cancel</button>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    </article>
+
+    @if (past().length) {
+      <article class="bk-card">
+        <h2 class="bk-sub">Past</h2>
+        <ul class="list">
+          @for (r of past(); track r.id) {
+            <li>
+              <div>
+                <b>{{ r.restaurant_name }}</b> · {{ when(r.starts_at) }}
+                <span class="bk-badge" [attr.data-status]="r.status">{{ resLabel[r.status] }}</span>
+                @if (r.refunded_amount && +r.refunded_amount > 0) { <div class="bk-muted">₹{{ r.refunded_amount }} refunded</div> }
+              </div>
+            </li>
+          }
+        </ul>
+      </article>
+    }
+  }
+</section>

@@ -17,7 +17,8 @@ from app.core.errors import AppError
 from app.core.security import decode_access_token
 from app.models import Branch
 from app.services.access import load_tenant_context
-from app.websocket.bus import NAMESPACE, branch_staff_room, set_server
+from app.services.notify import user_room
+from app.websocket.bus import NAMESPACE, branch_queue_room, branch_staff_room, set_server
 
 log = logging.getLogger(__name__)
 
@@ -77,13 +78,30 @@ def create_socket_server() -> socketio.AsyncServer:
 
     @sio.on("subscribe", namespace=NAMESPACE)
     async def subscribe(sid: str, data: dict | None = None) -> dict:
+        """Rooms: branch_staff (staff of a branch), user (my own notifications), branch_queue (public)."""
         identity = await sio.get_session(sid, namespace=NAMESPACE)
-        if not identity.get("user_id") or not identity.get("tenant_id"):
+        data = data or {}
+        kind = data.get("kind")
+        if kind == "branch_queue":
+            # Public: only says "the queue changed" (no personal data); clients then refetch their token.
+            try:
+                room = branch_queue_room(uuid.UUID(str(data.get("tenant_id"))), uuid.UUID(str(data.get("branch_id"))))
+            except ValueError:
+                return {"ok": False, "error": "INVALID_BRANCH"}
+            await sio.enter_room(sid, room, namespace=NAMESPACE)
+            return {"ok": True, "room": room}
+        if not identity.get("user_id"):
             return {"ok": False, "error": "NOT_AUTHENTICATED"}
-        if (data or {}).get("kind") != "branch_staff":
+        if kind == "user":
+            room = user_room(uuid.UUID(identity["user_id"]))  # always the caller's own room
+            await sio.enter_room(sid, room, namespace=NAMESPACE)
+            return {"ok": True, "room": room}
+        if kind != "branch_staff":
             return {"ok": False, "error": "UNKNOWN_ROOM"}
+        if not identity.get("tenant_id"):
+            return {"ok": False, "error": "NOT_AUTHENTICATED"}
         try:
-            branch_id = uuid.UUID(str(data.get("branch_id")))  # type: ignore[union-attr]
+            branch_id = uuid.UUID(str(data.get("branch_id")))
         except ValueError:
             return {"ok": False, "error": "INVALID_BRANCH"}
         tenant_id = uuid.UUID(identity["tenant_id"])
@@ -96,8 +114,14 @@ def create_socket_server() -> socketio.AsyncServer:
     @sio.on("unsubscribe", namespace=NAMESPACE)
     async def unsubscribe(sid: str, data: dict | None = None) -> dict:
         identity = await sio.get_session(sid, namespace=NAMESPACE)
+        data = data or {}
         try:
-            room = branch_staff_room(uuid.UUID(identity["tenant_id"]), uuid.UUID(str((data or {}).get("branch_id"))))
+            if data.get("kind") == "branch_queue":
+                room = branch_queue_room(uuid.UUID(str(data.get("tenant_id"))), uuid.UUID(str(data.get("branch_id"))))
+            elif data.get("kind") == "user":
+                room = user_room(uuid.UUID(identity["user_id"]))
+            else:
+                room = branch_staff_room(uuid.UUID(identity["tenant_id"]), uuid.UUID(str(data.get("branch_id"))))
         except (ValueError, TypeError, KeyError):
             return {"ok": False}
         await sio.leave_room(sid, room, namespace=NAMESPACE)

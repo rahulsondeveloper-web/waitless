@@ -3,7 +3,7 @@
     python -m app.worker
 
 Every job runs under a Redis lock so that running several workers never executes a job twice.
-Jobs for later phases (reservation expiry, SLA boundaries, outbox dispatch, alerts) register here.
+Jobs: heartbeat, reservation_tick. Later phases add SLA boundaries, outbox dispatch, alerts) register here.
 """
 
 import asyncio
@@ -50,15 +50,32 @@ async def heartbeat() -> None:
         await client.set(WORKER_HEARTBEAT_KEY, datetime.now(UTC).isoformat(), ex=300)
 
 
+@locked("reservation_tick", ttl_seconds=55)
+async def reservation_tick() -> None:
+    """Expire unpaid / no-arrival bookings and mark tables reserved shortly before bookings (PRD §12)."""
+    from app.core.db import get_sessionmaker
+    from app.services.reservations import tick
+
+    async with get_sessionmaker()() as session:
+        counts = await tick(session)
+    if any(counts.values()):
+        log.info("reservation tick: %s", counts)
+
+
 def build_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC", job_defaults={"coalesce": True, "max_instances": 1})
     scheduler.add_job(heartbeat, "interval", seconds=30, id="heartbeat", next_run_time=datetime.now(UTC))
+    scheduler.add_job(reservation_tick, "interval", seconds=60, id="reservation_tick", next_run_time=datetime.now(UTC))
     return scheduler
 
 
 async def main() -> None:
     settings = get_settings()
     setup_logging(settings.log_level, settings.log_json)
+    from app.websocket.bus import set_server
+    from app.websocket.server import create_emitter
+
+    set_server(create_emitter())  # worker events reach browsers through Redis
     scheduler = build_scheduler()
     scheduler.start()
     log.info("Worker started with jobs: %s", ", ".join(j.id for j in scheduler.get_jobs()))

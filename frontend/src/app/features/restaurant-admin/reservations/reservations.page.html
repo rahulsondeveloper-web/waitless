@@ -1,0 +1,191 @@
+<header class="page-head">
+  <div>
+    <h1>Reservations</h1>
+    <p class="muted">
+      @if (live()) {
+        <span class="live" role="status"><span class="dot"></span> Live</span>
+      } @else {
+        Bookings and arrivals
+      }
+    </p>
+  </div>
+  <div class="head-tools">
+    @if (branches().length > 1) {
+      <label class="field">
+        <span>Branch</span>
+        <select [value]="branchId() ?? ''" (change)="selectBranch($any($event.target).value)" aria-label="Branch">
+          @for (b of branches(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+        </select>
+      </label>
+    }
+  </div>
+</header>
+
+@if (error(); as e) {
+  <wl-error-state title="Could not load reservations" [message]="e.message" [retryable]="false" />
+} @else {
+  <mat-tab-group animationDuration="150ms">
+    <mat-tab label="Bookings">
+      <div class="day-bar">
+        <button mat-icon-button (click)="shiftDay(-1)" aria-label="Previous day"><mat-icon>chevron_left</mat-icon></button>
+        <label class="field"><span>Date</span>
+          <input type="date" [value]="date()" (change)="setDate($any($event.target).value)" data-testid="admin-res-date" /></label>
+        <button mat-icon-button (click)="shiftDay(1)" aria-label="Next day"><mat-icon>chevron_right</mat-icon></button>
+        <span class="muted stats">
+          {{ counts().total }} bookings · {{ counts().guests }} guests · {{ counts().waiting }} expected · {{ counts().arrived }} arrived
+        </span>
+      </div>
+
+      @if (!list()) {
+        <wl-loading-state />
+      } @else {
+        @if (!list()!.length) { <p class="empty">No bookings on this day.</p> }
+        <ul class="rows">
+          @for (r of list()!; track r.id) {
+            <li class="row" [attr.data-status]="r.status" data-testid="admin-reservation">
+              <span class="row__lead">{{ time(r.starts_at) }}</span>
+              <div class="row__main">
+                <div>
+                  <b>{{ r.guest_name }}</b> · {{ r.party_size }} guests
+                  <span class="badge" [attr.data-status]="r.status">{{ statusLabel[r.status] }}</span>
+                  @if (r.type === 'paid') { <span class="badge paid">Paid ₹{{ r.booking_fee }}</span> }
+                </div>
+                <span class="muted">
+                  Ref {{ r.code }}
+                  @if (r.table_labels.length) { · table {{ r.table_labels.join(', ') }} }
+                  @if (r.phone) { · {{ r.phone }} }
+                  @if (r.status === 'confirmed') { · hold until {{ time(r.arrival_deadline) }} }
+                  @if (r.staff_confirmed_at) { · arrived {{ time(r.staff_confirmed_at) }} }
+                </span>
+                @if (r.notes) { <span class="note">“{{ r.notes }}”</span> }
+              </div>
+              @if (canManage()) {
+                <div class="row__actions">
+                  @if (r.status === 'confirmed') {
+                    <button mat-flat-button [matMenuTriggerFor]="arriveMenu" [disabled]="busy() === r.id" data-testid="arrive">
+                      <mat-icon>how_to_reg</mat-icon>Confirm arrival</button>
+                    <mat-menu #arriveMenu="matMenu">
+                      @for (t of seatOptions(r); track t.id) {
+                        <button mat-menu-item (click)="arrive(r, t.id)">
+                          {{ t.label }} · {{ t.capacity }} seats{{ r.table_labels.includes(t.label) ? ' (held)' : '' }}
+                        </button>
+                      } @empty {
+                        <button mat-menu-item disabled>No free table fits {{ r.party_size }}</button>
+                      }
+                    </mat-menu>
+                  }
+                  @if (r.status === 'confirmed' || r.status === 'pending_payment') {
+                    <button mat-icon-button [matMenuTriggerFor]="more" aria-label="More actions"><mat-icon>more_vert</mat-icon></button>
+                    <mat-menu #more="matMenu">
+                      @if (r.status === 'confirmed') {
+                        <button mat-menu-item (click)="noShow(r)"><mat-icon>person_off</mat-icon>No-show</button>
+                      }
+                      <button mat-menu-item (click)="cancel(r)"><mat-icon>event_busy</mat-icon>Cancel booking</button>
+                    </mat-menu>
+                  }
+                </div>
+              } @else {
+                <span></span>
+              }
+            </li>
+          }
+        </ul>
+      }
+
+      @if (canManage()) {
+        <section class="panel phone" aria-labelledby="h-phone">
+          <h2 id="h-phone">Phone booking</h2>
+          <form class="inline-form" (ngSubmit)="addPhoneBooking()">
+            <label class="field"><span>Guest name</span>
+              <input name="pname" [(ngModel)]="phone.name" maxlength="80" required /></label>
+            <label class="field"><span>Mobile</span>
+              <input name="pphone" type="tel" [(ngModel)]="phone.phone" placeholder="+91…" /></label>
+            <label class="field"><span>Guests</span>
+              <input name="pparty" type="number" min="1" max="50" [(ngModel)]="phone.party" (change)="loadSlots()" class="narrow" /></label>
+            <label class="field"><span>Date</span>
+              <input name="pdate" type="date" [(ngModel)]="phone.date" (change)="loadSlots()" /></label>
+            <label class="field"><span>Time</span>
+              <select name="pslot" [(ngModel)]="phone.slot">
+                <option value="">{{ slots()?.message || 'Choose…' }}</option>
+                @for (s of slots()?.slots ?? []; track s.starts_at) {
+                  <option [value]="s.starts_at" [disabled]="!s.available">{{ s.label }}{{ s.available ? '' : ' · full' }}</option>
+                }
+              </select></label>
+            <label class="field grow"><span>Notes</span>
+              <input name="pnotes" [(ngModel)]="phone.notes" maxlength="500" /></label>
+            <button mat-flat-button type="submit" [disabled]="busy() === 'phone'"><mat-icon>add_call</mat-icon>Book</button>
+          </form>
+        </section>
+      }
+    </mat-tab>
+
+    <mat-tab label="Booking policy">
+      @if (policy(); as p) {
+        <form class="policy" (ngSubmit)="savePolicy()">
+          <fieldset [disabled]="!canEditPolicy()">
+            <section class="panel">
+              <h2>What guests can do online</h2>
+              <mat-slide-toggle [checked]="p.accepts_queue" (change)="patchPolicy('accepts_queue', $event.checked)">
+                Online queue (walk-ins join from their phone)</mat-slide-toggle>
+              <mat-slide-toggle [checked]="p.accepts_reservations" (change)="patchPolicy('accepts_reservations', $event.checked)">
+                Online reservations</mat-slide-toggle>
+              <mat-slide-toggle [checked]="p.free_enabled" (change)="patchPolicy('free_enabled', $event.checked)">
+                Free bookings</mat-slide-toggle>
+              <mat-slide-toggle [checked]="p.paid_enabled" [disabled]="!paidAllowed()"
+                                (change)="patchPolicy('paid_enabled', $event.checked)" data-testid="paid-toggle">
+                Paid bookings (guests can pre-order)</mat-slide-toggle>
+              @if (!paidAllowed()) { <p class="muted">Paid bookings are part of the Professional plan.</p> }
+              @if (p.paid_enabled) {
+                <label class="field"><span>Booking fee (₹)</span>
+                  <input type="number" min="1" step="1" name="fee" [ngModel]="p.booking_fee"
+                         (ngModelChange)="patchPolicy('booking_fee', $event)" class="narrow" /></label>
+              }
+            </section>
+
+            <section class="panel grid">
+              <h2>Times</h2>
+              <label class="field"><span>Slot length</span>
+                <select name="slot" [ngModel]="p.slot_minutes" (ngModelChange)="patchPolicy('slot_minutes', $event)">
+                  <option [ngValue]="15">15 min</option><option [ngValue]="30">30 min</option><option [ngValue]="60">60 min</option>
+                </select></label>
+              <label class="field"><span>Table held for (dining, min)</span>
+                <input type="number" min="30" max="360" name="dining" [ngModel]="p.dining_minutes"
+                       (ngModelChange)="patchPolicy('dining_minutes', +$event)" /></label>
+              <label class="field"><span>Grace period (min)</span>
+                <input type="number" min="0" max="120" name="grace" [ngModel]="p.grace_minutes"
+                       (ngModelChange)="patchPolicy('grace_minutes', +$event)" /></label>
+              <label class="field"><span>Minimum notice (min)</span>
+                <input type="number" min="0" name="lead" [ngModel]="p.min_lead_minutes"
+                       (ngModelChange)="patchPolicy('min_lead_minutes', +$event)" /></label>
+              <label class="field"><span>Book up to (days ahead)</span>
+                <input type="number" min="1" max="365" name="adv" [ngModel]="p.max_advance_days"
+                       (ngModelChange)="patchPolicy('max_advance_days', +$event)" /></label>
+              <label class="field"><span>Party size from</span>
+                <input type="number" min="1" max="50" name="minp" [ngModel]="p.min_party"
+                       (ngModelChange)="patchPolicy('min_party', +$event)" /></label>
+              <label class="field"><span>Party size up to</span>
+                <input type="number" min="1" max="50" name="maxp" [ngModel]="p.max_party"
+                       (ngModelChange)="patchPolicy('max_party', +$event)" /></label>
+            </section>
+
+            <section class="panel grid">
+              <h2>Cancellation &amp; refunds</h2>
+              <label class="field"><span>Free cancellation until (hours before)</span>
+                <input type="number" min="0" max="168" name="fch" [ngModel]="p.free_cancel_hours"
+                       (ngModelChange)="patchPolicy('free_cancel_hours', +$event)" /></label>
+              <mat-slide-toggle [checked]="p.refund_on_no_show" (change)="patchPolicy('refund_on_no_show', $event.checked)">
+                Refund the fee on no-show</mat-slide-toggle>
+            </section>
+          </fieldset>
+          @if (canEditPolicy()) {
+            <div class="save">
+              <button mat-flat-button type="submit" [disabled]="busy() === 'policy'" data-testid="save-policy">Save policy</button>
+            </div>
+          }
+        </form>
+      } @else {
+        <wl-loading-state />
+      }
+    </mat-tab>
+  </mat-tab-group>
+}

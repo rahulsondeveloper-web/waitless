@@ -41,6 +41,7 @@ export class StorefrontLayoutComponent implements OnDestroy {
     { label: 'Gallery', path: 'gallery' },
     { label: 'About Us', path: 'about' },
     { label: 'Reservations', path: 'reservations' },
+    { label: 'Queue', path: 'queue' },
     { label: 'Contact', path: 'contact' },
   ];
 

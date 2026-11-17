@@ -360,6 +360,7 @@ async def _session_out(session: AsyncSession, s: TableSession) -> SessionOut:
         branch_id=s.branch_id,
         public_code=s.public_code,
         status=s.status,
+        source=s.source,
         party_size=s.party_size,
         guest_name=s.guest_name,
         table_ids=list(table_ids),
@@ -483,6 +484,10 @@ async def close(session: AsyncSession, ctx: TenantContext, session_id: uuid.UUID
     if tables:
         await session.execute(update(RestaurantTable).where(RestaurantTable.id.in_(tables)).values(status="cleaning"))
     s.status, s.closed_at, s.closed_by = "closed", now, ctx.user_id
+    if s.source == "reservation":
+        from app.services.reservations import complete_for_session  # local: reservations imports this module
+
+        await complete_for_session(session, s.id)
     await session.commit()
     await _changed(ctx, s.branch_id)
     return await _session_out(session, s)

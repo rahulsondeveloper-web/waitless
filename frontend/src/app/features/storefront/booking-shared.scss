@@ -1,0 +1,154 @@
+// Shared look for the storefront queue / reservation pages (inherits the restaurant's theme tokens).
+:host {
+  display: block;
+}
+
+.bk-page {
+  display: grid;
+  gap: 1.4rem;
+  max-width: 760px;
+  padding-block: 2.5rem 4rem;
+}
+
+.bk-head {
+  text-align: center;
+  display: grid;
+  gap: 0.4rem;
+  h1 {
+    font: 600 clamp(1.9rem, 4.5vw, 2.8rem) / 1.1 var(--wl-font-serif);
+  }
+  p {
+    color: var(--wl-text-soft);
+  }
+}
+
+.bk-card {
+  background: var(--wl-surface);
+  border: 1px solid var(--wl-line);
+  border-radius: var(--wl-radius-lg);
+  padding: clamp(1rem, 3vw, 1.6rem);
+  box-shadow: var(--wl-shadow-sm);
+  display: grid;
+  gap: 1rem;
+}
+
+.bk-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.9rem;
+}
+
+.bk-field {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+  > span {
+    font-weight: 600;
+    color: var(--wl-text-soft);
+  }
+  input,
+  select,
+  textarea {
+    font: inherit;
+    padding: 0.7rem 0.85rem;
+    border: 1.5px solid var(--wl-line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--wl-text);
+    min-height: 44px;
+    &:focus-visible {
+      outline: 2px solid var(--wl-primary);
+      outline-offset: 1px;
+    }
+  }
+  small {
+    color: var(--wl-muted);
+  }
+}
+
+.bk-error {
+  background: #fde8e4;
+  color: #8a2a17;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+}
+
+.bk-note {
+  background: var(--wl-primary-soft);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: var(--wl-text);
+}
+
+.bk-muted {
+  color: var(--wl-muted);
+  font-size: 0.9rem;
+}
+
+.bk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+}
+
+.bk-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.6rem;
+  text-align: center;
+  div {
+    background: var(--wl-bg);
+    border-radius: 12px;
+    padding: 0.8rem 0.5rem;
+  }
+  b {
+    display: block;
+    font: 600 1.7rem var(--wl-font-serif);
+    color: var(--wl-primary);
+  }
+  span {
+    font-size: 0.8rem;
+    color: var(--wl-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+}
+
+.bk-badge {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--wl-surface-alt);
+  &[data-status='confirmed'],
+  &[data-status='waiting'] {
+    background: #e3efe1;
+    color: #2f5a2b;
+  }
+  &[data-status='notified'],
+  &[data-status='pending_payment'] {
+    background: #fbefd3;
+    color: #7a5310;
+  }
+  &[data-status='checked_in'],
+  &[data-status='seated'],
+  &[data-status='completed'] {
+    background: #e0eaf7;
+    color: #24497a;
+  }
+  &[data-status='cancelled'],
+  &[data-status='expired'],
+  &[data-status='no_show'],
+  &[data-status='skipped'] {
+    background: #f4e1dc;
+    color: #7f2f1d;
+  }
+}
+
+button.wl-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}

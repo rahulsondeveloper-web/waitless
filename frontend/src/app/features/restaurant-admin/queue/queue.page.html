@@ -1,0 +1,128 @@
+<header class="page-head">
+  <div>
+    <h1>Queue</h1>
+    <p class="muted">
+      @if (live()) {
+        <span class="live" role="status"><span class="dot"></span> Live — guests see their place update instantly</span>
+      } @else {
+        Walk-in waiting list
+      }
+    </p>
+  </div>
+  @if (branches().length > 1) {
+    <label class="field">
+      <span>Branch</span>
+      <select [value]="branchId() ?? ''" (change)="selectBranch($any($event.target).value)" aria-label="Branch">
+        @for (b of branches(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+      </select>
+    </label>
+  }
+</header>
+
+@if (error(); as e) {
+  <wl-error-state title="Could not load the queue" [message]="e.message" [retryable]="false" />
+} @else if (!entries()) {
+  <wl-loading-state />
+} @else {
+  <div class="layout">
+    <div>
+      <section class="panel" aria-labelledby="h-add">
+        <h2 id="h-add">Add a walk-in</h2>
+        <form class="inline-form" (ngSubmit)="add()">
+          <label class="field"><span>Name</span>
+            <input name="name" [(ngModel)]="guest.name" maxlength="80" required data-testid="q-name" /></label>
+          <label class="field"><span>Guests</span>
+            <input name="party" type="number" min="1" max="50" [(ngModel)]="guest.party" class="narrow" /></label>
+          <label class="field"><span>Mobile (optional)</span>
+            <input name="phone" type="tel" [(ngModel)]="guest.phone" placeholder="+91…" /></label>
+          <button mat-flat-button type="submit" [disabled]="busy() === 'add'"><mat-icon>person_add</mat-icon>Add</button>
+        </form>
+      </section>
+
+      <mat-tab-group animationDuration="150ms">
+        <mat-tab [label]="'Waiting (' + entries()!.length + ')'">
+          @if (!entries()!.length) {
+            <p class="empty">Nobody is waiting. Free tables: {{ freeTables().length }}</p>
+          }
+          <ul class="rows">
+            @for (e of entries()!; track e.id; let first = $first; let last = $last) {
+              <li class="row" [attr.data-status]="e.status" data-testid="queue-row">
+                <span class="row__lead">{{ e.token }}</span>
+                <div class="row__main">
+                  <div>
+                    <b>{{ e.guest_name }}</b> · {{ e.party_size }} {{ e.party_size === 1 ? 'guest' : 'guests' }}
+                    <span class="badge" [attr.data-status]="e.status">{{ statusLabel[e.status] }}</span>
+                    @if (e.source === 'online') { <mat-icon class="src" matTooltip="Joined online">smartphone</mat-icon> }
+                  </div>
+                  <span class="muted">
+                    #{{ e.position }} · waiting {{ waited(e) }} min
+                    @if (e.estimated_wait_minutes !== null) { · ETA ~{{ e.estimated_wait_minutes }} min }
+                    @if (e.notified_table_label) { · holding {{ e.notified_table_label }} }
+                    @if (e.phone) { · {{ e.phone }} }
+                  </span>
+                </div>
+                <div class="row__actions">
+                  <button mat-icon-button (click)="move(e, 'up')" [disabled]="first || busy() === e.id" aria-label="Move up">
+                    <mat-icon>arrow_upward</mat-icon></button>
+                  <button mat-icon-button (click)="move(e, 'down')" [disabled]="last || busy() === e.id" aria-label="Move down">
+                    <mat-icon>arrow_downward</mat-icon></button>
+                  <button mat-stroked-button [matMenuTriggerFor]="notifyMenu" [disabled]="busy() === e.id">
+                    <mat-icon>notifications</mat-icon>Table ready</button>
+                  <mat-menu #notifyMenu="matMenu">
+                    <button mat-menu-item (click)="notify(e, null)">Notify (no table held)</button>
+                    @for (t of tablesFor(e); track t.id) {
+                      @if (t.status === 'available') {
+                        <button mat-menu-item (click)="notify(e, t.id)">Hold {{ t.label }} ({{ t.capacity }} seats)</button>
+                      }
+                    }
+                  </mat-menu>
+                  <button mat-flat-button [matMenuTriggerFor]="seatMenu" [disabled]="busy() === e.id" data-testid="q-seat">
+                    <mat-icon>event_seat</mat-icon>Seat</button>
+                  <mat-menu #seatMenu="matMenu">
+                    @for (t of tablesFor(e); track t.id) {
+                      <button mat-menu-item (click)="seat(e, t.id)">{{ t.label }} · {{ t.capacity }} seats</button>
+                    } @empty {
+                      <button mat-menu-item disabled>No free table fits {{ e.party_size }}</button>
+                    }
+                  </mat-menu>
+                  <button mat-icon-button [matMenuTriggerFor]="more" aria-label="More actions"><mat-icon>more_vert</mat-icon></button>
+                  <mat-menu #more="matMenu">
+                    <button mat-menu-item (click)="end(e, 'skip')"><mat-icon>skip_next</mat-icon>Skip</button>
+                    <button mat-menu-item (click)="end(e, 'no-show')"><mat-icon>person_off</mat-icon>No-show</button>
+                    <button mat-menu-item (click)="end(e, 'cancel')"><mat-icon>close</mat-icon>Cancel</button>
+                  </mat-menu>
+                </div>
+              </li>
+            }
+          </ul>
+        </mat-tab>
+        <mat-tab [label]="'Today (' + history().length + ')'">
+          @if (!history().length) { <p class="empty">No finished entries yet today.</p> }
+          <ul class="rows">
+            @for (e of history(); track e.id) {
+              <li class="row">
+                <span class="row__lead">{{ e.token }}</span>
+                <div class="row__main">
+                  <div><b>{{ e.guest_name }}</b> · {{ e.party_size }} guests
+                    <span class="badge" [attr.data-status]="e.status">{{ statusLabel[e.status] }}</span></div>
+                </div>
+                <span></span>
+              </li>
+            }
+          </ul>
+        </mat-tab>
+      </mat-tab-group>
+    </div>
+
+    <aside class="panel qr" aria-labelledby="h-qr">
+      <h2 id="h-qr">Queue QR code</h2>
+      <p class="muted">Put this at the entrance. Guests scan it, sign in with their mobile and get a token.</p>
+      @if (qr(); as src) { <img [src]="src" width="220" height="220" alt="QR code for the online queue" /> }
+      <code>{{ queueUrl() }}</code>
+      <div class="qr__actions">
+        <button mat-stroked-button (click)="copyLink()"><mat-icon>content_copy</mat-icon>Copy link</button>
+        <button mat-flat-button (click)="printQr()"><mat-icon>print</mat-icon>Print</button>
+      </div>
+    </aside>
+  </div>
+}

@@ -1,0 +1,155 @@
+// Shared styles for the admin Queue & Reservations pages.
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+  h1 {
+    font: 600 2rem/1.1 var(--wl-font-serif);
+  }
+}
+.head-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  align-items: flex-end;
+}
+.muted {
+  color: var(--wl-muted);
+}
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #2e6b2a;
+  font-weight: 500;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2e6b2a;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.field {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--wl-muted);
+  select,
+  input {
+    font: inherit;
+    font-size: 0.95rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--wl-line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--wl-text);
+    min-height: 38px;
+  }
+}
+.panel {
+  background: var(--wl-surface);
+  border: 1px solid var(--wl-line);
+  border-radius: var(--wl-radius);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+  h2 {
+    font: 600 1.15rem var(--wl-font-serif);
+    margin-bottom: 0.6rem;
+  }
+}
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-end;
+}
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.8rem;
+  align-items: center;
+  background: var(--wl-surface);
+  border: 1px solid var(--wl-line);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  &[data-status='notified'],
+  &[data-status='pending_payment'] {
+    border-color: #e0a53b;
+    background: #fffaf0;
+  }
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+.row__lead {
+  font: 600 1.3rem var(--wl-font-serif);
+  color: var(--wl-primary);
+  min-width: 4.2rem;
+}
+.row__main {
+  display: grid;
+  gap: 0.15rem;
+  b {
+    font-weight: 600;
+  }
+}
+.row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--wl-surface-alt);
+  margin-left: 0.3rem;
+  &[data-status='confirmed'],
+  &[data-status='waiting'] {
+    background: #e3f2e1;
+    color: #2e6b2a;
+  }
+  &[data-status='notified'],
+  &[data-status='pending_payment'] {
+    background: #fdf3cf;
+    color: #8a6a00;
+  }
+  &[data-status='checked_in'],
+  &[data-status='seated'],
+  &[data-status='completed'] {
+    background: #dde9f8;
+    color: #285a99;
+  }
+  &[data-status='cancelled'],
+  &[data-status='expired'],
+  &[data-status='no_show'],
+  &[data-status='skipped'] {
+    background: #fbe0db;
+    color: #a3321c;
+  }
+}
+.empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--wl-muted);
+}

@@ -105,6 +105,7 @@ export interface TableSession {
   branch_id: string;
   public_code: string;
   status: string;
+  source?: string;
   party_size: number;
   guest_name: string | null;
   table_ids: string[];

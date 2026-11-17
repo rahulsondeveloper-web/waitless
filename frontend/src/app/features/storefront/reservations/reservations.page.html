@@ -1,0 +1,149 @@
+<section class="wl-container bk-page">
+  <header class="bk-head">
+    <h1>Book a table</h1>
+    <p>Reserve at {{ ctx.restaurant()?.name }} in a few taps.</p>
+  </header>
+
+  @if (upcoming().length) {
+    <article class="bk-card" aria-labelledby="h-mine">
+      <h2 id="h-mine" class="bk-sub">Your bookings here</h2>
+      <ul class="mine">
+        @for (r of upcoming(); track r.id) {
+          <li data-testid="my-reservation">
+            <div>
+              <b>{{ when(r.starts_at, tz()) }}</b> · {{ r.party_size }} guests
+              <span class="bk-badge" [attr.data-status]="r.status">{{ statusLabel[r.status] }}</span>
+              <div class="bk-muted">Ref {{ r.code }}{{ r.table_labels.length ? ' · table ' + r.table_labels.join(', ') : '' }}</div>
+            </div>
+            <div class="mine__actions">
+              @if (r.status === 'pending_payment') {
+                <button type="button" class="wl-btn wl-btn--primary wl-btn--sm" (click)="pay(r)">Pay ₹{{ r.booking_fee }}</button>
+              }
+              @if (r.can_cancel) {
+                <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="cancel(r)">Cancel</button>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    </article>
+  }
+
+  @if (!loaded()) {
+    <div class="wl-state"><span class="wl-spinner" aria-label="Loading"></span></div>
+  } @else if (booked(); as r) {
+    <article class="bk-card done" role="status" data-testid="booking-confirmed">
+      <span class="material-symbols-outlined done__icon" aria-hidden="true">event_available</span>
+      <h2>Your table is booked!</h2>
+      <p><b>{{ when(r.starts_at, tz()) }}</b> · {{ r.party_size }} guests · {{ r.branch_name }}</p>
+      <p class="done__code">Ref {{ r.code }}</p>
+      <p class="bk-muted">
+        Please arrive by {{ when(r.arrival_deadline, tz()) }} — we hold the table for {{ branch()?.grace_minutes }} minutes.
+        Show this reference at the door.
+      </p>
+      <div class="bk-actions">
+        <a routerLink="/customer/bookings" class="wl-btn wl-btn--ghost wl-btn--sm">My bookings</a>
+        <button type="button" class="wl-btn wl-btn--primary wl-btn--sm" (click)="another()">Book another</button>
+      </div>
+    </article>
+  } @else if (!bookable().length) {
+    <article class="bk-card">
+      <p>{{ ctx.restaurant()?.name }} is not taking online reservations right now.</p>
+      @if (ctx.restaurant()?.contact_phone; as phone) {
+        <p>Call us: <a [href]="'tel:' + phone">{{ phone }}</a></p>
+      }
+      <div class="bk-actions"><a routerLink="../menu" class="wl-btn wl-btn--primary">Browse the menu</a></div>
+    </article>
+  } @else {
+    <article class="bk-card">
+      <div class="bk-row">
+        @if (bookable().length > 1) {
+          <label class="bk-field">
+            <span>Branch</span>
+            <select [ngModel]="branchId()" (ngModelChange)="setBranch($event)" name="branch">
+              @for (b of bookable(); track b.branch_id) { <option [value]="b.branch_id">{{ b.branch_name }}</option> }
+            </select>
+          </label>
+        }
+        <label class="bk-field">
+          <span>Date</span>
+          <input type="date" [min]="minDate()" [max]="maxDate()" [ngModel]="date()" (ngModelChange)="setDate($event)"
+                 name="date" data-testid="res-date" />
+        </label>
+        <label class="bk-field">
+          <span>Guests</span>
+          <input type="number" [min]="branch()?.min_party ?? 1" [max]="branch()?.max_party ?? 12" [ngModel]="party()"
+                 (change)="setParty($any($event.target).value)" name="party" data-testid="res-party" />
+        </label>
+      </div>
+
+      <fieldset class="slots">
+        <legend>Time</legend>
+        @if (loadingSlots()) {
+          <span class="wl-spinner" aria-label="Loading times"></span>
+        } @else if (availability(); as a) {
+          @if (a.message && !a.slots.length) {
+            <p class="bk-muted">{{ a.message }}</p>
+          } @else {
+            <div class="slot-grid" role="listbox" aria-label="Available times">
+              @for (s of a.slots; track s.starts_at) {
+                <button type="button" class="slot" role="option" [disabled]="!s.available"
+                        [class.is-picked]="slot()?.starts_at === s.starts_at"
+                        [attr.aria-selected]="slot()?.starts_at === s.starts_at" (click)="pick(s)">
+                  {{ s.label }}
+                </button>
+              }
+            </div>
+          }
+        }
+      </fieldset>
+
+      @if (slot(); as s) {
+        @if (branch(); as b) {
+          @if (b.free_enabled && b.paid_enabled) {
+            <fieldset class="types">
+              <legend>Booking type</legend>
+              <label class="type" [class.is-picked]="type() === 'free'">
+                <input type="radio" name="type" value="free" [checked]="type() === 'free'" (change)="type.set('free')" />
+                <b>Free booking</b>
+                <small>We hold your table for {{ b.grace_minutes }} minutes after your time.</small>
+              </label>
+              <label class="type" [class.is-picked]="type() === 'paid'">
+                <input type="radio" name="type" value="paid" [checked]="type() === 'paid'" (change)="type.set('paid')" />
+                <b>Paid booking · ₹{{ b.booking_fee }}</b>
+                <small>Lets you pre-order so food is ready when you arrive. Refunded if you cancel {{ b.free_cancel_hours }} h ahead.</small>
+              </label>
+            </fieldset>
+          } @else if (b.paid_enabled) {
+            <p class="bk-note">Booking fee ₹{{ b.booking_fee }} — refunded if you cancel at least {{ b.free_cancel_hours }} hours ahead.</p>
+          }
+        }
+
+        <div class="bk-row">
+          <label class="bk-field">
+            <span>Name</span>
+            <input type="text" maxlength="80" [(ngModel)]="name" name="name" autocomplete="name" />
+          </label>
+          <label class="bk-field">
+            <span>Notes (optional)</span>
+            <input type="text" maxlength="500" [(ngModel)]="notes" name="notes" placeholder="Birthday, high chair…" />
+          </label>
+        </div>
+        <p class="summary">{{ when(s.starts_at, tz()) }} · {{ party() }} guests</p>
+      }
+
+      @if (error(); as msg) { <p class="bk-error" role="alert">{{ msg }}</p> }
+
+      <div class="bk-actions">
+        @if (!auth.isAuthenticated()) {
+          <button type="button" class="wl-btn wl-btn--primary" (click)="signIn()">Sign in with your mobile to book</button>
+        } @else {
+          <button type="button" class="wl-btn wl-btn--primary" [disabled]="!slot() || busy()" (click)="confirm()"
+                  data-testid="res-confirm">
+            {{ type() === 'paid' ? 'Continue to payment' : 'Confirm booking' }}
+          </button>
+        }
+      </div>
+    </article>
+  }
+</section>

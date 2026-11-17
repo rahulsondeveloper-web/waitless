@@ -1,0 +1,102 @@
+<section class="wl-container bk-page">
+  <header class="bk-head">
+    <h1>Join the queue</h1>
+    <p>Skip standing at the door — wait wherever you like. We'll tell you when your table is ready.</p>
+  </header>
+
+  @if (!loaded()) {
+    <div class="wl-state"><span class="wl-spinner" aria-label="Loading"></span></div>
+  } @else if (entry(); as e) {
+    <article class="bk-card token" aria-live="polite" data-testid="queue-token">
+      @if (e.status === 'notified') {
+        <p class="ready" role="alert">
+          <span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>
+          Your table is ready{{ e.notified_table_label ? ' — table ' + e.notified_table_label : '' }}! Please come to the
+          host stand.
+        </p>
+      }
+      <p class="bk-muted">Your token at {{ e.restaurant_name || ctx.restaurant()?.name }}</p>
+      <p class="token__code">{{ e.token }}</p>
+      <p><span class="bk-badge" [attr.data-status]="e.status">{{ statusLabel[e.status] }}</span></p>
+      @if (active()) {
+        <div class="bk-stats">
+          <div><b>{{ e.position }}</b><span>Your place</span></div>
+          <div><b>{{ e.ahead }}</b><span>Ahead of you</span></div>
+          <div>
+            <b>{{ e.estimated_wait_minutes === null ? '—' : '~' + e.estimated_wait_minutes }}</b><span>Minutes</span>
+          </div>
+        </div>
+        <p class="bk-muted">Party of {{ e.party_size }} · updates live, no need to refresh.</p>
+        <div class="bk-actions">
+          <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="leave()" [disabled]="busy()">
+            Leave the queue
+          </button>
+        </div>
+      } @else {
+        <p class="bk-muted">
+          @switch (e.status) {
+            @case ('seated') { Enjoy your meal! }
+            @case ('cancelled') { You left the queue. }
+            @default { This token is no longer active. }
+          }
+        </p>
+        <div class="bk-actions">
+          <a routerLink="../menu" class="wl-btn wl-btn--ghost wl-btn--sm">See the menu</a>
+          @if (e.status !== 'seated') {
+            <button type="button" class="wl-btn wl-btn--primary wl-btn--sm" (click)="rejoin()">Join again</button>
+          }
+        </div>
+      }
+    </article>
+  } @else if (!queueBranches().length) {
+    <article class="bk-card">
+      <p>{{ ctx.restaurant()?.name }} is not taking online queue sign-ups right now.</p>
+      <div class="bk-actions"><a routerLink="../reservations" class="wl-btn wl-btn--primary">Book a table instead</a></div>
+    </article>
+  } @else {
+    <article class="bk-card">
+      @if (wait(); as w) {
+        <div class="bk-stats" aria-label="Current queue">
+          <div><b>{{ w.waiting }}</b><span>Waiting</span></div>
+          <div><b>{{ w.estimated_wait_minutes === null ? '—' : '~' + w.estimated_wait_minutes }}</b><span>Est. minutes</span></div>
+          <div><b>{{ w.free_tables }}</b><span>Tables free</span></div>
+        </div>
+        @if (w.estimated_wait_minutes === null && w.accepting) {
+          <p class="bk-muted">No table here seats that many guests — please call us for large groups.</p>
+        }
+      }
+
+      <div class="bk-row">
+        @if (queueBranches().length > 1) {
+          <label class="bk-field">
+            <span>Branch</span>
+            <select [ngModel]="branchId()" (ngModelChange)="selectBranch($event)" name="branch">
+              @for (b of queueBranches(); track b.branch_id) { <option [value]="b.branch_id">{{ b.branch_name }}</option> }
+            </select>
+          </label>
+        }
+        <label class="bk-field">
+          <span>Guests</span>
+          <input type="number" min="1" [max]="branch()?.max_party ?? 50" [(ngModel)]="party" (change)="partyChanged()"
+                 name="party" data-testid="queue-party" />
+        </label>
+        <label class="bk-field">
+          <span>Name</span>
+          <input type="text" maxlength="80" [(ngModel)]="name" name="name" autocomplete="name" />
+        </label>
+      </div>
+
+      @if (error(); as msg) { <p class="bk-error" role="alert">{{ msg }}</p> }
+
+      <div class="bk-actions">
+        @if (auth.isAuthenticated()) {
+          <button type="button" class="wl-btn wl-btn--primary" (click)="join()" [disabled]="busy() || party < 1">
+            Get my token
+          </button>
+        } @else {
+          <button type="button" class="wl-btn wl-btn--primary" (click)="signIn()">Sign in with your mobile to join</button>
+        }
+      </div>
+    </article>
+  }
+</section>

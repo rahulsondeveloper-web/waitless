@@ -1,0 +1,41 @@
+@use '../storefront/booking-shared';
+
+.bk-sub {
+  font: 600 1.3rem var(--wl-font-serif);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px dashed var(--wl-line);
+    &:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+  }
+}
+
+.token {
+  font: 400 1.3rem var(--wl-font-display);
+  color: var(--wl-primary);
+}
+
+.actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+a:not(.wl-btn) {
+  color: var(--wl-primary);
+  font-weight: 600;
+}

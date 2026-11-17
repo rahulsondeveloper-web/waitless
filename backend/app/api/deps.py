@@ -1,5 +1,6 @@
 """Shared FastAPI dependencies: session, current user, tenant context, permissions, plan features."""
 
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 
@@ -100,16 +101,20 @@ def require_permission(permission: str) -> Callable[..., Awaitable[TenantContext
     return checker
 
 
+async def feature_enabled(session: AsyncSession, tenant_id: uuid.UUID, feature: str) -> bool:
+    from app.services.access import tenant_features  # local: avoid cycles at import time
+
+    live = await live_subscription(session, tenant_id)
+    features = await tenant_features(session, live[1].id if live else None)
+    f = features.get(feature)
+    return f is not None and f.enabled
+
+
 def require_feature(feature: str) -> Callable[..., Awaitable[TenantContext]]:
     """Plan gate (docs/04 §4): 402 when the tenant's plan does not include the feature."""
 
     async def checker(session: SessionDep, ctx: TenantCtx) -> TenantContext:
-        from app.services.access import tenant_features  # local: avoid cycles at import time
-
-        live = await live_subscription(session, ctx.tenant_id)
-        features = await tenant_features(session, live[1].id if live else None)
-        f = features.get(feature)
-        if f is None or not f.enabled:
+        if not await feature_enabled(session, ctx.tenant_id, feature):
             raise AppError(
                 "Your plan does not include this feature.",
                 code="PLAN_FEATURE_REQUIRED",

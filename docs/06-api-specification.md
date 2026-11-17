@@ -43,9 +43,10 @@ Auth column legend: **P** public · **C** customer · **S:perm** staff with perm
 | GET | `/public/restaurants/{slug}/branding` | Theme tokens + logo |
 | GET | `/public/restaurants/{slug}/gallery` | Up to 5 images |
 | GET | `/public/restaurants/{slug}/menu` | `?branch_id=&meal_type=` — available items only |
-| GET | `/public/restaurants/{slug}/availability` | Per branch: open now, free tables by size, next slots |
-| GET | `/public/restaurants/{slug}/wait-time` | Per branch, per party size |
-| GET | `/public/restaurants/{slug}/reservation-options` | Slots, free/paid, fee, policy text |
+| GET | `/public/restaurants/{slug}/booking-options` | Per branch: queue/reservations on, free/paid, fee, party range, grace, cancel window *(Phase 6)* |
+| GET | `/public/restaurants/{slug}/availability` | `?branch_id=&date=&party=` → time slots (available or full) in the branch time zone *(Phase 6)* |
+| GET | `/public/restaurants/{slug}/wait-time` | `?branch_id=&party=` → waiting parties, estimated minutes, free tables *(Phase 6)* |
+| GET / POST | `/public/payments/mock/{order_id}` | Development only (mock gateway): order details / simulate pay or fail through the signed-webhook path |
 | POST | `/public/restaurants/register` | Restaurant registration (PRD §4) |
 | GET | `/public/slug-availability?slug=` | Check slug during registration |
 
@@ -53,12 +54,12 @@ Auth column legend: **P** public · **C** customer · **S:perm** staff with perm
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| POST | `/customer/restaurants/{slug}/queue` | C 🔁 | Join queue → token, position, ETA |
-| GET / DELETE | `/customer/queue-entries/{id}` | C | Status / leave queue |
-| POST | `/customer/restaurants/{slug}/reservations` | C 🔁 | Create free or paid reservation |
-| POST | `/customer/reservations/{id}/payment` | C 🔁 | Create gateway order for booking fee |
-| GET | `/customer/reservations` · `/{id}` | C | List / detail |
-| POST | `/customer/reservations/{id}/cancel` | C | Cancel (refund per policy) |
+| POST | `/public/restaurants/{slug}/queue` | C | Join queue → token, position, ETA. 409 `ALREADY_IN_QUEUE` / `QUEUE_CLOSED`, 422 `PHONE_REQUIRED` *(Phase 6)* |
+| GET | `/me/queue/{id}` · POST `/me/queue/{id}/leave` | C | My token (live position) / leave *(Phase 6)* |
+| POST | `/public/restaurants/{slug}/reservations` | C | Free or paid booking → `{reservation, payment}`; paid starts as `pending_payment` with a checkout. 409 `SLOT_TAKEN` / `DUPLICATE_BOOKING`, 422 `INVALID_SLOT` *(Phase 6)* |
+| POST | `/me/reservations/{id}/pay` | C | New gateway order for an unpaid booking *(Phase 6)* |
+| GET | `/me/bookings` · `/me/reservations/{id}` | C | All my reservations + queue tokens across restaurants / one booking *(Phase 6)* |
+| POST | `/me/reservations/{id}/cancel` | C | Cancel (refund per policy, D58) *(Phase 6)* |
 | PUT | `/customer/reservations/{id}/pre-order` | C 🔁 | Create/replace pre-order (paid bookings only → else 403 `PREORDER_NOT_ALLOWED`) |
 | POST | `/customer/table-sessions/join` | C | `{ code, pin }` → session access token |
 | GET | `/customer/table-sessions/{id}` | C (joined) | Orders, SLA timers, discounts, running total |
@@ -105,20 +106,21 @@ All paths prefixed `/restaurant`. Permission keys from [doc 04](04-roles-permiss
 | POST | `/table-sessions/{id}/assign` · `/transfer` · `/release` | `tables.operate` |
 | POST | `/table-sessions/{id}/reopen` · `/close` | `billing.operate` |
 | PATCH | `/tables/{id}/status` | `tables.operate` (cleaning → available) |
-| GET | `/queue` | `queue.manage` |
-| POST | `/queue` 🔁 | `queue.manage` — add walk-in |
-| POST | `/queue/{id}/notify` · `/seat` · `/skip` · `/no-show` · `/cancel` | `queue.manage` |
-| PATCH | `/queue/{id}/position` | `queue.manage` |
-| GET | `/queue/history` | `queue.manage` |
+| GET | `/queue?branch_id=&history=` | `queue.manage` — active list, or today's finished entries *(Phase 6)* |
+| POST | `/queue` | `queue.manage` — add walk-in *(Phase 6)* |
+| POST | `/queue/{id}/notify` `{table_id?}` · `/seat` `{table_id}` · `/skip` · `/no-show` · `/cancel` | `queue.manage` (+ `tables.operate` to hold/seat) *(Phase 6)* |
+| POST | `/queue/{id}/move` `{direction: up\|down}` | `queue.manage` *(Phase 6)* |
 
 ### Reservations
 
 | Method | Path | Permission |
 |---|---|---|
-| GET | `/reservations` | `reservations.view` |
-| POST | `/reservations/{id}/confirm-arrival` 🔁 | `reservations.manage` — sets `staff_confirmed_at`, starts SLA for paid pre-orders |
-| POST | `/reservations/{id}/cancel` · `/no-show` | `reservations.manage` |
-| GET / PUT | `/reservation-policies` | `reservations.policy.manage` |
+| GET | `/reservations?branch_id=&date=` | `reservations.view` *(Phase 6)* |
+| GET | `/reservations/availability?branch_id=&date=&party=` | `reservations.view` — slots for phone bookings *(Phase 6)* |
+| POST | `/reservations` | `reservations.manage` — phone booking (free) *(Phase 6)* |
+| POST | `/reservations/{id}/arrive` `{table_id?}` | `reservations.manage` + `tables.operate` — confirm arrival, seat → code + PIN; sets `staff_confirmed_at` *(Phase 6)* |
+| POST | `/reservations/{id}/cancel` · `/no-show` | `reservations.manage` *(Phase 6)* |
+| GET / PUT | `/branches/{id}/booking-policy` | GET `reservations.view`, PUT `reservations.policy.manage`; paid needs plan feature `reservations.paid` *(Phase 6)* |
 
 ### Menu
 
@@ -207,12 +209,14 @@ Prefix `/super-admin`. All writes audited.
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/webhooks/payments/razorpay` | HMAC signature verified; idempotent on event id; routes to reservation, bill or SaaS invoice by `notes.kind` |
+| POST | `/webhooks/payments/{provider}` | `razorpay` (header `X-Razorpay-Signature`) or `mock` (`X-Mock-Signature`, non-production). HMAC of the raw body verified (400 `INVALID_SIGNATURE`); idempotent per order. Phase 6 routes booking fees; bills and SaaS invoices follow |
 | POST | `/webhooks/notifications/{provider}` | Delivery receipts |
 
 ## 8. Socket.IO
 
 Namespace `/rt`. Connect with `auth: { token }` (staff/customer JWT or table-session token). Client emits `subscribe { room }`; server authorises each room (see [doc 01 §6](01-system-architecture.md#6-real-time-design)).
+
+**Implemented so far (Phase 6):** `subscribe {kind}` with `branch_staff` (`branch_id`; membership + branch access checked), `user` (always the caller's own room) and `branch_queue` (`tenant_id, branch_id`; public, no personal data). Events: `tables.changed`, `queue.changed`, `reservations.changed` (payload `{branch_id}` — clients refetch) and `notification` (`{event, title, body, link}`) to the user room.
 
 | Event | Room | Payload (key fields) |
 |---|---|---|

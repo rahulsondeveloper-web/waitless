@@ -66,7 +66,7 @@ test('guest signs in with a mobile one-time code', async ({ page }) => {
   await page.getByLabel('Your name (first time only)').fill('E2E Guest');
   await page.getByRole('button', { name: /Verify/ }).click();
 
-  await expect(page).toHaveURL(/\/customer$/);
+  await expect(page).toHaveURL(/\/customer\/bookings$/);
   await page.goto('/super-admin/restaurants');
-  await expect(page).toHaveURL(/\/customer$/); // not a super admin
+  await expect(page).toHaveURL(/\/customer\/bookings$/); // not a super admin
 });

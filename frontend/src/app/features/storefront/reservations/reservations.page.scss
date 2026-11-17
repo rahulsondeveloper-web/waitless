@@ -1,0 +1,128 @@
+@use '../booking-shared';
+
+.bk-sub {
+  font: 600 1.3rem var(--wl-font-serif);
+}
+
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+legend {
+  float: left;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--wl-text-soft);
+  margin-bottom: 0.4rem;
+  + * {
+    clear: both;
+  }
+}
+
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 0.45rem;
+}
+
+.slot {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid var(--wl-line);
+  background: #fff;
+  font: 600 0.95rem var(--wl-font-sans);
+  color: var(--wl-text);
+  cursor: pointer;
+  &:hover:not(:disabled) {
+    border-color: var(--wl-primary);
+  }
+  &:disabled {
+    color: var(--wl-muted);
+    background: var(--wl-surface-alt);
+    text-decoration: line-through;
+    cursor: not-allowed;
+  }
+  &.is-picked {
+    background: var(--wl-primary);
+    border-color: var(--wl-primary);
+    color: #fff;
+  }
+}
+
+.types {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.type {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  border: 1.5px solid var(--wl-line);
+  border-radius: 12px;
+  cursor: pointer;
+  background: #fff;
+  input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  small {
+    color: var(--wl-muted);
+  }
+  &.is-picked {
+    border-color: var(--wl-primary);
+    box-shadow: 0 0 0 3px var(--wl-primary-soft);
+  }
+  &:focus-within {
+    outline: 2px solid var(--wl-primary);
+  }
+}
+
+.summary {
+  text-align: center;
+  font: 600 1.15rem var(--wl-font-serif);
+}
+
+.mine {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.6rem;
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.6rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px dashed var(--wl-line);
+  }
+}
+
+.mine__actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.done {
+  text-align: center;
+  justify-items: center;
+  h2 {
+    font: 600 1.8rem var(--wl-font-serif);
+  }
+}
+
+.done__icon {
+  font-size: 3rem;
+  color: var(--wl-secondary);
+}
+
+.done__code {
+  font: 600 1.4rem var(--wl-font-sans);
+  letter-spacing: 0.12em;
+}

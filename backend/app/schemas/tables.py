@@ -94,6 +94,7 @@ class SessionOut(ApiModel):
     branch_id: uuid.UUID
     public_code: str
     status: str
+    source: str = "walk_in"  # walk_in | queue | reservation
     party_size: int
     guest_name: str | None
     table_ids: list[uuid.UUID]

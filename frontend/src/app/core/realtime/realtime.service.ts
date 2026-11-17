@@ -35,20 +35,46 @@ export class RealtimeService implements OnDestroy {
   }
 
   /** Join a staff room for one branch. Resolves false when not allowed. */
-  async subscribeBranch(branchId: string): Promise<boolean> {
-    if (!this.socket || !this.authed) {
-      this.disconnect(false);
-      this.open(true);
-    }
-    const payload = { kind: 'branch_staff', branch_id: branchId };
-    const ok = await this.emitSubscribe(payload);
-    if (ok) this.rooms.set(`branch:${branchId}`, payload);
-    return ok;
+  subscribeBranch(branchId: string): Promise<boolean> {
+    return this.join(`branch:${branchId}`, { kind: 'branch_staff', branch_id: branchId }, true);
   }
 
   unsubscribeBranch(branchId: string): void {
-    this.rooms.delete(`branch:${branchId}`);
-    this.socket?.emit('unsubscribe', { branch_id: branchId });
+    this.leave(`branch:${branchId}`, { kind: 'branch_staff', branch_id: branchId });
+  }
+
+  /** My own notifications (room u:{me}); needs a signed-in user. */
+  subscribeUser(): Promise<boolean> {
+    return this.join('user', { kind: 'user' }, true);
+  }
+
+  unsubscribeUser(): void {
+    this.leave('user', { kind: 'user' });
+  }
+
+  /** Public "queue changed" pings of one branch (no personal data). */
+  subscribeQueue(tenantId: string, branchId: string): Promise<boolean> {
+    return this.join(`queue:${branchId}`, { kind: 'branch_queue', tenant_id: tenantId, branch_id: branchId }, false);
+  }
+
+  unsubscribeQueue(tenantId: string, branchId: string): void {
+    this.leave(`queue:${branchId}`, { kind: 'branch_queue', tenant_id: tenantId, branch_id: branchId });
+  }
+
+  private async join(key: string, payload: Record<string, string>, needsAuth: boolean): Promise<boolean> {
+    if (!this.socket || (needsAuth && !this.authed)) {
+      const withAuth = needsAuth || this.authed; // never downgrade a signed-in connection
+      this.disconnect(false);
+      this.open(withAuth);
+    }
+    const ok = await this.emitSubscribe(payload);
+    if (ok) this.rooms.set(key, payload);
+    return ok;
+  }
+
+  private leave(key: string, payload: Record<string, string>): void {
+    this.rooms.delete(key);
+    this.socket?.emit('unsubscribe', payload);
   }
 
   on<T>(event: string, handler: (payload: T) => void): () => void {

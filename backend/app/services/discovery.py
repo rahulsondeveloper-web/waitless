@@ -6,6 +6,7 @@ anonymous reads. Only public storefront fields are returned.
 """
 
 import math
+import uuid
 from collections import defaultdict
 
 from sqlalchemy import func, or_, select
@@ -89,6 +90,7 @@ async def discover(
     )
 
     cards: list[DiscoveryCard] = []
+    card_branch: dict[uuid.UUID, Branch] = {}
     for tenant, profile, branding, branch in rows:
         status = open_status(hours.get(branch.id, []) if branch else [], branch.timezone if branch else "Asia/Kolkata")
         if open_now and not status.is_open:
@@ -126,10 +128,26 @@ async def discover(
                 distance_km=distance,
             )
         )
+        if branch is not None and status.is_open:
+            card_branch[tenant.id] = branch
     if lat is not None and lng is not None:
         cards.sort(key=lambda c: (c.distance_km is None, c.distance_km or 0, c.name))
     start = (page - 1) * page_size
-    return DiscoveryPage(items=cards[start : start + page_size], page=page, page_size=page_size, total=len(cards))
+    items = cards[start : start + page_size]
+    for card in items:  # only the visible page: bounded work
+        branch = card_branch.get(card.id)
+        if branch is not None:
+            card.wait_minutes = await _wait(session, branch)
+    return DiscoveryPage(items=items, page=page, page_size=page_size, total=len(cards))
+
+
+async def _wait(session: AsyncSession, branch: Branch) -> int | None:
+    from app.services import queue as queue_svc  # local: queue imports tables → keeps discovery light
+
+    policy = await queue_svc.policy_for(session, branch)
+    if not policy.accepts_queue:
+        return None
+    return (await queue_svc.wait_time(session, branch, 2)).estimated_wait_minutes
 
 
 async def filters(session: AsyncSession) -> DiscoveryFilters:

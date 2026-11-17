@@ -14,13 +14,14 @@ from datetime import UTC, datetime, time
 from decimal import Decimal
 
 from PIL import Image, ImageDraw
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.db import use_system
 from app.core.storage import get_storage
 from app.models import Branch, Tenant
+from app.models.booking import QueueEntry, Reservation, ReservationPolicy
 from app.models.menu import CategoryMealType, MealType, MenuCategory, MenuItem, MenuSubcategory
 from app.models.profile import (
     BusinessHours,
@@ -30,7 +31,7 @@ from app.models.profile import (
     RestaurantProfile,
     SocialLink,
 )
-from app.models.tables import RestaurantTable, TableSection
+from app.models.tables import RestaurantTable, TableAssignment, TableSection, TableSession
 from app.schemas.tenancy import RestaurantRegistration
 from app.services.media import process_image
 from app.services.registration import register_restaurant
@@ -428,6 +429,23 @@ async def _reset_e2e(session: AsyncSession, demo: DemoRestaurant) -> None:
     if branding is not None:
         branding.tokens, branding.button_style, branding.mode = demo.tokens, demo.button_style, "light"
     tenant.status, tenant.is_published = "active", True
+    # Phase 6: empty queue, no bookings, default policy, every table free.
+    tid = tenant.id
+    await session.execute(delete(QueueEntry).where(QueueEntry.tenant_id == tid))
+    await session.execute(delete(Reservation).where(Reservation.tenant_id == tid))
+    await session.execute(delete(ReservationPolicy).where(ReservationPolicy.tenant_id == tid))
+    now = datetime.now(UTC)
+    await session.execute(
+        update(TableAssignment)
+        .where(TableAssignment.tenant_id == tid, TableAssignment.released_at.is_(None))
+        .values(released_at=now)
+    )
+    await session.execute(
+        update(TableSession)
+        .where(TableSession.tenant_id == tid, TableSession.status != "closed")
+        .values(status="closed", closed_at=now)
+    )
+    await session.execute(update(RestaurantTable).where(RestaurantTable.tenant_id == tid).values(status="available"))
     await session.commit()
     await invalidate_storefront(demo.slug)
 

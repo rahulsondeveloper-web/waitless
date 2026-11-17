@@ -99,7 +99,21 @@ export const routes: Routes = [
       {
         path: 'customer',
         canActivate: [authGuard],
-        children: [page('', 'My Account', 6), page('bookings', 'My Bookings', 6), page('orders', 'My Orders', 7)],
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'bookings' },
+          {
+            path: 'bookings',
+            title: 'My bookings · WaitLess',
+            loadComponent: () => import('./features/customer/bookings.page').then((m) => m.MyBookingsPage),
+          },
+          page('orders', 'My Orders', 7),
+        ],
+      },
+      {
+        path: 'pay/mock/:orderId',
+        title: 'Payment · WaitLess',
+        canActivate: [authGuard],
+        loadComponent: () => import('./features/pay/mock-pay.page').then((m) => m.MockPayPage),
       },
     ],
   },
@@ -132,6 +146,10 @@ export const routes: Routes = [
           import('./features/storefront/reservations/reservations.page').then((m) => m.StorefrontReservationsPage),
       },
       {
+        path: 'queue',
+        loadComponent: () => import('./features/storefront/queue/queue.page').then((m) => m.StorefrontQueuePage),
+      },
+      {
         path: 'contact',
         loadComponent: () => import('./features/storefront/contact/contact.page').then((m) => m.StorefrontContactPage),
       },
@@ -149,8 +167,7 @@ export const routes: Routes = [
     children: adminChildren(
       RESTAURANT_ADMIN_NAV,
       {
-        profile: 3, branding: 3, gallery: 3, queue: 6,
-        reservations: 6, orders: 7, kitchen: 7, inventory: 9, suppliers: 9, purchases: 9,
+        profile: 3, branding: 3, gallery: 3, orders: 7, kitchen: 7, inventory: 9, suppliers: 9, purchases: 9,
         billing: 10, payments: 10, discounts: 8, reports: 11, settings: 10,
       },
       {
@@ -186,6 +203,17 @@ export const routes: Routes = [
           path: 'tables',
           title: 'Tables · WaitLess',
           loadComponent: () => import('./features/restaurant-admin/tables/tables.page').then((m) => m.TablesPage),
+        },
+        queue: {
+          path: 'queue',
+          title: 'Queue · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/queue/queue.page').then((m) => m.QueuePage),
+        },
+        reservations: {
+          path: 'reservations',
+          title: 'Reservations · WaitLess',
+          loadComponent: () =>
+            import('./features/restaurant-admin/reservations/reservations.page').then((m) => m.ReservationsAdminPage),
         },
         menu: {
           path: 'menu',

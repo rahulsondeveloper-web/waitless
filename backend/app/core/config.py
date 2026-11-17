@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     # SaaS
     trial_plan_code: str = "professional"
 
+    # Booking payments (decision D17). "mock" works offline; "razorpay" needs the three keys below.
+    payment_provider: Literal["mock", "razorpay"] = "mock"
+    mock_webhook_secret: str = "dev-mock-webhook-secret"
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
+    payment_hold_minutes: int = 15  # unpaid paid-bookings release their table after this
+
     # Restaurant storefront (PRD §5.3: change only together with the DB check constraint)
     gallery_max_photos: int = 5
     storefront_cache_seconds: int = 60

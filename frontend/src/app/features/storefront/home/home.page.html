@@ -18,9 +18,22 @@
           </li>
         }
         <li>{{ r.restaurant_type }} · {{ r.cuisines.join(' · ') }}</li>
+        @if (wait(); as w) {
+          @if (w.accepting && branch()?.open_now) {
+            <li class="wait" data-testid="wait-time">
+              <span class="material-symbols-outlined" aria-hidden="true">groups</span>
+              @if (w.waiting === 0 && w.free_tables > 0) { No wait right now }
+              @else if (w.estimated_wait_minutes !== null) { About {{ w.estimated_wait_minutes }} min wait · {{ w.waiting }} in queue }
+              @else { {{ w.waiting }} in queue }
+            </li>
+          }
+        }
       </ul>
       <div class="hero__cta">
         <a routerLink="reservations" class="wl-btn wl-btn--primary">Book a table</a>
+        @if (wait()?.accepting && branch()?.open_now) {
+          <a routerLink="queue" class="wl-btn wl-btn--light">Join the queue</a>
+        }
         <a routerLink="menu" class="wl-btn wl-btn--light">View menu</a>
         @if (r.gallery_count) {
           <a routerLink="gallery" class="wl-btn wl-btn--light">View gallery</a>
