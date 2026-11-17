@@ -1,70 +1,147 @@
-# Deployment / server use (not needed for local Windows development).
-#   docker compose -f infra/docker-compose.yml --env-file backend/.env up -d --build
-#   docker compose -f infra/docker-compose.yml exec api alembic upgrade head
+# WaitLess production stack (Phase 12). Not used for local Windows development.
+#
+#   cp infra/env/production.env.example infra/env/production.env   # fill in every CHANGE_ME
+#   docker compose -f infra/docker-compose.yml --env-file infra/env/production.env up -d --build
+#
+# First start: `migrate` creates/updates the schema (and the app's non-owner database role), then the API,
+# worker and web start. See docs/09-deployment.md for TLS, backups, monitoring and upgrades.
 name: waitless
+
+x-backend: &backend
+  build:
+    context: ..
+    dockerfile: infra/docker/backend.Dockerfile
+  image: waitless-api:${WAITLESS_VERSION:-latest}
+  env_file: env/production.env
+  environment:
+    ENVIRONMENT: production
+    DB_HOST: postgres
+    REDIS_URL: redis://redis:6379/0
+    LOG_JSON: "true"
+  volumes:
+    - uploads:/app/uploads # only used with STORAGE_BACKEND=local
+  restart: unless-stopped
+  logging: &logging
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
 
 services:
   postgres:
     image: postgres:18
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      # The database OWNER (migrations). The app connects as DB_USER, a non-owner role created by migration 0002,
+      # so Row-Level Security always applies to it.
+      POSTGRES_USER: ${DB_MIGRATION_USER:?set DB_MIGRATION_USER}
+      POSTGRES_PASSWORD: ${DB_MIGRATION_PASSWORD:?set DB_MIGRATION_PASSWORD}
       POSTGRES_DB: ${DB_NAME:-waitless}
+    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=512MB", "-c", "log_min_duration_statement=500"]
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
-      retries: 10
+      retries: 20
+    restart: unless-stopped
+    logging: *logging
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "volatile-lru"]
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    <<: *backend
+    command: ["sh", "-c", "alembic upgrade head && python -m app.cli seed"]
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
 
   api:
-    build:
-      context: ..
-      dockerfile: infra/docker/backend.Dockerfile
-    env_file: ../backend/.env
-    environment:
-      ENVIRONMENT: production
-      DB_HOST: postgres
-      REDIS_URL: redis://redis:6379/0
-      LOG_JSON: "true"
-    volumes:
-      - uploads:/app/uploads
+    <<: *backend
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    deploy:
+      replicas: ${API_REPLICAS:-2} # Socket.IO rooms are shared through Redis; Nginx keeps clients sticky
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
 
   worker:
-    build:
-      context: ..
-      dockerfile: infra/docker/backend.Dockerfile
+    <<: *backend
     command: ["python", "-m", "app.worker"]
-    env_file: ../backend/.env
-    environment:
-      ENVIRONMENT: production
-      DB_HOST: postgres
-      REDIS_URL: redis://redis:6379/0
-      LOG_JSON: "true"
     depends_on:
-      - api
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
 
   web:
     build:
       context: ..
       dockerfile: infra/docker/frontend.Dockerfile
+    image: waitless-web:${WAITLESS_VERSION:-latest}
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN, e.g. app.waitless.in}
+      MEDIA_HOST: ${MEDIA_HOST:-}
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - certs:/etc/letsencrypt
+      - acme:/var/www/acme
     depends_on:
-      - api
+      api: { condition: service_healthy }
+    restart: unless-stopped
+    logging: *logging
+
+  certbot:
+    image: certbot/certbot:v3.0.1
+    # Obtains the first certificate, then renews twice a day; Nginx reloads itself every 6 hours.
+    entrypoint: >
+      sh -c 'trap exit TERM;
+      [ -f /etc/letsencrypt/live/$${DOMAIN}/fullchain.pem ] ||
+      certbot certonly --webroot -w /var/www/acme -d $${DOMAIN} --email $${ACME_EMAIL} --agree-tos --no-eff-email --non-interactive;
+      while :; do certbot renew --webroot -w /var/www/acme --quiet; sleep 12h & wait $${!}; done'
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    volumes:
+      - certs:/etc/letsencrypt
+      - acme:/var/www/acme
+    depends_on:
+      - web
+    restart: unless-stopped
+    logging: *logging
+
+  backup:
+    build:
+      context: ..
+      dockerfile: infra/docker/backup.Dockerfile
+    env_file: env/production.env
+    environment:
+      DB_HOST: postgres
+      BACKUP_DIR: /backups
+    volumes:
+      - backups:/backups
+      - uploads:/uploads:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+    logging: *logging
 
 volumes:
   pgdata:
   redisdata:
   uploads:
+  backups:
+  certs:
+  acme:

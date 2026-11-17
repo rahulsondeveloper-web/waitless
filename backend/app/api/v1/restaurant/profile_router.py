@@ -3,7 +3,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
 from app.api.deps import SessionDep, require_permission
 from app.schemas.profile import (
@@ -156,3 +156,15 @@ async def checklist(session: SessionDep, ctx: ProfileView) -> PublishChecklist:
 @router.post("/publish", response_model=PublishChecklist, summary="Publish or unpublish the storefront")
 async def publish(body: PublishRequest, session: SessionDep, ctx: ProfileManage) -> PublishChecklist:
     return await svc.set_published(session, ctx, body.published)
+
+
+@router.get("/geocode", summary="Find an address on the map (Nominatim, or Google when configured)")
+async def geocode(ctx: ProfileManage, q: str = Query(min_length=3, max_length=200)) -> list[dict]:
+    """Server-side, cached 30 days and limited to 30 lookups per restaurant per hour."""
+    from dataclasses import asdict
+
+    from app.core import rate_limit
+    from app.integrations.maps import geocode as lookup
+
+    await rate_limit.hit(f"geocode:{ctx.tenant_id}", limit=30, window_seconds=3600)
+    return [asdict(p) for p in await lookup(q)]

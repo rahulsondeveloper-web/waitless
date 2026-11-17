@@ -1,4 +1,5 @@
-"""File storage behind an interface: local folder now, S3 later (decision D26)."""
+"""File storage behind an interface (decision D26): a local folder in development, S3 (or any
+S3-compatible store: MinIO, Cloudflare R2) in production — `STORAGE_BACKEND=s3`."""
 
 import secrets
 from dataclasses import dataclass
@@ -59,6 +60,83 @@ class LocalStorage:
         return f"{self.base_url}/{_safe_relpath(key)}"
 
 
+class S3Storage:
+    """Objects are public-read through the CDN / bucket URL; keys stay random (never the uploaded name).
+
+    boto3 is synchronous, so calls run in a worker thread. Credentials come from the AWS chain
+    (environment variables or the server's IAM role) — never from the database.
+    """
+
+    def __init__(
+        self,
+        bucket: str,
+        *,
+        region: str,
+        prefix: str = "",
+        endpoint_url: str = "",
+        public_base_url: str = "",
+        client=None,
+    ) -> None:  # type: ignore[no-untyped-def]
+        self.bucket = bucket
+        self.prefix = prefix.strip("/")
+        self.region = region
+        self.endpoint_url = endpoint_url.rstrip("/")
+        if client is None:
+            import boto3
+
+            client = boto3.client("s3", region_name=region, endpoint_url=endpoint_url or None)
+        self.client = client
+        if public_base_url:
+            self.base_url = public_base_url.rstrip("/")
+        elif endpoint_url:
+            self.base_url = f"{self.endpoint_url}/{bucket}"
+        else:
+            self.base_url = f"https://{bucket}.s3.{region}.amazonaws.com"
+
+    def _object(self, key: str) -> str:
+        rel = str(_safe_relpath(key))
+        return f"{self.prefix}/{rel}" if self.prefix else rel
+
+    async def save(self, folder: str, data: bytes, *, extension: str, content_type: str) -> StoredFile:
+        import asyncio
+
+        ext = extension.lower().lstrip(".")
+        if not ext.isalnum():
+            raise AppError("Invalid file extension.", code="INVALID_FILE_EXTENSION")
+        key = str(_safe_relpath(folder) / f"{secrets.token_hex(16)}.{ext}")
+        await asyncio.to_thread(
+            self.client.put_object,
+            Bucket=self.bucket,
+            Key=self._object(key),
+            Body=data,
+            ContentType=content_type,
+            CacheControl="public, max-age=31536000, immutable",  # names are random: safe to cache forever
+        )
+        return StoredFile(key=key, url=self.url_for(key), size=len(data), content_type=content_type)
+
+    async def delete(self, key: str) -> None:
+        import asyncio
+
+        await asyncio.to_thread(self.client.delete_object, Bucket=self.bucket, Key=self._object(key))
+
+    def url_for(self, key: str) -> str:
+        return f"{self.base_url}/{self._object(key)}"
+
+
 def get_storage() -> StorageBackend:
     s = get_settings()
+    if s.storage_backend == "s3":
+        global _s3
+        if _s3 is None:
+            _s3 = S3Storage(
+                s.s3_bucket,
+                region=s.s3_region,
+                prefix=s.s3_prefix,
+                endpoint_url=s.s3_endpoint_url,
+                public_base_url=s.s3_public_base_url,
+            )
+        return _s3
     return LocalStorage(s.media_root, s.media_url)
+
+
+_s3: S3Storage | None = None

@@ -81,6 +81,8 @@ Note: menu **management** (categories/items CRUD) moves up into Phase 4 in a min
 ### Phase 12 — Production readiness
 - Security review (OWASP checklist, tenant-isolation test suite), load test (k6/Locust) on storefront and ordering, full Playwright suite, Docker deployment, Nginx + HTTPS, backups, monitoring/log shipping, S3 storage adapter, Google Maps adapter (when key is provided), real SMS/WhatsApp/email providers.
 
+- **Status (17 Nov 2026):** done — security review (docs/08), deployment & operations (docs/09), load test (docs/10). Docker images could not be built on the development laptop (no Docker, decision D24): build and smoke-test them on the first Linux server.
+
 ## 4. Local development setup (Windows, no Docker)
 
 | Service | Where | Notes |

@@ -1,0 +1,19 @@
+# Keep secrets, local data and build artefacts out of Docker images.
+**/.env
+**/.env.*
+!**/.env.example
+**/*.env
+!infra/env/production.env.example
+**/__pycache__
+**/.venv
+**/.pytest_cache
+**/.ruff_cache
+backend/uploads
+backend/tests
+frontend/node_modules
+frontend/dist
+frontend/.angular
+frontend/test-results
+frontend/playwright-report
+loadtest/results
+.git

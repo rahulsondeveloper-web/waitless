@@ -1,12 +1,14 @@
 import time
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Header, Response, status
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from app.core.config import get_settings
 from app.core.db import ping_database
+from app.core.errors import NotFoundError
 from app.core.redis import get_redis
 
 router = APIRouter(tags=["health"])
@@ -74,3 +76,16 @@ async def health(response: Response) -> HealthResponse:
         server_time=datetime.now(UTC),
         checks=checks,
     )
+
+
+@router.get("/metrics", include_in_schema=False)
+async def metrics(authorization: Annotated[str | None, Header()] = None) -> PlainTextResponse:
+    """Prometheus scrape endpoint. Off unless METRICS_TOKEN is set; Nginx also blocks it from outside."""
+    import hmac
+
+    from app.core.middleware import METRICS
+
+    token = get_settings().metrics_token
+    if not token or not authorization or not hmac.compare_digest(authorization, f"Bearer {token}"):
+        raise NotFoundError("Not found.")
+    return PlainTextResponse(METRICS.render(), media_type="text/plain; version=0.0.4")

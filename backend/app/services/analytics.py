@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_, func, literal_column, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import AppError, ForbiddenError
+from app.core.errors import AppError, ForbiddenError, NotFoundError
 from app.models import Branch
 from app.models.billing import Bill, BillItem, BillPayment, BillRefund
 from app.models.booking import QueueEntry, Reservation
@@ -192,8 +192,12 @@ async def report(
         )
     if not ctx.has(perm):
         raise ForbiddenError("You do not have permission to see this report.", code="PERMISSION_DENIED")
-    if branch_id is not None and not ctx.can_act_in_branch(perm, branch_id):
-        raise ForbiddenError("You do not have access to this branch.", code="BRANCH_FORBIDDEN")
+    if branch_id is not None:
+        # Unknown here (another restaurant's branch is invisible through RLS) → 404, never an empty report.
+        if (await session.execute(select(Branch.id).where(Branch.id == branch_id))).scalar_one_or_none() is None:
+            raise NotFoundError("Branch not found.")
+        if not ctx.can_act_in_branch(perm, branch_id):
+            raise ForbiddenError("You do not have access to this branch.", code="BRANCH_FORBIDDEN")
     tz = await _tz(session, branch_id)
     today = datetime.now(UTC).astimezone(tz).date()
     end = min(end or today, today + timedelta(days=366))

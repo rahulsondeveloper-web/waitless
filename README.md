@@ -13,8 +13,9 @@
 | `frontend/` | Angular 21 app (standalone components, Signals) |
 | `docs/` | Planning documents (architecture, ER, API, roles, journeys, plan) |
 | `design/` | Brand assets and the default storefront theme (Restaurant Remelle template) |
-| `infra/` | Dockerfiles, docker-compose and Nginx for deployment |
-| `scripts/` | Developer scripts |
+| `infra/` | Production: Docker Compose, Nginx (TLS), backups, monitoring — see [docs/09-deployment.md](docs/09-deployment.md) |
+| `loadtest/` | Locust load test — see [docs/10-load-test.md](docs/10-load-test.md) |
+| `scripts/` | Developer scripts (`dev.ps1`, `backup.ps1`) |
 
 ## Local setup (Windows, no Docker)
 
@@ -60,3 +61,9 @@ cd backend;  .\.venv\Scripts\python.exe -m pytest              # unit + DB integ
 cd frontend; npm run test:ci                                    # Angular unit tests (Vitest)
 cd frontend; npm run e2e                                        # Playwright, uses installed Microsoft Edge
 ```
+
+
+## Production
+
+Deployment, TLS, backups, monitoring and the release checklist: [docs/09-deployment.md](docs/09-deployment.md).
+Security review (OWASP Top 10, tenant isolation): [docs/08-security-review.md](docs/08-security-review.md).

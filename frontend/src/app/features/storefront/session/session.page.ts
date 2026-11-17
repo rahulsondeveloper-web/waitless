@@ -13,6 +13,7 @@ import { RealtimeService } from '../../../core/realtime/realtime.service';
 import { formatPrice } from '../../../core/storefront/storefront.models';
 import { TenantContextService } from '../../../core/storefront/tenant-context.service';
 import { ServingTimerComponent } from '../../../shared/ui/serving-timer/serving-timer.component';
+import { CheckoutService } from '../../../core/payments/checkout.service';
 
 const STEPS = ['placed', 'accepted', 'preparing', 'ready', 'served'] as const;
 
@@ -32,6 +33,7 @@ export class StorefrontSessionPage implements OnInit {
   protected readonly cart = inject(CartService);
   private readonly api = inject(OrderingService);
   private readonly billing = inject(BillingService);
+  private readonly checkout = inject(CheckoutService);
   private readonly realtime = inject(RealtimeService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -127,8 +129,16 @@ export class StorefrontSessionPage implements OnInit {
     this.billing.payOnline(token, billId).subscribe({
       next: (p) => {
         this.billBusy.set(false);
-        this.paying.set({ billId, orderId: p.order_id, amount: p.amount, mock: !!p.checkout.url });
-        if (!p.checkout.url) this.error.set('Online payment is opening in a new window. Your bill updates once the payment succeeds.');
+        if (p.checkout.url) {
+          this.paying.set({ billId, orderId: p.order_id, amount: p.amount, mock: true });
+          return;
+        }
+        void this.checkout
+          .open(p.checkout, { name: this.view()?.restaurant_name ?? 'WaitLess', description: 'Your bill' })
+          .then((r) => {
+            if (r === 'unavailable') this.error.set('The payment window could not open. Please pay your waiter or try again.');
+            else if (r === 'submitted') setTimeout(() => this.loadBills(), 2500); // the webhook marks it paid
+          });
       },
       error: (e: ApiError) => {
         this.billBusy.set(false);

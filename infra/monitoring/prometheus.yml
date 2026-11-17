@@ -1,0 +1,19 @@
+# Scrapes every API replica directly on the Docker network (Nginx blocks /api/v1/metrics from outside).
+# Put the same value as METRICS_TOKEN into infra/monitoring/metrics-token (one line, not committed).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 30s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: waitless-api
+    metrics_path: /api/v1/metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/metrics-token
+    dns_sd_configs:
+      - names: ["api"]
+        type: A
+        port: 8000

@@ -1,0 +1,33 @@
+groups:
+  - name: waitless
+    rules:
+      - alert: ApiDown
+        expr: up{job="waitless-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "An API replica is not answering ({{ $labels.instance }})"
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(waitless_http_requests_total{status="5xx"}[5m]))
+            / clamp_min(sum(rate(waitless_http_requests_total[5m])), 1) > 0.02
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "More than 2% of API requests fail with 5xx"
+
+      - alert: SlowApi
+        expr: |
+          histogram_quantile(0.95, sum(rate(waitless_http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "95th percentile API latency above 1 s"
+
+      - alert: ApiRestarted
+        expr: waitless_uptime_seconds < 300
+        for: 0m
+        labels: { severity: info }
+        annotations:
+          summary: "An API replica restarted ({{ $labels.instance }})"

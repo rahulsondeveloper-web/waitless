@@ -14,3 +14,7 @@ These documents are the pre-implementation deliverables required by Section 29 o
 | 07 | [Development plan](07-development-plan.md) | Phases, deliverables, acceptance tests, local setup |
 
 Diagrams are written in Mermaid. VS Code shows them with the built-in Markdown preview (`Ctrl+Shift+V`) when the "Markdown Preview Mermaid Support" extension is installed; GitHub renders them natively.
+
+- [08 — Security review](08-security-review.md)
+- [09 — Deployment & operations](09-deployment.md)
+- [10 — Load test](10-load-test.md)

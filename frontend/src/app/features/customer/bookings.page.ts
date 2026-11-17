@@ -11,6 +11,7 @@ import {
 } from '../../core/bookings/bookings.service';
 import { ApiError } from '../../core/http/api-error';
 import { RealtimeService } from '../../core/realtime/realtime.service';
+import { CheckoutService } from '../../core/payments/checkout.service';
 
 const LIVE = ['pending_payment', 'confirmed', 'checked_in'];
 
@@ -26,6 +27,7 @@ export class MyBookingsPage implements OnInit {
   private readonly api = inject(BookingsService);
   private readonly realtime = inject(RealtimeService);
   private readonly router = inject(Router);
+  private readonly checkout = inject(CheckoutService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly resLabel = RESERVATION_STATUS_LABEL;
@@ -62,6 +64,11 @@ export class MyBookingsPage implements OnInit {
     this.api.retryPayment(r.id).subscribe({
       next: (c) => {
         if (c.checkout.url) void this.router.navigateByUrl(c.checkout.url);
+        else
+          void this.checkout.open(c.checkout, { name: r.restaurant_name ?? undefined, description: `Booking ${r.code}` }).then((res) => {
+            if (res === 'submitted') setTimeout(() => this.load(), 3000);
+            else if (res === 'unavailable') this.error.set('The payment window could not open. Please try again.');
+          });
       },
       error: (e: ApiError) => this.error.set(e.message),
     });

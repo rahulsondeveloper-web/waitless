@@ -29,23 +29,55 @@ CONTENT_DEFAULTS: dict[str, dict[str, Any]] = {
     "how_it_works": {
         "title": "From kitchen to your table",
         "steps": [
-            {"icon": "search", "title": "Discover", "text": "Find restaurants near you and see if they are open right now."},
-            {"icon": "event_available", "title": "Book or queue", "text": "Reserve a table or join the digital queue from your phone."},
-            {"icon": "restaurant_menu", "title": "Order", "text": "Browse the menu and order — even before you arrive with a paid booking."},
-            {"icon": "timer", "title": "Served in 15", "text": "Late food? Your discount grows automatically, every 5 minutes."},
+            {
+                "icon": "search",
+                "title": "Discover",
+                "text": "Find restaurants near you and see if they are open right now.",
+            },
+            {
+                "icon": "event_available",
+                "title": "Book or queue",
+                "text": "Reserve a table or join the digital queue from your phone.",
+            },
+            {
+                "icon": "restaurant_menu",
+                "title": "Order",
+                "text": "Browse the menu and order — even before you arrive with a paid booking.",
+            },
+            {
+                "icon": "timer",
+                "title": "Served in 15",
+                "text": "Late food? Your discount grows automatically, every 5 minutes.",
+            },
         ],
     },
     "features": {
         "title": "Everything a restaurant runs on",
         "items": [
-            {"icon": "storefront", "title": "Branded storefront", "text": "Your logo, colours and photos — your own app."},
+            {
+                "icon": "storefront",
+                "title": "Branded storefront",
+                "text": "Your logo, colours and photos — your own app.",
+            },
             {"icon": "groups", "title": "Digital queue", "text": "QR check-in, live position and table-ready alerts."},
             {"icon": "event_seat", "title": "Reservations", "text": "Free or paid bookings with pre-orders."},
-            {"icon": "table_restaurant", "title": "Table management", "text": "Live floor map with colour-coded status."},
+            {
+                "icon": "table_restaurant",
+                "title": "Table management",
+                "text": "Live floor map with colour-coded status.",
+            },
             {"icon": "menu_book", "title": "Digital menu", "text": "Meal types, categories, variants and add-ons."},
-            {"icon": "soup_kitchen", "title": "Kitchen display", "text": "Tickets from accepted to served, in real time."},
+            {
+                "icon": "soup_kitchen",
+                "title": "Kitchen display",
+                "text": "Tickets from accepted to served, in real time.",
+            },
             {"icon": "inventory_2", "title": "Inventory", "text": "Recipes, stock movements and low-stock alerts."},
-            {"icon": "point_of_sale", "title": "Billing & POS", "text": "Split bills, UPI, cards and instant receipts."},
+            {
+                "icon": "point_of_sale",
+                "title": "Billing & POS",
+                "text": "Split bills, UPI, cards and instant receipts.",
+            },
         ],
     },
     "for_restaurants": {

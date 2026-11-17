@@ -155,8 +155,12 @@ async def send_otp(session: AsyncSession, phone: str) -> OtpSendResponse:
         )
     )
     await session.commit()
-    # No SMS provider yet (decision D28): the code goes to the log and, outside production, the response.
-    log.info("OTP for %s: %s", phone[:-4] + "****", code if s.expose_dev_codes else "(sent)")
+    # SMS provider (Phase 12, SMS_PROVIDER); outside production the code is also logged and returned.
+    from app.integrations.messaging import send_otp as deliver
+
+    await deliver(phone, code)
+    if s.expose_dev_codes:
+        log.info("OTP for %s: %s (development)", phone[:-4] + "****", code)
     return OtpSendResponse(
         phone=phone, expires_in_seconds=s.otp_ttl_seconds, dev_code=code if s.expose_dev_codes else None
     )

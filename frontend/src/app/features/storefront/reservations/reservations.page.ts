@@ -17,6 +17,7 @@ import {
 } from '../../../core/bookings/bookings.service';
 import { ApiError } from '../../../core/http/api-error';
 import { TenantContextService } from '../../../core/storefront/tenant-context.service';
+import { CheckoutService } from '../../../core/payments/checkout.service';
 
 /**
  * Table booking (PRD §12): date & party → time slot → free or paid → sign in → confirm.
@@ -34,6 +35,7 @@ export class StorefrontReservationsPage implements OnInit {
   protected readonly auth = inject(AuthService);
   private readonly api = inject(BookingsService);
   private readonly router = inject(Router);
+  private readonly checkout = inject(CheckoutService);
 
   protected readonly statusLabel = RESERVATION_STATUS_LABEL;
   protected readonly when = formatWhen;
@@ -185,8 +187,13 @@ export class StorefrontReservationsPage implements OnInit {
       void this.router.navigateByUrl(c.checkout.url);
       return;
     }
-    // Real gateways (Razorpay) open their own checkout window; the webhook confirms the booking.
-    this.error.set('Online payment is opening in a new window. Your booking is confirmed once the payment succeeds.');
+    // Razorpay window; the signature-verified webhook confirms the booking (never the browser).
+    void this.checkout
+      .open(c.checkout, { name: this.ctx.restaurant()?.name ?? 'WaitLess', description: 'Table booking fee', prefill: { contact: this.auth.user()?.phone ?? undefined } })
+      .then((r) => {
+        if (r === 'unavailable') this.error.set('The payment window could not open. Please try again in a moment.');
+        else if (r === 'submitted') this.error.set('Payment received — your booking is confirmed in a few seconds (see My bookings).');
+      });
   }
 
   private loadSlots(): void {

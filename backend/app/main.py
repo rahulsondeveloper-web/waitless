@@ -20,7 +20,7 @@ from app.core.config import get_settings
 from app.core.db import dispose_engine
 from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
-from app.core.middleware import RequestContextMiddleware
+from app.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from app.core.redis import close_redis
 from app.websocket.server import create_socket_server
 
@@ -48,9 +48,10 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
         description="WaitLess — multi-tenant restaurant SaaS platform API.",
-        docs_url="/api/docs",
-        redoc_url="/api/redoc",
-        openapi_url="/api/openapi.json",
+        # The interactive docs reveal the whole API surface: off in production unless API_DOCS=true.
+        docs_url="/api/docs" if settings.docs_enabled else None,
+        redoc_url="/api/redoc" if settings.docs_enabled else None,
+        openapi_url="/api/openapi.json" if settings.docs_enabled else None,
         lifespan=lifespan,
     )
 
@@ -58,10 +59,11 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Table-Token", "X-Request-ID"],
         expose_headers=["X-Request-ID"],
     )
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestContextMiddleware)
     register_error_handlers(app)
 

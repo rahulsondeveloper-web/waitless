@@ -12,6 +12,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { ApiError } from '../../../core/http/api-error';
 import { formatPrice } from '../../../core/storefront/storefront.models';
 import { ErrorStateComponent, LoadingStateComponent } from '../../../shared/ui/state/state.components';
+import { CheckoutService } from '../../../core/payments/checkout.service';
 
 const STATUS: Record<string, string> = {
   trialing: 'Free trial',
@@ -173,6 +174,7 @@ export class SettingsPage implements OnInit {
   private readonly api = inject(AnalyticsService);
   private readonly auth = inject(AuthService);
   private readonly snack = inject(MatSnackBar);
+  private readonly checkout = inject(CheckoutService);
   protected readonly status = STATUS;
   protected readonly usage = signal<Usage | null>(null);
   protected readonly invoices = signal<SaasInvoice[]>([]);
@@ -208,8 +210,14 @@ export class SettingsPage implements OnInit {
   protected pay(i: SaasInvoice): void {
     this.api.payInvoice(i.id).subscribe({
       next: (r) => {
-        if (r.checkout.url) this.paying.set({ id: i.id, orderId: r.order_id });
-        else this.snack.open('The payment window is opening. The invoice updates once it succeeds.', 'OK', { duration: 5000 });
+        if (r.checkout.url) {
+          this.paying.set({ id: i.id, orderId: r.order_id });
+          return;
+        }
+        void this.checkout.open(r.checkout, { name: 'WaitLess', description: `Invoice ${i.number}` }).then((res) => {
+          if (res === 'submitted') setTimeout(() => this.load(), 3000);
+          else if (res === 'unavailable') this.snack.open('The payment window could not open. Please try again.', 'OK', { duration: 5000 });
+        });
       },
       error: (e: ApiError) => this.snack.open(e.message, 'OK', { duration: 5000 }),
     });

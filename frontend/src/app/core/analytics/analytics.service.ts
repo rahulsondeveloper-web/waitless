@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { ApiService } from '../http/api.service';
+import { CheckoutData } from '../payments/checkout.service';
 import { ChartSpec } from '../../shared/ui/chart/chart.component';
 
 /** Restaurant reports (PRD §15) and the restaurant's own WaitLess plan / help requests. */
@@ -113,7 +114,7 @@ export class AnalyticsService {
   invoices(): Observable<SaasInvoice[]> {
     return this.api.get('restaurant/saas-invoices');
   }
-  payInvoice(id: string): Observable<{ order_id: string; amount: string; checkout: { url?: string } }> {
+  payInvoice(id: string): Observable<{ order_id: string; amount: string; checkout: CheckoutData }> {
     return this.api.post(`restaurant/saas-invoices/${id}/pay`, {});
   }
   mockPay(orderId: string, success: boolean): Observable<{ result: string }> {

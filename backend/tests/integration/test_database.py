@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
-from app.core.db import get_engine, get_sessionmaker
+from app.core.db import get_engine, get_sessionmaker, use_system
 from app.core.events import record_event
 
 pytestmark = pytest.mark.db
@@ -45,6 +45,11 @@ async def test_uuidv7_default_and_outbox_insert() -> None:
 async def test_audit_log_is_append_only() -> None:
     async with get_sessionmaker()() as session:
         await session.execute(text("INSERT INTO audit_logs (action, entity) VALUES ('test', 'test')"))
+        # Phase 12: RLS hides platform entries from tenant-less sessions — nothing to update there …
+        hidden = await session.execute(text("UPDATE audit_logs SET action = 'changed' WHERE action = 'test'"))
+        assert hidden.rowcount == 0
+        # … and even the platform (system scope) cannot change history.
+        await use_system(session)
         with pytest.raises(DBAPIError, match="append-only"):
             await session.execute(text("UPDATE audit_logs SET action = 'changed'"))
         await session.rollback()
