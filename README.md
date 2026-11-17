@@ -31,6 +31,7 @@ copy .env.example .env            # set DB_MIGRATION_PASSWORD (postgres), a rand
 .\.venv\Scripts\alembic.exe -x test=1 upgrade head            # test database
 .\.venv\Scripts\python.exe -m app.cli seed                    # permissions, roles, plans (safe to re-run)
 .\.venv\Scripts\python.exe -m app.cli create-super-admin --email you@example.com --name "Your Name"   # prompts for password
+.\.venv\Scripts\python.exe -m app.cli seed-demo               # optional: 2 demo restaurants (owner password Demo-pass-123)
 
 # 2. Frontend
 cd ..\frontend
@@ -47,7 +48,8 @@ Then open:
 - http://localhost:4200/login — sign in (password for restaurants/admin, mobile code for guests)
 - http://localhost:4200/register-restaurant — register a restaurant
 - http://localhost:4200/super-admin/restaurants — approve / manage restaurants (Super Admin)
-- http://localhost:4200/r/urban-bites — storefront shell
+- http://localhost:4200/restaurants — discover restaurants (search, filters, map)
+- http://localhost:4200/r/urban-bites and /r/remelle — demo storefronts (after `seed-demo`)
 - http://localhost:4200/status — live status of database, Redis, worker and Socket.IO
 - http://localhost:8000/api/docs — Swagger
 

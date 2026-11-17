@@ -1,0 +1,69 @@
+@if (ctx.restaurant(); as r) {
+  <section class="wl-container page">
+    <header class="head">
+      <p class="eyebrow">Contact</p>
+      <h1 class="title">Come <span class="script">visit us</span></h1>
+    </header>
+
+    <div class="layout">
+      <div class="details">
+        @if (r.contact_phone || r.contact_email || r.website) {
+          <article class="card">
+            <h2>Reach us</h2>
+            <ul class="lines">
+              @if (r.contact_phone) {
+                <li><span class="material-symbols-outlined" aria-hidden="true">call</span>
+                  <a [href]="'tel:' + r.contact_phone">{{ r.contact_phone }}</a></li>
+              }
+              @if (r.contact_email) {
+                <li><span class="material-symbols-outlined" aria-hidden="true">mail</span>
+                  <a [href]="'mailto:' + r.contact_email">{{ r.contact_email }}</a></li>
+              }
+              @if (r.website) {
+                <li><span class="material-symbols-outlined" aria-hidden="true">language</span>
+                  <a [href]="r.website" target="_blank" rel="noopener noreferrer">{{ r.website }}</a></li>
+              }
+            </ul>
+            @if (r.social_links.length) {
+              <div class="social">
+                @for (s of r.social_links; track s.platform) {
+                  <a [href]="s.url" target="_blank" rel="noopener noreferrer">{{ socialLabels[s.platform] ?? s.platform }}</a>
+                }
+              </div>
+            }
+          </article>
+        }
+
+        @for (b of r.branches; track b.id) {
+          <article class="card">
+            <div class="branch-head">
+              <h2>{{ b.name }}</h2>
+              <span class="status" [class.status--open]="b.open_now">{{ b.open_now ? 'Open now' : 'Closed now' }}</span>
+            </div>
+            <p class="addr">{{ b.address_line }}, {{ b.city }}, {{ b.state }} {{ b.postal_code }}</p>
+            @if (b.phone) { <p><a [href]="'tel:' + b.phone">{{ b.phone }}</a></p> }
+            <a class="link" [href]="directions(b)" target="_blank" rel="noopener noreferrer">Get directions</a>
+
+            @if (b.hours.length) {
+              <table class="hours">
+                <caption>Opening hours</caption>
+                <tbody>
+                  @for (day of weekdays; track day; let i = $index) {
+                    <tr [class.today]="i === todayIndex">
+                      <th scope="row">{{ day }}</th>
+                      <td>{{ hoursText(b, i) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
+          </article>
+        }
+      </div>
+
+      @if (markers().length) {
+        <wl-map-view class="map" [markers]="markers()" [label]="'Map showing ' + r.name" />
+      }
+    </div>
+  </section>
+}

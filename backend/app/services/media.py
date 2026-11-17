@@ -44,6 +44,7 @@ SPECS: dict[str, ImageSpec] = {
     "logo": ImageSpec(max_w=512, max_h=512, min_w=64, min_h=64, quality=90),
     "cover": ImageSpec(max_w=2400, max_h=1600, min_w=800, min_h=300, quality=82),
     "gallery": ImageSpec(max_w=2000, max_h=2000, min_w=400, min_h=300, quality=82),
+    "menu_item": ImageSpec(max_w=1200, max_h=1200, min_w=300, min_h=300, quality=82),
 }
 
 

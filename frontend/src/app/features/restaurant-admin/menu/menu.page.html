@@ -1,0 +1,126 @@
+<header class="page-head">
+  <div>
+    <h1>Menu</h1>
+    <p class="muted">
+      {{ totalDishes() }} dish{{ totalDishes() === 1 ? '' : 'es' }} on your menu.
+      <a [routerLink]="['/r', auth.activeTenant()?.tenant_slug, 'menu']" target="_blank" class="link">See it as guests do ↗</a>
+    </p>
+  </div>
+  <button mat-flat-button type="button" (click)="openItem(null)" [disabled]="!selected()">
+    <mat-icon>add</mat-icon> Add dish
+  </button>
+</header>
+
+@if (error(); as e) {
+  <wl-error-state title="Could not load the menu" [message]="e.message" [retryable]="false" />
+} @else if (!menu()) {
+  <wl-loading-state />
+} @else {
+  <div class="layout">
+    <aside class="cats" aria-label="Categories">
+      <label class="meal">
+        <span>Menu</span>
+        <select [value]="mealFilter() ?? ''" (change)="mealFilter.set($any($event.target).value || null)">
+          <option value="">All meal types</option>
+          @for (m of menu()!.meal_types; track m.id) { <option [value]="m.id">{{ m.name }}</option> }
+        </select>
+      </label>
+      <ul>
+        @for (c of categories(); track c.id) {
+          <li>
+            <button type="button" [class.on]="c.id === selectedId()" [class.off]="!c.is_active" (click)="selectedId.set(c.id)"
+                    [attr.aria-current]="c.id === selectedId() ? 'true' : null">
+              <span class="name">{{ c.name }}</span>
+              @if (c.is_alcoholic && !menu()!.alcohol_licensed) { <mat-icon class="lock" aria-label="Needs licence">lock</mat-icon> }
+              @if (c.item_count) { <span class="count">{{ c.item_count }}</span> }
+            </button>
+          </li>
+        }
+      </ul>
+      <button mat-stroked-button type="button" class="new-cat" (click)="newCategory()"><mat-icon>add</mat-icon> New category</button>
+    </aside>
+
+    <section class="panel">
+      @if (selected(); as c) {
+        <div class="cat-head">
+          <div>
+            <h2>{{ c.name }}</h2>
+            @if (c.description) { <p class="muted">{{ c.description }}</p> }
+          </div>
+          <div class="cat-actions">
+            <mat-slide-toggle [checked]="c.is_active" (change)="toggleCategory($event.checked)"
+                              [disabled]="busy() === 'cat-' + c.id || (c.is_alcoholic && !menu()!.alcohol_licensed)">
+              {{ c.is_active ? 'Shown' : 'Hidden' }}
+            </mat-slide-toggle>
+            <button mat-icon-button type="button" (click)="editCategory()" aria-label="Edit category"><mat-icon>edit</mat-icon></button>
+            @if (!c.item_count) {
+              <button mat-icon-button type="button" (click)="deleteCategory()" aria-label="Delete category"><mat-icon>delete</mat-icon></button>
+            }
+          </div>
+        </div>
+        @if (c.is_alcoholic && !menu()!.alcohol_licensed) {
+          <p class="notice"><mat-icon>lock</mat-icon> Alcoholic categories unlock after WaitLess approves your liquor licence.</p>
+        }
+
+        <div class="subs">
+          @for (s of c.subcategories; track s.id) {
+            <span class="sub">{{ s.name }}
+              <button type="button" (click)="removeSubcategory(s.id, s.name)" [attr.aria-label]="'Remove ' + s.name">✕</button>
+            </span>
+          }
+          <form class="sub-add" (submit)="$event.preventDefault(); addSubcategory(subInput)">
+            <input #subInput placeholder="Add subcategory" maxlength="80" aria-label="New subcategory name" />
+            <button type="submit" aria-label="Add subcategory"><mat-icon>add</mat-icon></button>
+          </form>
+        </div>
+
+        <div class="items-head">
+          <label class="archived"><input type="checkbox" [checked]="showArchived()" (change)="showArchived.set($any($event.target).checked)" /> Show archived</label>
+        </div>
+        <ul class="items">
+          @for (i of items(); track i.id) {
+            <li class="item" [class.archived]="i.is_archived" [class.busy]="busy() === i.id">
+              <div class="thumb">
+                @if (i.image_url) { <img [src]="i.image_url" [alt]="i.name" /> } @else { <mat-icon>restaurant</mat-icon> }
+              </div>
+              <div class="info">
+                <b><span class="mark" [class]="'mark mark--' + i.food_class" aria-hidden="true"></span>{{ i.name }}</b>
+                <small>
+                  {{ price(i.base_price) }}
+                  @if (i.subcategory_id) { · {{ subName().get(i.subcategory_id) }} }
+                  @if (i.is_bestseller) { · Bestseller }
+                  @if (i.is_todays_special) { · Today's special }
+                  @if (i.is_archived) { · Archived }
+                </small>
+              </div>
+              <div class="row-actions">
+                @if (!i.is_archived) {
+                  <mat-slide-toggle [checked]="i.is_available" (change)="setStock(i, $event.checked)" [disabled]="busy() === i.id"
+                                    [attr.aria-label]="i.name + ' available'">{{ i.is_available ? 'Available' : 'Sold out' }}</mat-slide-toggle>
+                  <label class="icon-file" [attr.aria-label]="'Upload photo for ' + i.name">
+                    <input type="file" accept="image/jpeg,image/png,image/webp" (change)="uploadImage(i, $event)" />
+                    <mat-icon>photo_camera</mat-icon>
+                  </label>
+                  @if (i.image_url) {
+                    <button mat-icon-button type="button" (click)="removeImage(i)" [attr.aria-label]="'Remove photo of ' + i.name"><mat-icon>hide_image</mat-icon></button>
+                  }
+                  <button mat-icon-button type="button" (click)="openItem(i)" [attr.aria-label]="'Edit ' + i.name"><mat-icon>edit</mat-icon></button>
+                  <button mat-icon-button type="button" (click)="archive(i, true)" [attr.aria-label]="'Archive ' + i.name"><mat-icon>archive</mat-icon></button>
+                } @else {
+                  <button mat-button type="button" (click)="archive(i, false)">Restore</button>
+                }
+              </div>
+            </li>
+          } @empty {
+            <li class="empty">
+              No dishes here yet.
+              <button mat-button type="button" (click)="openItem(null)">Add the first one</button>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="muted">Choose a category.</p>
+      }
+    </section>
+  </div>
+}

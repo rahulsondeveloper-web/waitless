@@ -21,7 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 
-MEDIA_KINDS = ("logo", "cover", "gallery")
+MEDIA_KINDS = ("logo", "cover", "gallery", "menu_item")
 SOCIAL_PLATFORMS = ("instagram", "facebook", "x", "youtube", "google", "zomato", "swiggy", "tripadvisor", "other")
 GALLERY_MAX_POSITION = 5  # DB hard cap; the service enforces the configurable limit (PRD §5.3)
 

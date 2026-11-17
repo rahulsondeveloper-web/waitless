@@ -1,12 +1,19 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, inject, signal } from '@angular/core';
 
-import { DEFAULT_THEME, ThemeTokens, sanitizeTokens, tokensToCssVars } from './theme.tokens';
+import {
+  Branding,
+  DEFAULT_THEME,
+  ThemeTokens,
+  brandingToTokens,
+  sanitizeTokens,
+  tokensToCssVars,
+} from './theme.tokens';
 
 /**
  * Applies theme tokens as CSS variables on <html>.
  * - Platform pages and admin use the default (WaitLess) theme.
- * - A storefront calls apply(restaurant.branding) on enter and reset() on leave.
+ * - A storefront calls applyBranding(restaurant.branding) on enter and reset() on leave.
  */
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
@@ -21,7 +28,16 @@ export class ThemeService {
       root.style.setProperty(name, value);
     }
     root.dataset['wlMode'] = clean.mode;
+    root.style.colorScheme = clean.mode === 'dark' ? 'dark' : 'light';
     this._tokens.set(clean);
+  }
+
+  /** Restaurant branding → full theme. "auto" follows the guest's device setting. */
+  applyBranding(branding: Pick<Branding, 'tokens' | 'button_style' | 'mode'> | null | undefined): void {
+    if (!branding) return this.reset();
+    const prefersDark =
+      branding.mode === 'auto' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+    this.apply(brandingToTokens({ ...branding, mode: branding.mode === 'auto' ? (prefersDark ? 'dark' : 'light') : branding.mode }));
   }
 
   reset(): void {

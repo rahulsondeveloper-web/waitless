@@ -8,6 +8,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  globalSetup: './e2e/global-setup.ts',
   timeout: 30_000,
   // The dev server serves unbundled modules; give assertions room and limit parallel browsers.
   expect: { timeout: 10_000 },

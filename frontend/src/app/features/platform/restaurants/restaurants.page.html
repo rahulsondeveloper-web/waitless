@@ -1,0 +1,91 @@
+<section class="wl-page wl-container">
+  <header class="head">
+    <p class="wl-eyebrow">Discover</p>
+    <h1 class="wl-h2">Find a restaurant</h1>
+  </header>
+
+  <form class="search" role="search" (submit)="$event.preventDefault(); setFilter('q', qInput.value.trim())">
+    <span class="material-symbols-outlined" aria-hidden="true">search</span>
+    <input #qInput type="search" [value]="q()" placeholder="Restaurant, cuisine or city" aria-label="Search restaurants" />
+    <button type="submit" class="wl-btn wl-btn--primary wl-btn--sm">Search</button>
+  </form>
+
+  <div class="filters" aria-label="Filters">
+    <label>
+      <span class="sr">City</span>
+      <select [value]="city()" (change)="setFilter('city', $any($event.target).value)" aria-label="City">
+        <option value="">All cities</option>
+        @for (c of filters().cities; track c) { <option [value]="c" [selected]="c === city()">{{ c }}</option> }
+      </select>
+    </label>
+    <label>
+      <select [value]="cuisine()" (change)="setFilter('cuisine', $any($event.target).value)" aria-label="Cuisine">
+        <option value="">All cuisines</option>
+        @for (c of filters().cuisines; track c) { <option [value]="c" [selected]="c === cuisine()">{{ c }}</option> }
+      </select>
+    </label>
+    <label>
+      <select [value]="type()" (change)="setFilter('type', $any($event.target).value)" aria-label="Restaurant type">
+        <option value="">All types</option>
+        @for (t of filters().restaurant_types; track t) { <option [value]="t" [selected]="t === type()">{{ t }}</option> }
+      </select>
+    </label>
+    <label class="check">
+      <input type="checkbox" [checked]="openNow()" (change)="setFilter('open', $any($event.target).checked)" />
+      Open now
+    </label>
+    @if (coords()) {
+      <span class="near">
+        <span class="material-symbols-outlined" aria-hidden="true">near_me</span> Near you
+        <select [value]="radius() ?? ''" (change)="setFilter('radius', $any($event.target).value)" aria-label="Distance">
+          <option value="">any distance</option>
+          @for (km of [2, 5, 10, 25, 50]; track km) { <option [value]="km" [selected]="km === radius()">within {{ km }} km</option> }
+        </select>
+        <button type="button" class="x" (click)="clearLocation()" aria-label="Stop using my location">✕</button>
+      </span>
+    } @else {
+      <button type="button" class="chip" (click)="nearMe()" [disabled]="locating()">
+        <span class="material-symbols-outlined" aria-hidden="true">near_me</span>
+        {{ locating() ? 'Locating…' : 'Near me' }}
+      </button>
+    }
+    @if (activeFilters()) {
+      <button type="button" class="clear" (click)="clearAll()">Clear filters</button>
+    }
+    <div class="views" role="group" aria-label="View">
+      <button type="button" [class.on]="view() === 'list'" (click)="view.set('list')" [attr.aria-pressed]="view() === 'list'">
+        <span class="material-symbols-outlined" aria-hidden="true">grid_view</span> List
+      </button>
+      <button type="button" [class.on]="view() === 'map'" (click)="view.set('map')" [attr.aria-pressed]="view() === 'map'">
+        <span class="material-symbols-outlined" aria-hidden="true">map</span> Map
+      </button>
+    </div>
+  </div>
+  @if (geoError()) { <p class="geo-error" role="status">{{ geoError() }}</p> }
+
+  @if (error(); as e) {
+    <wl-error-state title="Could not load restaurants" [message]="e.message" [retryable]="false" />
+  } @else if (loading() && !items().length) {
+    <wl-loading-state label="Finding restaurants…" />
+  } @else if (!items().length) {
+    <wl-empty-state icon="search_off" title="No restaurants found"
+                    [message]="activeFilters() ? 'Try removing a filter.' : 'Restaurants appear here once they go live.'" />
+  } @else {
+    <p class="count" aria-live="polite">{{ total() }} restaurant{{ total() === 1 ? '' : 's' }}</p>
+    <div class="results" [class.results--map]="view() === 'map'">
+      <div class="grid">
+        @for (r of items(); track r.id) {
+          <wl-restaurant-card [restaurant]="r" (mouseenter)="highlighted.set(r.id)" (mouseleave)="highlighted.set(null)" />
+        }
+      </div>
+      @if (view() === 'map') {
+        <wl-map-view class="map" [markers]="markers()" [highlight]="highlighted()" label="Map of restaurants" />
+      }
+    </div>
+    @if (hasMore()) {
+      <div class="more">
+        <button type="button" class="wl-btn wl-btn--ghost" (click)="loadMore()" [disabled]="loading()">Show more</button>
+      </div>
+    }
+  }
+</section>

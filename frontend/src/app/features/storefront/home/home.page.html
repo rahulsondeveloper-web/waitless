@@ -1,0 +1,80 @@
+@if (r(); as r) {
+  <section class="hero" [style.background-image]="r.cover_url ? 'url(' + r.cover_url + ')' : null">
+    <div class="hero__shade"></div>
+    <div class="wl-container hero__content">
+      @if (r.branding.logo_url) {
+        <img class="hero__logo" [src]="r.branding.logo_url" alt="" width="88" height="88" />
+      }
+      <p class="hero__eyebrow">Welcome to</p>
+      <h1 class="hero__title">{{ r.name }}</h1>
+      @if (r.short_description) {
+        <p class="hero__tag">{{ r.short_description }}</p>
+      }
+      <ul class="hero__meta" aria-label="At a glance">
+        @if (branch(); as b) {
+          <li>
+            <span class="status" [class.status--open]="b.open_now">{{ b.open_now ? 'Open now' : 'Closed now' }}</span>
+            @if (b.today_hours) { <span>Today {{ b.today_hours }}</span> }
+          </li>
+        }
+        <li>{{ r.restaurant_type }} · {{ r.cuisines.join(' · ') }}</li>
+      </ul>
+      <div class="hero__cta">
+        <a routerLink="reservations" class="wl-btn wl-btn--primary">Book a table</a>
+        <a routerLink="menu" class="wl-btn wl-btn--light">View menu</a>
+        @if (r.gallery_count) {
+          <a routerLink="gallery" class="wl-btn wl-btn--light">View gallery</a>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="wl-container info">
+    <article class="card promise">
+      <span class="material-symbols-outlined" aria-hidden="true">timer</span>
+      <div>
+        <h2>Served in 15 minutes</h2>
+        <p>If your food takes longer, your discount grows automatically — 2% for every extra 5 minutes.</p>
+      </div>
+    </article>
+    @if (branch(); as b) {
+      <article class="card">
+        <h2>Find us</h2>
+        <p>{{ b.address_line }}, {{ b.city }}, {{ b.state }}</p>
+        @if (mapsUrl()) {
+          <a [href]="mapsUrl()" target="_blank" rel="noopener noreferrer" class="link">Open in maps</a>
+        }
+      </article>
+    }
+    <article class="card">
+      <h2>Get in touch</h2>
+      @if (r.contact_phone) { <p><a [href]="'tel:' + r.contact_phone" class="link">{{ r.contact_phone }}</a></p> }
+      @if (r.contact_email) { <p><a [href]="'mailto:' + r.contact_email" class="link">{{ r.contact_email }}</a></p> }
+      <a routerLink="contact" class="link">Hours &amp; directions</a>
+    </article>
+  </section>
+
+  @if (photos().length) {
+    <section class="wl-container strip" aria-labelledby="h-photos">
+      <div class="strip__head">
+        <h2 id="h-photos" class="section-title">A look <span class="script">inside</span></h2>
+        <a routerLink="gallery" class="link">View gallery</a>
+      </div>
+      <div class="strip__grid">
+        @for (p of photos(); track p.id) {
+          <a routerLink="gallery" [queryParams]="{ photo: $index }" class="strip__item">
+            <img [src]="p.url" [alt]="p.caption || 'Photo of ' + r.name" loading="lazy" />
+          </a>
+        }
+      </div>
+    </section>
+  }
+
+  @if (r.about_us) {
+    <section class="wl-container about" aria-labelledby="h-about">
+      <h2 id="h-about" class="section-title">Our <span class="script">story</span></h2>
+      <p class="about__text">{{ r.about_us }}</p>
+      <a routerLink="about" class="link">Read more</a>
+    </section>
+  }
+}

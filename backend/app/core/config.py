@@ -56,6 +56,7 @@ class Settings(BaseSettings):
 
     # Rate limits (per client IP). Raise in development .env when running e2e tests repeatedly.
     register_limit_per_hour: int = 10
+    contact_limit_per_hour: int = 5
 
     # SaaS
     trial_plan_code: str = "professional"

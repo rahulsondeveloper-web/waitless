@@ -76,7 +76,7 @@ async def db(admin_engine: AsyncEngine) -> AsyncIterator[None]:
     if not await _database_available():
         pytest.skip("PostgreSQL test database not reachable or not migrated (alembic -x test=1 upgrade head)")
     async with admin_engine.begin() as conn:
-        for table in ("tenants", "users", "otp_challenges", "outbox_events", "idempotency_keys"):
+        for table in ("tenants", "users", "otp_challenges", "outbox_events", "idempotency_keys", "support_tickets"):
             await conn.execute(text(f"DELETE FROM {table}"))
     redis = get_redis()
     if redis is not None:

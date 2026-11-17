@@ -1,0 +1,128 @@
+.page {
+  padding-block: 2.5rem;
+}
+.head {
+  margin-bottom: 1.4rem;
+}
+.eyebrow {
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--wl-primary);
+}
+.title {
+  font: 600 clamp(2rem, 4vw, 3rem) / 1.1 var(--wl-font-serif);
+}
+.script {
+  font-family: var(--wl-font-script);
+  font-weight: 400;
+  color: var(--wl-primary);
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 1.4rem;
+  align-items: start;
+}
+.details {
+  display: grid;
+  gap: 1rem;
+}
+.map {
+  position: sticky;
+  top: 90px;
+  --map-height: 460px;
+}
+.card {
+  background: var(--wl-surface);
+  border: 1px solid var(--wl-line);
+  border-radius: var(--wl-radius);
+  padding: 1.2rem 1.3rem;
+  h2 {
+    font: 600 1.35rem var(--wl-font-serif);
+  }
+  a {
+    color: var(--wl-primary);
+  }
+}
+.lines {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    word-break: break-word;
+  }
+  .material-symbols-outlined {
+    color: var(--wl-muted);
+  }
+}
+.social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-top: 0.8rem;
+  font-weight: 500;
+}
+.branch-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+.status {
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: var(--wl-surface-alt);
+  font-size: 0.78rem;
+  font-weight: 600;
+  &--open {
+    background: var(--wl-secondary);
+    color: #fff;
+  }
+}
+.addr {
+  margin: 0.4rem 0;
+  color: var(--wl-text-soft);
+}
+.link {
+  font-weight: 500;
+}
+.hours {
+  width: 100%;
+  margin-top: 1rem;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  caption {
+    text-align: left;
+    font-weight: 600;
+    padding-bottom: 0.3rem;
+  }
+  th,
+  td {
+    padding: 0.35rem 0;
+    border-bottom: 1px dashed var(--wl-line);
+    text-align: left;
+  }
+  th {
+    font-weight: 500;
+  }
+  td {
+    text-align: right;
+  }
+  .today {
+    font-weight: 700;
+    color: var(--wl-primary);
+  }
+}
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .map {
+    position: static;
+    --map-height: 300px;
+  }
+}

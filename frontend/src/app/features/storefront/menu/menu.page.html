@@ -1,0 +1,83 @@
+<section class="wl-container page">
+  <header class="head">
+    <p class="eyebrow">Our menu</p>
+    <h1 class="title">Crafted with love, <span class="script">served with joy</span></h1>
+    <p class="note">
+      <span class="material-symbols-outlined" aria-hidden="true">timer</span>
+      Every dish comes with our 15-minute serving promise. Online ordering opens soon.
+    </p>
+  </header>
+
+  @if (error(); as e) {
+    <wl-error-state title="Could not load the menu" [message]="e.message" (retry)="load()" />
+  } @else if (!menu()) {
+    <wl-loading-state label="Loading menu…" />
+  } @else if (!menu()!.categories.length) {
+    <wl-empty-state icon="restaurant_menu" title="The menu is being prepared" message="Please check back soon." />
+  } @else {
+    <div class="toolbar">
+      <div class="meals" role="tablist" aria-label="Meal type">
+        <button type="button" role="tab" [attr.aria-selected]="meal() === null" [class.on]="meal() === null"
+                (click)="meal.set(null)">All</button>
+        @for (m of menu()!.meal_types; track m.id) {
+          <button type="button" role="tab" [attr.aria-selected]="meal() === m.id" [class.on]="meal() === m.id"
+                  (click)="meal.set(m.id)">{{ m.name }}</button>
+        }
+      </div>
+      <div class="filters">
+        <label class="search">
+          <span class="material-symbols-outlined" aria-hidden="true">search</span>
+          <input type="search" placeholder="Search dishes" [value]="query()" (input)="query.set($any($event.target).value)"
+                 aria-label="Search dishes" />
+        </label>
+        <label class="veg-toggle">
+          <input type="checkbox" [checked]="vegOnly()" (change)="vegOnly.set($any($event.target).checked)" />
+          <span class="mark mark--veg" aria-hidden="true"></span> Veg only
+        </label>
+      </div>
+      @if (categories().length > 1) {
+        <nav class="jump" aria-label="Categories">
+          @for (c of categories(); track c.id) {
+            <button type="button" (click)="jump(c.id)">{{ c.name }}</button>
+          }
+        </nav>
+      }
+    </div>
+
+    @for (c of categories(); track c.id) {
+      <section class="category" [id]="'cat-' + c.id" [attr.aria-labelledby]="'h-' + c.id">
+        <h2 class="cat-title" [id]="'h-' + c.id">{{ c.name }}</h2>
+        @if (c.description) { <p class="cat-desc">{{ c.description }}</p> }
+        <ul class="items">
+          @for (i of c.items; track i.id) {
+            <li class="item" [class.item--off]="!i.is_available">
+              @if (i.image_url) {
+                <img class="item__img" [src]="i.image_url" [alt]="i.name" loading="lazy" />
+              }
+              <div class="item__body">
+                <h3>
+                  <span class="mark" [class]="'mark mark--' + i.food_class" role="img" [attr.aria-label]="foodLabel[i.food_class]"></span>
+                  {{ i.name }}
+                  @if (i.spice_level) { <span class="spice" [attr.aria-label]="'Spice level ' + i.spice_level + ' of 3'">{{ spice(i.spice_level) }}</span> }
+                </h3>
+                <div class="badges">
+                  @if (i.is_bestseller) { <span class="badge">Bestseller</span> }
+                  @if (i.is_todays_special) { <span class="badge badge--accent">Today's special</span> }
+                  @if (i.subcategory) { <span class="sub">{{ i.subcategory }}</span> }
+                </div>
+                @if (i.description) { <p>{{ i.description }}</p> }
+                @if (i.allergens.length) { <p class="allergens">Contains: {{ i.allergens.join(', ') }}</p> }
+              </div>
+              <div class="item__side">
+                <span class="price">{{ price(i.price) }}</span>
+                @if (!i.is_available) { <span class="sold">Sold out</span> }
+              </div>
+            </li>
+          }
+        </ul>
+      </section>
+    } @empty {
+      <wl-empty-state icon="search_off" title="No dishes match" message="Try another search or meal type." />
+    }
+  }
+</section>

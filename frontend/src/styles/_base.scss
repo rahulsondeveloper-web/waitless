@@ -181,3 +181,8 @@ button {
     transition: none !important;
   }
 }
+
+.wl-pin--hi span {
+  background: var(--wl-accent);
+  transform: rotate(-45deg) scale(1.2);
+}

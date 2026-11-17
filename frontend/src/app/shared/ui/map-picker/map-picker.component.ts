@@ -12,6 +12,8 @@ import {
 } from '@angular/core';
 import type * as Leaflet from 'leaflet';
 
+import { OSM_ATTRIBUTION, OSM_TILES, loadLeaflet, pinIcon } from '../map/leaflet-loader';
+
 export interface LatLng {
   lat: number;
   lng: number;
@@ -68,8 +70,7 @@ export class MapPickerComponent implements AfterViewInit, OnDestroy {
 
   async ngAfterViewInit(): Promise<void> {
     try {
-      loadLeafletCss();
-      this.L = await import('leaflet');
+      this.L = await loadLeaflet();
     } catch {
       this.failed.set(true);
       return;
@@ -80,10 +81,7 @@ export class MapPickerComponent implements AfterViewInit, OnDestroy {
       start ?? INDIA,
       start ? 16 : 5,
     );
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(this.map);
+    L.tileLayer(OSM_TILES, { maxZoom: 19, attribution: OSM_ATTRIBUTION }).addTo(this.map);
     this.map.on('click', (e: Leaflet.LeafletMouseEvent) => this.place(e.latlng, true));
     if (start) this.place(start, false);
   }
@@ -95,13 +93,7 @@ export class MapPickerComponent implements AfterViewInit, OnDestroy {
   private place(p: LatLng, emit: boolean): void {
     const L = this.L!;
     if (!this.marker) {
-      // divIcon: no image assets to resolve through the bundler
-      const icon = L.divIcon({
-        className: 'wl-pin',
-        html: '<span></span>',
-        iconSize: [28, 28],
-        iconAnchor: [14, 28],
-      });
+      const icon = pinIcon(L);
       this.marker = L.marker(p, { draggable: true, icon, keyboard: true, title: 'Restaurant location' }).addTo(this.map!);
       this.marker.on('dragend', () => this.picked.emit(round(this.marker!.getLatLng())));
     } else {
@@ -113,16 +105,6 @@ export class MapPickerComponent implements AfterViewInit, OnDestroy {
       this.map!.setView(p, Math.max(this.map!.getZoom(), 15));
     }
   }
-}
-
-/** leaflet.css is built as a separate, non-injected bundle (angular.json) and added only when a map is shown. */
-function loadLeafletCss(): void {
-  if (document.querySelector('link[data-leaflet]')) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = 'leaflet.css';
-  link.dataset['leaflet'] = '';
-  document.head.appendChild(link);
 }
 
 function round(p: LatLng): LatLng {

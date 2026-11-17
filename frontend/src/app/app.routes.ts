@@ -73,8 +73,16 @@ export const routes: Routes = [
         title: 'System status · WaitLess',
         loadComponent: () => import('./features/platform/status/status.page').then((m) => m.StatusPage),
       },
-      page('about', 'About WaitLess', 4),
-      page('restaurants', 'Find Restaurants', 4),
+      {
+        path: 'about',
+        title: 'About · WaitLess',
+        loadComponent: () => import('./features/platform/about/about.page').then((m) => m.AboutPage),
+      },
+      {
+        path: 'restaurants',
+        title: 'Find restaurants · WaitLess',
+        loadComponent: () => import('./features/platform/restaurants/restaurants.page').then((m) => m.RestaurantsPage),
+      },
       {
         path: 'login',
         title: 'Sign in · WaitLess',
@@ -102,12 +110,31 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./layouts/storefront-layout/storefront-layout.component').then((m) => m.StorefrontLayoutComponent),
     children: [
-      page('', 'Restaurant Home', 4),
-      page('menu', 'Menu', 4),
-      page('gallery', 'Gallery', 4),
-      page('about', 'About Us', 4),
-      page('reservations', 'Reservations', 6),
-      page('contact', 'Contact', 4),
+      {
+        path: '',
+        loadComponent: () => import('./features/storefront/home/home.page').then((m) => m.StorefrontHomePage),
+      },
+      {
+        path: 'menu',
+        loadComponent: () => import('./features/storefront/menu/menu.page').then((m) => m.StorefrontMenuPage),
+      },
+      {
+        path: 'gallery',
+        loadComponent: () => import('./features/storefront/gallery/gallery.page').then((m) => m.StorefrontGalleryPage),
+      },
+      {
+        path: 'about',
+        loadComponent: () => import('./features/storefront/about/about.page').then((m) => m.StorefrontAboutPage),
+      },
+      {
+        path: 'reservations',
+        loadComponent: () =>
+          import('./features/storefront/reservations/reservations.page').then((m) => m.StorefrontReservationsPage),
+      },
+      {
+        path: 'contact',
+        loadComponent: () => import('./features/storefront/contact/contact.page').then((m) => m.StorefrontContactPage),
+      },
       page('cart', 'Cart', 7),
       page('session', 'My Table', 7),
     ],
@@ -123,7 +150,7 @@ export const routes: Routes = [
       RESTAURANT_ADMIN_NAV,
       {
         profile: 3, branding: 3, gallery: 3, branches: 5, employees: 5, tables: 5, queue: 6,
-        reservations: 6, orders: 7, kitchen: 7, menu: 4, inventory: 9, suppliers: 9, purchases: 9,
+        reservations: 6, orders: 7, kitchen: 7, inventory: 9, suppliers: 9, purchases: 9,
         billing: 10, payments: 10, discounts: 8, reports: 11, settings: 5,
       },
       {
@@ -143,6 +170,11 @@ export const routes: Routes = [
           title: 'Branding · WaitLess',
           loadComponent: () =>
             import('./features/restaurant-admin/branding/branding.page').then((m) => m.BrandingPage),
+        },
+        menu: {
+          path: 'menu',
+          title: 'Menu · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/menu/menu.page').then((m) => m.MenuAdminPage),
         },
         gallery: {
           path: 'gallery',

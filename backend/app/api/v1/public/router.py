@@ -5,10 +5,12 @@ from fastapi import APIRouter, Path, Query, status
 from app.api.deps import ClientDep, SessionDep
 from app.core import rate_limit
 from app.core.config import get_settings
+from app.schemas.discovery import ContactRequest, ContactResponse, DiscoveryFilters, DiscoveryPage
+from app.schemas.menu import PublicMenu
 from app.schemas.profile import BrandingOut, GalleryOut, StorefrontOut
 from app.schemas.tenancy import RegistrationResponse, RestaurantRegistration, SlugAvailability, TenantOut
+from app.services import discovery, registration
 from app.services import profile as profile_service
-from app.services import registration
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -30,6 +32,52 @@ async def register_restaurant(
         tenant=TenantOut.model_validate(tenant),
         message="Registration received. You can sign in and complete your profile while WaitLess reviews it.",
     )
+
+
+@router.get("/restaurants", response_model=DiscoveryPage, summary="Discover restaurants (published only)")
+async def discover_restaurants(
+    session: SessionDep,
+    q: str | None = Query(default=None, max_length=80),
+    city: str | None = Query(default=None, max_length=80),
+    cuisine: str | None = Query(default=None, max_length=60),
+    restaurant_type: str | None = Query(default=None, alias="type", max_length=60),
+    open_now: bool = False,
+    lat: float | None = Query(default=None, ge=-90, le=90),
+    lng: float | None = Query(default=None, ge=-180, le=180),
+    radius_km: float | None = Query(default=None, gt=0, le=200),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=12, ge=1, le=50),
+) -> DiscoveryPage:
+    return await discovery.discover(
+        session,
+        q=q,
+        city=city,
+        cuisine=cuisine,
+        restaurant_type=restaurant_type,
+        open_now=open_now,
+        lat=lat,
+        lng=lng,
+        radius_km=radius_km,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/discovery/filters", response_model=DiscoveryFilters, summary="Cities, cuisines and types for filters")
+async def discovery_filters(session: SessionDep) -> DiscoveryFilters:
+    return await discovery.filters(session)
+
+
+@router.post("/contact", response_model=ContactResponse, status_code=201, summary="WaitLess contact form")
+async def contact(body: ContactRequest, session: SessionDep, client: ClientDep) -> ContactResponse:
+    if client.ip:
+        await rate_limit.hit(f"contact:{client.ip}", limit=get_settings().contact_limit_per_hour, window_seconds=3600)
+    return await discovery.submit_contact(session, body)
+
+
+@router.get("/restaurants/{slug}/menu", response_model=PublicMenu, summary="Menu (active categories with dishes)")
+async def storefront_menu(slug: Annotated[str, Path(max_length=60)], session: SessionDep) -> PublicMenu:
+    return await profile_service.public_menu(session, slug)
 
 
 @router.get(

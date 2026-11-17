@@ -1,41 +1,38 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { map } from 'rxjs';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter, map } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
-import { ThemeService } from '../../core/theme/theme.service';
+import { SOCIAL_LABELS } from '../../core/storefront/storefront.models';
+import { TenantContextService } from '../../core/storefront/tenant-context.service';
+import { ErrorStateComponent, LoadingStateComponent } from '../../shared/ui/state/state.components';
 import { UserMenuComponent } from '../../shared/ui/user-menu/user-menu.component';
 
 /**
- * Restaurant storefront shell (/r/:slug).
- *
- * Phase 1: the name is derived from the slug and the default theme is applied.
- * Phase 3/4: TenantContextService loads profile + branding from the public API and this
- * header becomes RestaurantHeaderComponent with the restaurant's logo and colours.
+ * One reusable storefront for every restaurant (/r/:slug, PRD §2.2, §6, §20).
+ * Everything restaurant-specific comes from TenantContextService; nothing is hard-coded.
  * The WaitLess link on the right is permanent (PRD §2.2 "Do not remove").
  */
 @Component({
   selector: 'wl-storefront-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent, LoadingStateComponent, ErrorStateComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './storefront-layout.component.html',
   styleUrl: './storefront-layout.component.scss',
 })
 export class StorefrontLayoutComponent implements OnDestroy {
-  private readonly theme = inject(ThemeService);
+  protected readonly ctx = inject(TenantContextService);
   protected readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+
   protected readonly slug = toSignal(inject(ActivatedRoute).paramMap.pipe(map((p) => p.get('slug') ?? '')), {
     initialValue: '',
   });
-  protected readonly name = computed(() =>
-    this.slug()
-      .split('-')
-      .filter(Boolean)
-      .map((w) => w[0].toUpperCase() + w.slice(1))
-      .join(' '),
-  );
-  protected readonly initial = computed(() => this.name().charAt(0) || 'R');
+  protected readonly r = this.ctx.restaurant;
+  protected readonly initial = computed(() => (this.r()?.name ?? this.slug()).charAt(0).toUpperCase() || 'R');
+  protected readonly year = new Date().getFullYear();
+  protected readonly socialLabels = SOCIAL_LABELS;
   protected readonly menuOpen = signal(false);
 
   protected readonly nav = [
@@ -48,10 +45,15 @@ export class StorefrontLayoutComponent implements OnDestroy {
   ];
 
   constructor() {
-    this.theme.reset(); // replaced by the restaurant's branding in Phase 3/4
+    // Switching /r/a → /r/b reuses this component: the effect swaps the whole tenant context.
+    effect(() => {
+      const slug = this.slug();
+      if (slug) this.ctx.enter(slug);
+    });
+    this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => this.menuOpen.set(false));
   }
 
   ngOnDestroy(): void {
-    this.theme.reset(); // never leak a restaurant's theme to the next page
+    this.ctx.leave(); // restores WaitLess branding; drops all restaurant data
   }
 }

@@ -241,6 +241,8 @@ class PublicBranch(ApiModel):
     timezone: str
     is_primary: bool
     hours: list[HoursDay]
+    open_now: bool
+    today_hours: str | None  # "11:00–23:00", "Closed", or null when hours are not set
 
 
 class StorefrontOut(ApiModel):
@@ -249,6 +251,8 @@ class StorefrontOut(ApiModel):
     slug: str
     restaurant_type: str
     cuisines: list[str]
+    currency: str
+    is_published: bool  # false only in owner preview
     short_description: str
     description: str
     about_us: str

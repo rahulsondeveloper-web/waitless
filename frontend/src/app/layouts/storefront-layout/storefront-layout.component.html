@@ -1,8 +1,20 @@
+@if (ctx.preview()) {
+  <div class="sf-preview" role="status">
+    <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+    Preview — guests cannot see this storefront until it is approved and published.
+    <a routerLink="/restaurant-admin">Back to dashboard</a>
+  </div>
+}
+
 <header class="sf-header">
   <div class="wl-container sf-header__inner">
-    <a routerLink="." class="sf-brand">
-      <span class="sf-brand__logo" aria-hidden="true">{{ initial() }}</span>
-      <span class="sf-brand__name">{{ name() }}</span>
+    <a routerLink="." class="sf-brand" [attr.aria-label]="(r()?.name ?? 'Restaurant') + ' home'">
+      @if (r()?.branding?.logo_url; as logo) {
+        <img class="sf-brand__img" [src]="logo" alt="" width="40" height="40" />
+      } @else {
+        <span class="sf-brand__logo" aria-hidden="true">{{ initial() }}</span>
+      }
+      <span class="sf-brand__name">{{ r()?.name ?? '' }}</span>
     </a>
 
     <nav class="sf-nav" [class.is-open]="menuOpen()" aria-label="Restaurant">
@@ -11,7 +23,6 @@
           [routerLink]="item.path"
           routerLinkActive="is-active"
           [routerLinkActiveOptions]="{ exact: item.path === '.' }"
-          (click)="menuOpen.set(false)"
           >{{ item.label }}</a
         >
       }
@@ -46,12 +57,45 @@
 </header>
 
 <main id="main">
-  <router-outlet />
+  @switch (ctx.status()) {
+    @case ('ready') {
+      <router-outlet />
+    }
+    @case ('not_found') {
+      <section class="wl-container sf-missing">
+        <span class="material-symbols-outlined" aria-hidden="true">storefront</span>
+        <h1>This restaurant isn't on WaitLess yet</h1>
+        <p>It may not be open for guests, or the address may be mistyped.</p>
+        <a routerLink="/restaurants" class="wl-btn wl-btn--primary">Find restaurants</a>
+      </section>
+    }
+    @case ('error') {
+      <wl-error-state title="We couldn't load this restaurant" [message]="ctx.error()?.message ?? ''" (retry)="ctx.retry()" />
+    }
+    @default {
+      <wl-loading-state label="Loading restaurant…" />
+    }
+  }
 </main>
 
 <footer class="sf-footer">
   <div class="wl-container sf-footer__inner">
-    <span>© {{ name() }}</span>
-    <a routerLink="/">Powered by <b>WaitLess</b></a>
+    @if (r(); as rest) {
+      <div>
+        <b>{{ rest.name }}</b>
+        @if (ctx.primaryBranch(); as b) {
+          <span>{{ b.address_line }}, {{ b.city }}</span>
+        }
+      </div>
+      @if (rest.social_links.length) {
+        <nav class="sf-social" aria-label="Social media">
+          @for (s of rest.social_links; track s.platform) {
+            <a [href]="s.url" target="_blank" rel="noopener noreferrer">{{ socialLabels[s.platform] ?? s.platform }}</a>
+          }
+        </nav>
+      }
+    }
+    <a routerLink="/" class="sf-powered">Powered by <b>WaitLess</b></a>
   </div>
+  <div class="wl-container sf-footer__copy">© {{ year }} {{ r()?.name }}</div>
 </footer>

@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.db import use_tenant
 from app.core.errors import AppError, ConflictError, ForbiddenError, NotFoundError
-from app.core.redis import get_redis
 from app.models import Branch, Tenant
 from app.models.profile import (
     BusinessHours,
@@ -24,6 +23,7 @@ from app.models.profile import (
     RestaurantProfile,
     SocialLink,
 )
+from app.schemas.menu import PublicMenu
 from app.schemas.profile import (
     BranchLocationUpdate,
     BrandingOut,
@@ -45,42 +45,14 @@ from app.schemas.profile import (
 from app.schemas.tenancy import BranchOut
 from app.services.access import TenantContext, live_subscription
 from app.services.audit import write_audit
+from app.services.hours import open_status
 from app.services.media import delete_files, media_url, store_image
-
-# ---------- cache ----------
-
-
-def _cache_keys(slug: str) -> list[str]:
-    return [f"storefront:{slug.lower()}", f"storefront:{slug.lower()}:gallery"]
-
-
-async def invalidate_storefront(slug: str) -> None:
-    client = get_redis()
-    if client is not None:
-        try:
-            await client.delete(*_cache_keys(slug))
-        except Exception:  # cache is an optimisation; never fail the write because of it
-            pass
-
-
-async def _cache_get(key: str) -> str | None:
-    client = get_redis()
-    if client is None:
-        return None
-    try:
-        return await client.get(key)
-    except Exception:
-        return None
-
-
-async def _cache_set(key: str, value: str) -> None:
-    client = get_redis()
-    if client is not None:
-        try:
-            await client.set(key, value, ex=get_settings().storefront_cache_seconds)
-        except Exception:
-            pass
-
+from app.services.storefront_cache import cache_get as _cache_get
+from app.services.storefront_cache import (
+    cache_key,
+    invalidate_storefront,  # noqa: F401  (re-exported for other services)
+)
+from app.services.storefront_cache import cache_set as _cache_set
 
 # ---------- helpers ----------
 
@@ -530,7 +502,19 @@ async def publish_checklist(session: AsyncSession, ctx: TenantContext) -> Publis
             hint=f"Up to {get_settings().gallery_max_photos} photos.",
         ),
     ]
-    # Menu (Phase 4) and tables (Phase 5) join this list when those modules exist.
+    from app.services.menu import menu_ready  # local import: menu imports this module's helpers
+
+    items.insert(
+        6,
+        ChecklistItem(
+            key="menu",
+            label="At least one dish on the menu",
+            done=await menu_ready(session),
+            required=True,
+            hint="Guests need something to browse.",
+        ),
+    )
+    # Tables (Phase 5) join this list when that module exists.
     can_publish = all(i.done for i in items if i.required)
     return PublishChecklist(items=items, can_publish=can_publish, is_published=tenant.is_published)
 
@@ -574,12 +558,8 @@ async def _public_tenant(session: AsyncSession, slug: str) -> Tenant:
     return tenant
 
 
-async def public_storefront(session: AsyncSession, slug: str) -> StorefrontOut:
-    key = _cache_keys(slug)[0]
-    if cached := await _cache_get(key):
-        return StorefrontOut.model_validate_json(cached)
-
-    tenant = await _public_tenant(session, slug)
+async def build_storefront(session: AsyncSession, tenant: Tenant) -> StorefrontOut:
+    """Session must already be scoped to `tenant` (use_tenant). Shared by the public API and owner preview."""
     profile, branding = await ensure_profile_rows(session, tenant.id)
     branches = (
         (await session.execute(select(Branch).where(Branch.is_active).order_by(Branch.is_primary.desc(), Branch.name)))
@@ -589,21 +569,11 @@ async def public_storefront(session: AsyncSession, slug: str) -> StorefrontOut:
     social = (await session.execute(select(SocialLink).order_by(SocialLink.sort_order))).scalars().all()
     gallery_count = (await session.execute(select(func.count()).select_from(GalleryImage))).scalar_one()
 
-    out = StorefrontOut(
-        id=tenant.id,
-        name=tenant.name,
-        slug=tenant.slug,
-        restaurant_type=tenant.restaurant_type,
-        cuisines=tenant.cuisines,
-        short_description=profile.short_description,
-        description=profile.description,
-        about_us=profile.about_us,
-        contact_phone=profile.contact_phone,
-        contact_email=profile.contact_email,
-        website=profile.website,
-        cover_url=media_url(await _media(session, profile.cover_media_id)),
-        branding=await _branding_out(session, branding),
-        branches=[
+    public_branches = []
+    for b in branches:
+        hours = await _hours(session, b.id)
+        status = open_status(hours, b.timezone)
+        public_branches.append(
             PublicBranch(
                 id=b.id,
                 name=b.name,
@@ -617,13 +587,39 @@ async def public_storefront(session: AsyncSession, slug: str) -> StorefrontOut:
                 phone=b.phone,
                 timezone=b.timezone,
                 is_primary=b.is_primary,
-                hours=await _hours(session, b.id),
+                hours=hours,
+                open_now=status.is_open,
+                today_hours=status.today,
             )
-            for b in branches
-        ],
+        )
+    return StorefrontOut(
+        id=tenant.id,
+        name=tenant.name,
+        slug=tenant.slug,
+        restaurant_type=tenant.restaurant_type,
+        cuisines=tenant.cuisines,
+        currency=str((tenant.settings or {}).get("currency", "INR")),
+        is_published=tenant.is_published and tenant.status == "active",
+        short_description=profile.short_description,
+        description=profile.description,
+        about_us=profile.about_us,
+        contact_phone=profile.contact_phone,
+        contact_email=profile.contact_email,
+        website=profile.website,
+        cover_url=media_url(await _media(session, profile.cover_media_id)),
+        branding=await _branding_out(session, branding),
+        branches=public_branches,
         social_links=[SocialLinkOut(platform=s.platform, url=s.url) for s in social],
         gallery_count=gallery_count,
     )
+
+
+async def public_storefront(session: AsyncSession, slug: str) -> StorefrontOut:
+    key = cache_key(slug)
+    if cached := await _cache_get(key):
+        return StorefrontOut.model_validate_json(cached)
+    tenant = await _public_tenant(session, slug)
+    out = await build_storefront(session, tenant)
     await _cache_set(key, out.model_dump_json())
     return out
 
@@ -633,10 +629,36 @@ async def public_branding(session: AsyncSession, slug: str) -> BrandingOut:
 
 
 async def public_gallery(session: AsyncSession, slug: str) -> GalleryOut:
-    key = _cache_keys(slug)[1]
+    key = cache_key(slug, ":gallery")
     if cached := await _cache_get(key):
         return GalleryOut.model_validate(json.loads(cached))
     await _public_tenant(session, slug)
     out = GalleryOut(items=await _gallery_items(session), max_photos=get_settings().gallery_max_photos)
     await _cache_set(key, out.model_dump_json())
     return out
+
+
+async def public_menu(session: AsyncSession, slug: str) -> PublicMenu:
+    from app.services.menu import build_public_menu
+
+    key = cache_key(slug, ":menu")
+    if cached := await _cache_get(key):
+        return PublicMenu.model_validate_json(cached)
+    tenant = await _public_tenant(session, slug)
+    out = await build_public_menu(session, str((tenant.settings or {}).get("currency", "INR")))
+    await _cache_set(key, out.model_dump_json())
+    return out
+
+
+# ---------- owner preview (unpublished storefront, never cached) ----------
+
+
+async def preview_storefront(session: AsyncSession, ctx: TenantContext) -> StorefrontOut:
+    return await build_storefront(session, await _tenant(session, ctx))
+
+
+async def preview_menu(session: AsyncSession, ctx: TenantContext) -> PublicMenu:
+    from app.services.menu import build_public_menu
+
+    tenant = await _tenant(session, ctx)
+    return await build_public_menu(session, str((tenant.settings or {}).get("currency", "INR")))
