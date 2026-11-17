@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { interval } from 'rxjs';
 
+import { BillingService, SessionBills } from '../../../core/billing/billing.service';
 import { ApiError } from '../../../core/http/api-error';
 import { CartService } from '../../../core/ordering/cart.service';
 import { ORDER_STATUS_LABEL, Order, OrderingService, TableView } from '../../../core/ordering/ordering.service';
@@ -30,6 +31,7 @@ export class StorefrontSessionPage implements OnInit {
   protected readonly ctx = inject(TenantContextService);
   protected readonly cart = inject(CartService);
   private readonly api = inject(OrderingService);
+  private readonly billing = inject(BillingService);
   private readonly realtime = inject(RealtimeService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -43,6 +45,10 @@ export class StorefrontSessionPage implements OnInit {
   /** server time − device time, so the countdown is right even on a phone with a wrong clock */
   protected readonly offset = signal(0);
   protected readonly promiseText = promiseText;
+  /** The bill (Phase 10): after Finish, or as soon as staff generate it. null = billing not available. */
+  protected readonly bills = signal<SessionBills | null>(null);
+  protected readonly paying = signal<{ billId: string; orderId: string; amount: string; mock: boolean } | null>(null);
+  protected readonly billBusy = signal(false);
   protected code = '';
   protected pin = '';
   private watching: string | null = null;
@@ -52,6 +58,7 @@ export class StorefrontSessionPage implements OnInit {
   ngOnInit(): void {
     if (this.cart.tableToken()) this.load();
     const off = this.realtime.on<{ order_id: string }>('orders.changed', () => this.load(false));
+    const offBills = this.realtime.on('bills.changed', () => this.loadBills());
     interval(30_000)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
@@ -60,6 +67,7 @@ export class StorefrontSessionPage implements OnInit {
       });
     this.destroyRef.onDestroy(() => {
       off();
+      offBills();
       if (this.watching) this.realtime.unsubscribeTableSession(this.watching);
     });
   }
@@ -89,6 +97,78 @@ export class StorefrontSessionPage implements OnInit {
     this.watching = null;
     this.cart.setTableToken(null);
     this.view.set(null);
+    this.bills.set(null);
+  }
+
+  // ---------- the bill ----------
+
+  protected finish(): void {
+    const token = this.cart.tableToken();
+    if (!token || !confirm("Finish your meal? You won't be able to order more, and your final bill will be ready.")) return;
+    this.billBusy.set(true);
+    this.billing.finish(token).subscribe({
+      next: (b) => {
+        this.billBusy.set(false);
+        this.bills.set(b);
+        this.load(false);
+      },
+      error: (e: ApiError) => {
+        this.billBusy.set(false);
+        this.error.set(e.message);
+      },
+    });
+  }
+
+  protected payOnline(billId: string): void {
+    const token = this.cart.tableToken();
+    if (!token) return;
+    this.billBusy.set(true);
+    this.error.set(null);
+    this.billing.payOnline(token, billId).subscribe({
+      next: (p) => {
+        this.billBusy.set(false);
+        this.paying.set({ billId, orderId: p.order_id, amount: p.amount, mock: !!p.checkout.url });
+        if (!p.checkout.url) this.error.set('Online payment is opening in a new window. Your bill updates once the payment succeeds.');
+      },
+      error: (e: ApiError) => {
+        this.billBusy.set(false);
+        this.error.set(e.message);
+      },
+    });
+  }
+
+  /** Development only (mock gateway): simulate the payment page. */
+  protected mockPay(success: boolean): void {
+    const token = this.cart.tableToken();
+    const p = this.paying();
+    if (!token || !p) return;
+    this.billBusy.set(true);
+    this.billing.mockPay(token, p.orderId, success).subscribe({
+      next: (r) => {
+        this.billBusy.set(false);
+        this.paying.set(null);
+        if (r.result === 'failed') this.error.set('The payment did not go through. You can try again or pay at the counter.');
+        this.loadBills();
+      },
+      error: (e: ApiError) => {
+        this.billBusy.set(false);
+        this.error.set(e.message);
+      },
+    });
+  }
+
+  protected receiptUrl(invoiceId: string): string {
+    return this.billing.guestReceiptUrl(this.cart.tableToken() ?? '', invoiceId);
+  }
+
+  protected n(v: string): number {
+    return +v;
+  }
+
+  private loadBills(): void {
+    const token = this.cart.tableToken();
+    if (!token) return;
+    this.billing.guestBills(token).subscribe({ next: (b) => this.bills.set(b), error: () => this.bills.set(null) });
   }
 
   protected cancel(o: Order): void {
@@ -127,6 +207,7 @@ export class StorefrontSessionPage implements OnInit {
         }
         this.offset.set(Date.parse(v.server_time) - Date.now());
         this.view.set(v);
+        this.loadBills();
         if (this.watching !== token) {
           this.watching = token;
           void this.realtime.subscribeTableSession(token);

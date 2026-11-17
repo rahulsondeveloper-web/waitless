@@ -1,0 +1,173 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: start;
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr;
+  }
+}
+.tables {
+  display: grid;
+  gap: 0.45rem;
+}
+.table-card {
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  font: inherit;
+  background: var(--wl-surface);
+  border: 1px solid var(--wl-line);
+  border-radius: 12px;
+  padding: 0.65rem 0.8rem;
+  cursor: pointer;
+  color: var(--wl-text);
+  &.on {
+    border-color: var(--wl-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--wl-primary) 30%, transparent);
+  }
+  &[data-state='finished'] {
+    border-color: #e0a53b;
+  }
+  .name {
+    font-weight: 600;
+  }
+  .amt {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.4rem;
+    b {
+      margin-left: auto;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+.small {
+  font-size: 0.82rem;
+}
+.pick {
+  padding: 2rem 0;
+  text-align: center;
+}
+.visit {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: start;
+  h2 {
+    margin: 0;
+    font-size: 1.2rem;
+  }
+  p {
+    margin: 0.2rem 0 0;
+  }
+}
+.visit-actions,
+.bill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+.bill {
+  background: var(--wl-surface);
+  border: 1px solid var(--wl-line);
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.6rem;
+  &[data-status='paid'] {
+    border-color: #8cc9a1;
+  }
+  > header {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    h3 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+  }
+}
+.lines small {
+  display: block;
+}
+.pick-cell {
+  width: 1.6rem;
+}
+.totals {
+  margin: 0;
+  display: grid;
+  gap: 0.2rem;
+  font-variant-numeric: tabular-nums;
+  div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  dt,
+  dd {
+    margin: 0;
+  }
+  .tax {
+    font-size: 0.85rem;
+    color: var(--wl-muted);
+  }
+  .minus dd {
+    color: #2e7d4f;
+  }
+  .grand {
+    font-size: 1.15rem;
+    font-weight: 700;
+    border-top: 1px solid var(--wl-line);
+    padding-top: 0.35rem;
+    margin-top: 0.2rem;
+  }
+  .due {
+    font-weight: 700;
+    color: #a3321c;
+  }
+}
+.pays {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.3rem;
+  li {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 0.6rem;
+    align-items: center;
+    small {
+      margin-left: 0.35rem;
+    }
+    &.off {
+      opacity: 0.55;
+    }
+  }
+}
+.settings {
+  max-width: 860px;
+  margin-top: 1rem;
+  h2 {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 1.05rem;
+  }
+}
+.save {
+  display: flex;
+  justify-content: flex-end;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

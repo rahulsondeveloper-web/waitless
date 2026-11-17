@@ -100,3 +100,38 @@
   color: #2e8b57;
   font-weight: 600;
 }
+.bill .totals {
+  display: grid;
+  gap: 0.35rem;
+  div {
+    display: flex;
+    justify-content: space-between;
+  }
+  .grand {
+    font-weight: 700;
+    font-size: 1.1rem;
+    border-top: 1px solid var(--wl-line);
+    padding-top: 0.4rem;
+  }
+}
+.paid-note {
+  margin: 0;
+  font-weight: 600;
+  a {
+    margin-left: 0.4rem;
+    color: var(--wl-primary);
+  }
+}
+.mock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.6rem;
+  border: 1px dashed var(--wl-line);
+  border-radius: 10px;
+  p {
+    flex-basis: 100%;
+    margin: 0;
+  }
+}

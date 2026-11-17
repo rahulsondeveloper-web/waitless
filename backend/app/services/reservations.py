@@ -527,7 +527,9 @@ async def process_payment_event(session: AsyncSession, provider: str, event: Pay
         )
     ).scalar_one_or_none()
     if pay is None:
-        return "unknown_order"
+        from app.services.billing import process_payment_event as bill_event  # bills share the webhook
+
+        return await bill_event(session, provider, event) or "unknown_order"
     if pay.status != "created":
         return "already_processed"
     await use_tenant(session, pay.tenant_id)

@@ -178,7 +178,7 @@ export const routes: Routes = [
       RESTAURANT_ADMIN_NAV,
       {
         profile: 3, branding: 3, gallery: 3,
-        billing: 10, payments: 10, reports: 11, settings: 10,
+        reports: 11, settings: 10,
       },
       {
         '.': {
@@ -249,6 +249,16 @@ export const routes: Routes = [
           path: 'purchases',
           title: 'Purchases · WaitLess',
           loadComponent: () => import('./features/restaurant-admin/purchases/purchases.page').then((m) => m.PurchasesPage),
+        },
+        billing: {
+          path: 'billing',
+          title: 'Billing · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/billing/billing.page').then((m) => m.BillingPage),
+        },
+        payments: {
+          path: 'payments',
+          title: 'Payments · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/billing/payments.page').then((m) => m.PaymentsPage),
         },
         discounts: {
           path: 'discounts',

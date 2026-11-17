@@ -506,8 +506,11 @@ async def transfer(session: AsyncSession, ctx: TenantContext, session_id: uuid.U
 
 
 async def close(session: AsyncSession, ctx: TenantContext, session_id: uuid.UUID) -> SessionOut:
-    """Guests left: release tables (→ cleaning). Billing checks join this in Phase 10."""
+    """Guests left: release tables (→ cleaning). Every bill must be paid first (Phase 10)."""
     s = await _open_session(session, ctx, session_id)
+    from app.services.billing import ensure_settled  # local: billing imports this module
+
+    await ensure_settled(session, s, ctx.user_id)
     now = datetime.now(UTC)
     tables = (
         (

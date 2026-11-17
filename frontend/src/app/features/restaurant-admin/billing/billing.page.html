@@ -1,0 +1,229 @@
+<header class="page-head">
+  <div>
+    <h1>Billing</h1>
+    <p class="muted">
+      @if (live()) { <span class="live" role="status"><span class="dot"></span> Live</span> · }
+      Table bills, payments and invoices
+    </p>
+  </div>
+  @if (branches().length > 1) {
+    <div class="head-tools">
+      <label class="field"><span>Branch</span>
+        <select [value]="branchId() ?? ''" (change)="selectBranch($any($event.target).value)" aria-label="Branch">
+          @for (b of branches(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+        </select></label>
+    </div>
+  }
+</header>
+
+@if (error(); as e) {
+  @if (e.status === 402) {
+    <wl-empty-state icon="workspace_premium" title="Billing is part of the Professional plan" message="Upgrade to bill tables, take payments and print invoices." />
+  } @else {
+    <wl-error-state title="Could not load billing" [message]="e.message" (retry)="loadTables()" />
+  }
+} @else {
+  <mat-tab-group animationDuration="150ms" mat-stretch-tabs="false">
+    <mat-tab label="Tables">
+      <div class="layout">
+        <!-- tables with guests -->
+        <section class="tables" aria-label="Tables with guests">
+          @if (!tables()) {
+            <wl-loading-state />
+          } @else if (!tables()!.length) {
+            <wl-empty-state icon="table_restaurant" title="No tables with guests" message="Seat guests from Tables or Reservations." />
+          } @else {
+            @for (t of tables(); track t.session_id) {
+              <button type="button" class="table-card" [class.on]="selected() === t.session_id" (click)="open(t.session_id)"
+                      [attr.data-state]="t.paid ? 'paid' : t.session_status" data-testid="billing-table">
+                <span class="name">{{ tableName(t) }}</span>
+                <span class="muted small">{{ t.guest_name ?? t.party_size + ' guests' }} · {{ t.orders }} order{{ t.orders === 1 ? '' : 's' }}</span>
+                <span class="amt">
+                  @if (t.paid) { <span class="badge" data-status="seated">Paid</span> }
+                  @else if (t.session_status === 'finished') { <span class="badge" data-status="notified">Wants the bill</span> }
+                  <b>{{ price(t.paid ? t.total : t.due) }}</b>
+                </span>
+              </button>
+            }
+          }
+        </section>
+
+        <!-- the selected visit -->
+        <section class="detail" aria-live="polite">
+          @if (!selected()) {
+            <p class="muted pick">Choose a table to see its bill.</p>
+          } @else if (!current()) {
+            <wl-loading-state />
+          } @else {
+            @let s = current()!;
+            <header class="visit">
+              <div>
+                <h2>{{ tableName(s) }} <span class="muted">· {{ s.session_code }}</span></h2>
+                <p class="muted small">{{ s.guest_name ?? '' }} {{ s.party_size }} guests · since {{ s.opened_at | date: 'HH:mm' }}
+                  @if (s.session_status === 'finished') { · <b>guest pressed Finish</b> }</p>
+              </div>
+              <div class="visit-actions">
+                <button mat-button (click)="open(s.session_id, false)"><mat-icon>refresh</mat-icon>Refresh</button>
+                @if (s.session_status === 'finished') { <button mat-button (click)="reopen()">Reopen for orders</button> }
+                @if (canClose()) {
+                  <button mat-flat-button (click)="closeTable()" [disabled]="!s.can_close || busy() === 'close'" data-testid="close-table"
+                          [title]="s.can_close ? '' : 'Every bill must be paid first'"><mat-icon>logout</mat-icon>Guests left</button>
+                }
+              </div>
+            </header>
+
+            @if (!s.bills.length) { <p class="muted">No orders yet — nothing to bill.</p> }
+
+            @for (b of s.bills; track b.id) {
+              <article class="bill" [attr.data-status]="b.status" data-testid="bill">
+                <header>
+                  <h3>{{ b.label }}</h3>
+                  <span class="badge" [attr.data-status]="b.status === 'paid' ? 'seated' : b.locked ? 'notified' : 'waiting'">
+                    {{ b.status === 'paid' ? 'Paid' : b.locked ? 'Part paid' : 'Open' }}</span>
+                  @if (b.unserved_orders) { <span class="badge" data-status="notified">{{ b.unserved_orders }} not served yet</span> }
+                </header>
+
+                <table class="table lines">
+                  <thead><tr>
+                    @if (b.status === 'open' && !b.locked && s.bills.length >= 1) { <th><span class="sr-only">Pick</span></th> }
+                    <th>Item</th><th class="num">Amount</th></tr></thead>
+                  <tbody>
+                    @for (l of b.lines; track l.id) {
+                      <tr>
+                        @if (b.status === 'open' && !b.locked) {
+                          <td class="pick-cell"><input type="checkbox" [checked]="picked()[l.order_item_id]"
+                                     (change)="toggle(l.order_item_id, $any($event.target).checked)" [attr.aria-label]="'Pick ' + l.name" /></td>
+                        }
+                        <td>{{ l.quantity }} × {{ l.name }}
+                          <small class="muted">#{{ l.order_number }} · GST {{ n(l.tax_pct) }}%@if (n(l.sla_pct) > 0) { · {{ n(l.sla_pct) }}% late discount }</small></td>
+                        <td class="num">{{ price(l.line_total) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+
+                <dl class="totals" data-testid="bill-totals">
+                  <div><dt>Food</dt><dd>{{ price(b.subtotal) }}</dd></div>
+                  @if (n(b.sla_discount) > 0) { <div class="minus"><dt>Serving-time discount</dt><dd>− {{ price(b.sla_discount) }}</dd></div> }
+                  @if (n(b.manual_discount) > 0) {
+                    <div class="minus"><dt>Discount{{ b.manual_discount_pct ? ' ' + n(b.manual_discount_pct) + '%' : '' }}
+                      @if (b.manual_discount_reason) { <small>({{ b.manual_discount_reason }})</small> }</dt><dd>− {{ price(b.manual_discount) }}</dd></div>
+                  }
+                  @if (n(b.service_charge) > 0) { <div><dt>Service charge {{ n(b.service_charge_pct) }}%</dt><dd>{{ price(b.service_charge) }}</dd></div> }
+                  @for (t of b.taxes; track t.rate) {
+                    @if (n(t.tax) > 0) {
+                      @if (n(t.cgst) > 0) {
+                        <div class="tax"><dt>CGST {{ n(t.rate) / 2 }}% + SGST {{ n(t.rate) / 2 }}% on {{ price(t.taxable) }}</dt><dd>{{ price(t.tax) }}</dd></div>
+                      } @else {
+                        <div class="tax"><dt>GST {{ n(t.rate) }}% on {{ price(t.taxable) }}</dt><dd>{{ price(t.tax) }}</dd></div>
+                      }
+                    }
+                  }
+                  @if (n(b.sla_discount_after_tax) > 0) { <div class="minus"><dt>Serving-time discount</dt><dd>− {{ price(b.sla_discount_after_tax) }}</dd></div> }
+                  @if (n(b.booking_credit) > 0) { <div class="minus"><dt>Booking fee paid</dt><dd>− {{ price(b.booking_credit) }}</dd></div> }
+                  @if (n(b.round_off) !== 0) { <div><dt>Round off</dt><dd>{{ price(b.round_off) }}</dd></div> }
+                  <div class="grand"><dt>Total</dt><dd data-testid="bill-total">{{ price(b.grand_total) }}</dd></div>
+                  @if (n(b.paid_total) > 0) { <div><dt>Paid</dt><dd>{{ price(b.paid_total) }}</dd></div> }
+                  @if (b.status === 'open') { <div class="due"><dt>Due</dt><dd data-testid="bill-due">{{ price(b.due) }}</dd></div> }
+                  @if (n(b.refunded_total) > 0) { <div class="minus"><dt>Refunded</dt><dd>{{ price(b.refunded_total) }}</dd></div> }
+                </dl>
+
+                @if (b.payments.length) {
+                  <ul class="pays">
+                    @for (p of b.payments; track p.id) {
+                      <li [class.off]="p.status !== 'captured'">
+                        <span>{{ p.method === 'other' ? p.method_label || 'Other' : methodLabel[p.method] }}
+                          @if (p.reference) { <small class="muted">{{ p.reference }}</small> }
+                          @if (p.status === 'pending') { <small class="muted">waiting for the gateway</small> }
+                          @if (p.status === 'failed') { <small class="muted">failed</small> }
+                          @if (n(p.change_due) > 0) { <small class="muted">change {{ price(p.change_due) }}</small> }</span>
+                        <span class="muted small">{{ p.created_at | date: 'HH:mm' }}{{ p.received_by_name ? ' · ' + p.received_by_name : '' }}</span>
+                        <b>{{ price(p.amount) }}</b>
+                        @if (canRefund() && p.status === 'captured' && n(p.refunded_amount) < n(p.amount)) {
+                          <button mat-button (click)="refund(p)" data-testid="refund">Refund</button>
+                        } @else if (n(p.refunded_amount) > 0) { <small class="muted">refunded {{ price(p.refunded_amount) }}</small> }
+                      </li>
+                    }
+                  </ul>
+                }
+
+                <footer class="bill-actions">
+                  @if (b.status === 'open') {
+                    @if (canCollect() && n(b.due) > 0) {
+                      <button mat-flat-button (click)="pay(b)" data-testid="take-payment"><mat-icon>payments</mat-icon>Take payment</button>
+                    }
+                    @if (n(b.due) === 0 && b.lines.length) {
+                      <button mat-flat-button (click)="settle(b)" [disabled]="busy() === b.id" data-testid="settle">Close ₹0 bill</button>
+                    }
+                    @if (!b.locked) {
+                      @if (canDiscount()) { <button mat-stroked-button (click)="discount(b)" data-testid="discount">Discount</button> }
+                      <button mat-stroked-button (click)="split(b)" [disabled]="!pickedCount() || busy() === b.id" data-testid="split">
+                        Split {{ pickedCount() ? pickedCount() + ' to a new bill' : '(tick lines)' }}</button>
+                      @if (mergeable().length) {
+                        <button mat-stroked-button [matMenuTriggerFor]="mergeMenu">Merge a table</button>
+                        <mat-menu #mergeMenu="matMenu">
+                          @for (t of mergeable(); track t.session_id) {
+                            <button mat-menu-item (click)="mergeFrom(b, t)">{{ tableName(t) }} · {{ price(t.due) }}</button>
+                          }
+                        </mat-menu>
+                      }
+                      @if (canDiscount()) { <button mat-button (click)="voidBill(b)">Write off</button> }
+                    }
+                  }
+                  @for (inv of b.invoices; track inv.id) {
+                    <button mat-button (click)="pdf(inv.id)" [attr.data-testid]="inv.kind === 'invoice' ? 'invoice-pdf' : 'credit-note-pdf'">
+                      <mat-icon>{{ inv.kind === 'invoice' ? 'receipt_long' : 'undo' }}</mat-icon>{{ inv.number }}</button>
+                    @if (inv.kind === 'invoice') { <button mat-icon-button (click)="pdf(inv.id, true)" aria-label="80 mm receipt"><mat-icon>print</mat-icon></button> }
+                  }
+                </footer>
+              </article>
+            }
+          }
+        </section>
+      </div>
+    </mat-tab>
+
+    @if (canSettings()) {
+      <mat-tab label="Settings">
+        @if (settings(); as st) {
+          <form class="form settings" (ngSubmit)="saveSettings()">
+            <section class="panel grid2">
+              <h2>Charges &amp; tax</h2>
+              <label class="field"><span>Service charge %</span>
+                <input type="number" min="0" max="20" step="0.5" name="sc" [ngModel]="st.service_charge_pct" (ngModelChange)="patchSettings('service_charge_pct', $event)" data-testid="set-service" /></label>
+              <label class="field"><span>GST on the service charge %</span>
+                <input type="number" min="0" max="28" step="0.5" name="sct" [ngModel]="st.service_charge_tax_pct" (ngModelChange)="patchSettings('service_charge_tax_pct', $event)" /></label>
+              <label class="field"><span>Show tax as</span>
+                <select name="split" [ngModel]="st.tax_split" (ngModelChange)="patchSettings('tax_split', $event)">
+                  <option value="cgst_sgst">CGST + SGST (within the state)</option><option value="single">One GST line</option>
+                </select></label>
+              <mat-slide-toggle [checked]="st.round_off" (change)="patchSettings('round_off', $event.checked)">Round the total to the rupee</mat-slide-toggle>
+              <p class="hint">GST per dish is set on each dish in Menu. Food prices are before tax.</p>
+            </section>
+            <section class="panel grid2">
+              <h2>Invoice</h2>
+              <label class="field"><span>Legal name</span><input name="ln" [ngModel]="st.legal_name" (ngModelChange)="patchSettings('legal_name', $event)" maxlength="120" /></label>
+              <label class="field"><span>GSTIN</span><input name="g" [ngModel]="st.gstin" (ngModelChange)="patchSettings('gstin', $event)" maxlength="20" /></label>
+              <label class="field"><span>Address on the invoice</span><input name="ad" [ngModel]="st.address" (ngModelChange)="patchSettings('address', $event)" maxlength="300" /></label>
+              <label class="field"><span>Invoice prefix</span><input name="px" [ngModel]="st.invoice_prefix" (ngModelChange)="patchSettings('invoice_prefix', $event.toUpperCase())" maxlength="8" /></label>
+              <label class="field"><span>Footer</span><input name="ft" [ngModel]="st.invoice_footer" (ngModelChange)="patchSettings('invoice_footer', $event)" maxlength="300" /></label>
+            </section>
+            <section class="panel">
+              <h2>Payment methods</h2>
+              @for (m of allMethods; track m) {
+                <label class="check"><input type="checkbox" [checked]="st.methods.includes(m)" (change)="toggleMethod(m, $any($event.target).checked)" />
+                  {{ m === 'gateway' ? 'Online (guests pay from their phone)' : methodLabel[m] }}</label>
+              }
+              @if (st.methods.includes('other')) {
+                <label class="field"><span>Name for "Other"</span><input name="ol" [ngModel]="st.other_method_label" (ngModelChange)="patchSettings('other_method_label', $event)" maxlength="40" placeholder="e.g. Sodexo, Zomato Pay" /></label>
+              }
+            </section>
+            <div class="save"><button mat-flat-button type="submit" [disabled]="busy() === 'settings'" data-testid="save-billing-settings">Save</button></div>
+          </form>
+        } @else {
+          <wl-loading-state />
+        }
+      </mat-tab>
+    }
+  </mat-tab-group>
+}

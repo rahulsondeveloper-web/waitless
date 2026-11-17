@@ -90,7 +90,57 @@
         }
         <div class="grand"><span>Total so far</span><span data-testid="table-total">{{ price(v.payable_total) }}</span></div>
         <p class="bk-muted">Discounts grow while an order is late and are fixed once it is served. The final bill comes when you finish.</p>
+        @if (v.status === 'open' && bills()) {
+          <div class="bk-actions">
+            <button type="button" class="wl-btn wl-btn--ghost" (click)="finish()" [disabled]="billBusy()" data-testid="finish">
+              Finish &amp; get the bill</button>
+          </div>
+        }
       </article>
+    }
+
+    @if (bills(); as bs) {
+      @for (b of bs.bills; track b.id) {
+        @if (b.lines.length && (v.status !== 'open' || b.locked || b.status === 'paid')) {
+          <article class="bk-card bill" data-testid="guest-bill" [attr.data-status]="b.status">
+            <header class="order__head"><b>Your bill{{ bs.bills.length > 1 ? ' · ' + b.label : '' }}</b>
+              <span class="bk-badge" [attr.data-status]="b.status === 'paid' ? 'seated' : 'waiting'">{{ b.status === 'paid' ? 'Paid' : 'To pay' }}</span></header>
+            <div class="totals">
+              <div><span>Food</span><span>{{ price(b.subtotal) }}</span></div>
+              @if (n(b.sla_discount) + n(b.sla_discount_after_tax) > 0) {
+                <div class="saved"><span>Serving-time discount</span><span>− {{ price(n(b.sla_discount) + n(b.sla_discount_after_tax)) }}</span></div>
+              }
+              @if (n(b.manual_discount) > 0) { <div class="saved"><span>Discount</span><span>− {{ price(b.manual_discount) }}</span></div> }
+              @if (n(b.service_charge) > 0) { <div><span>Service charge {{ n(b.service_charge_pct) }}%</span><span>{{ price(b.service_charge) }}</span></div> }
+              <div><span>Taxes</span><span>{{ price(b.tax_total) }}</span></div>
+              @if (n(b.booking_credit) > 0) { <div class="saved"><span>Booking fee already paid</span><span>− {{ price(b.booking_credit) }}</span></div> }
+              @if (n(b.round_off) !== 0) { <div><span>Round off</span><span>{{ price(b.round_off) }}</span></div> }
+              <div class="grand"><span>Total</span><span data-testid="guest-bill-total">{{ price(b.grand_total) }}</span></div>
+              @if (b.status === 'open' && n(b.paid_total) > 0) { <div><span>Paid so far</span><span>{{ price(b.paid_total) }}</span></div> }
+            </div>
+            @if (b.status === 'paid') {
+              <p class="paid-note">Thank you! @for (inv of b.invoices; track inv.id) {
+                @if (inv.kind === 'invoice') { <a [href]="receiptUrl(inv.id)" target="_blank" rel="noopener" data-testid="receipt">Receipt {{ inv.number }}</a> } }</p>
+            } @else if (n(b.due) > 0) {
+              @if (paying()?.billId === b.id && paying()!.mock) {
+                <div class="mock" role="group" aria-label="Test payment">
+                  <p class="bk-muted">Test payment (development) — {{ price(paying()!.amount) }}</p>
+                  <button type="button" class="wl-btn wl-btn--primary" (click)="mockPay(true)" [disabled]="billBusy()" data-testid="mock-pay">Pay now</button>
+                  <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="mockPay(false)" [disabled]="billBusy()">Fail</button>
+                </div>
+              } @else {
+                <div class="bk-actions">
+                  @if (b.methods.includes('gateway')) {
+                    <button type="button" class="wl-btn wl-btn--primary" (click)="payOnline(b.id)" [disabled]="billBusy()" data-testid="pay-online">
+                      Pay {{ price(b.due) }} online</button>
+                  }
+                  <span class="bk-muted">or pay your waiter by cash, card or UPI.</span>
+                </div>
+              }
+            }
+          </article>
+        }
+      }
     }
   } @else if (loading()) {
     <div class="wl-state"><span class="wl-spinner" aria-label="Loading"></span></div>

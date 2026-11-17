@@ -33,6 +33,11 @@ async function seatGuests(
       const s = await r.json();
       const release = async () => {
         // Guests left: free the table so later tests (and the other device project) find one.
+        // Unpaid test bills are written off first: a table cannot be closed with money due (Phase 10).
+        const bills = await (await request.post(`/api/v1/restaurant/table-sessions/${s.session.id}/bill`, { headers })).json();
+        for (const b of bills.bills ?? []) {
+          if (b.status === 'open') await request.post(`/api/v1/restaurant/bills/${b.id}/void`, { headers, data: { reason: 'e2e test' } });
+        }
         await request.post(`/api/v1/restaurant/table-sessions/${s.session.id}/close`, { headers });
         await request.patch(`/api/v1/restaurant/tables/${t.id}/status`, { headers, data: { status: 'available' } });
       };

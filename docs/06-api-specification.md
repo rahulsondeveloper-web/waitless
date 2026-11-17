@@ -66,9 +66,9 @@ Auth column legend: **P** public · **C** customer · **S:perm** staff with perm
 | POST | `/table-session/orders/{id}/cancel` | `X-Table-Token` | Only while "placed" *(Phase 7)* |
 | POST · GET | `/me/reservations/{id}/orders` | C 🔁 | Pre-order (paid bookings only → 403 `PREORDER_NOT_ALLOWED`) / list *(Phase 7)* |
 | GET | `/me/orders` · POST `/me/orders/{id}/cancel` | C | My orders across restaurants / cancel while "placed" *(Phase 7)* |
-| POST | `/customer/table-sessions/{id}/finish` | C | Lock session → final bill |
-| GET | `/customer/table-sessions/{id}/bill` | C | Final invoice view |
-| POST | `/customer/bills/{id}/payment` | C 🔁 | Pay bill online |
+| POST | `/table-session/finish` | `X-Table-Token` | Finish → no more orders, final bill *(Phase 10)* |
+| GET | `/table-session/bills` | `X-Table-Token` | The bill(s) with totals, payments, invoices *(Phase 10)* |
+| POST | `/table-session/bills/{id}/pay` | `X-Table-Token` | Pay online (gateway order for what is due) *(Phase 10)* |
 | POST | `/customer/bills/{id}/rating` | C | 1–5 stars + comment |
 | GET | `/customer/orders` · `/notifications` | C | History |
 | PATCH | `/customer/profile` · `/notification-preferences` | C | Settings |
@@ -172,17 +172,26 @@ Planned (later phases):
 
 ### Billing & payments
 
+Implemented in Phase 10 (plan feature `billing_pos`):
+
 | Method | Path | Permission |
 |---|---|---|
-| GET | `/bills` (`?status=open`) | `billing.operate` |
-| POST | `/table-sessions/{id}/bill` | `billing.operate` — generate/refresh |
-| POST | `/bills/{id}/split` · `/bills/merge` | `billing.operate` |
-| POST | `/bills/{id}/discounts` | `billing.discount.apply` |
-| POST | `/bills/{id}/payments` 🔁 | `payments.collect` (cash, UPI, card, other) |
-| POST | `/payments/{id}/refunds` 🔁 | `payments.refund` |
-| POST | `/bills/{id}/finalise` | `billing.operate` → immutable invoice |
-| GET | `/invoices/{id}` · `/invoices/{id}/pdf` | `billing.operate` |
-| GET | `/payments` | `payments.collect` |
+| GET · PUT | `/billing-settings` | GET any staff; PUT `settings.manage` |
+| GET | `/billing/tables?branch_id=` | `billing.operate` — tables with guests, totals, due |
+| POST | `/table-sessions/{id}/bill` | `billing.operate` — generate / refresh the visit's bills |
+| POST | `/table-sessions/{id}/reopen` | `billing.operate` — finished → open |
+| POST | `/table-sessions/{id}/close` | `tables.operate` — 409 `BILL_UNPAID` while money is due |
+| GET | `/bills?branch_id=&date=&status=` · `/bills/{id}` | `billing.operate` |
+| POST | `/bills/{id}/split` `{order_item_ids}` · `/bills/{id}/merge` `{source_bill_id}` | `billing.operate` — 409 `BILL_LOCKED` once paid into |
+| POST | `/bills/{id}/discount` `{pct \| amount, reason}` | `billing.discount.apply` — 403 `DISCOUNT_LIMIT` |
+| POST | `/bills/{id}/void` `{reason}` | `billing.discount.apply` — write off an unpaid bill |
+| POST | `/bills/{id}/payments` 🔁 `{method, amount, tendered?, reference?}` | `payments.collect` — 409 `OVERPAYMENT`; paid in full → invoice |
+| POST | `/bills/{id}/settle` | `billing.operate` — close a ₹0 bill |
+| POST | `/payments/{id}/refunds` 🔁 `{amount, reason}` | `payments.refund` — 403 `REFUND_LIMIT`; issues a credit note |
+| GET | `/payments?branch_id=&date=` | `payments.collect` |
+| GET | `/invoices?branch_id=&date=` · `/invoices/{id}` · `/invoices/{id}/pdf?format=a4\|receipt` | `billing.operate` or `payments.collect` |
+
+Guests (header `X-Table-Token`): `GET /table-session/bills`, `POST /table-session/finish`, `POST /table-session/bills/{id}/pay` (gateway order), `GET /table-session/invoices/{id}/pdf?t=` (receipt). Development: `POST /public/payments/mock-bill/{order_id}`. Gateway webhooks for bills arrive on the same `/webhooks/payments/{provider}`. Realtime: `bills.changed {branch_id[, session_id]}` to the branch staff room and the table.
 
 ### Inventory, suppliers, purchases
 

@@ -1,6 +1,7 @@
 """Import every model module here so Alembic autogenerate sees all tables."""
 
 from app.models.base import Base
+from app.models.billing import Bill, BillItem, BillPayment, BillRefund, Invoice
 from app.models.booking import QueueEntry, Reservation, ReservationPayment, ReservationPolicy, ReservationTable
 from app.models.identity import OtpChallenge, RefreshToken, User
 from app.models.inventory import (
@@ -38,6 +39,11 @@ from app.models.tables import RestaurantTable, TableAssignment, TableSection, Ta
 from app.models.tenancy import Branch, Membership, Permission, Role, RolePermission, Tenant, UserBranch
 
 __all__ = [
+    "Bill",
+    "BillItem",
+    "BillPayment",
+    "BillRefund",
+    "Invoice",
     "InventoryCategory",
     "InventoryItem",
     "InventoryMovement",
