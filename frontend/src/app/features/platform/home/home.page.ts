@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -6,6 +6,7 @@ import { catchError, map, of } from 'rxjs';
 
 import { APP_CONFIG } from '../../../core/config/app-config';
 import { ApiError } from '../../../core/http/api-error';
+import { SiteContentService } from '../../../core/platform-admin/site-content.service';
 import { StorefrontApi } from '../../../core/storefront/storefront.api';
 import { RestaurantCardComponent } from '../../../shared/ui/restaurant-card/restaurant-card.component';
 
@@ -31,14 +32,16 @@ export class HomePage {
     { initialValue: null },
   );
 
-  protected readonly steps = [
+  /** Super Admin → Content (falls back to the built-in text below). */
+  protected readonly site = inject(SiteContentService).content;
+  private readonly defaultSteps = [
     { icon: 'search', title: 'Discover', text: 'Find restaurants near you and see if they are open right now.' },
     { icon: 'event_available', title: 'Book or queue', text: 'Reserve a table or join the digital queue from your phone.' },
     { icon: 'restaurant_menu', title: 'Order', text: 'Browse the menu and order — even before you arrive with a paid booking.' },
     { icon: 'timer', title: 'Served in 15', text: 'Late food? Your discount grows automatically, every 5 minutes.' },
   ];
 
-  protected readonly features = [
+  private readonly defaultFeatures = [
     { icon: 'storefront', title: 'Branded storefront', text: 'Your logo, colours and photos — your own app.' },
     { icon: 'groups', title: 'Digital queue', text: 'QR check-in, live position and table-ready alerts.' },
     { icon: 'event_seat', title: 'Reservations', text: 'Free or paid bookings with pre-orders.' },
@@ -49,13 +52,21 @@ export class HomePage {
     { icon: 'point_of_sale', title: 'Billing & POS', text: 'Split bills, UPI, cards and instant receipts.' },
   ];
 
-  protected readonly benefits = [
+  private readonly defaultBenefits = [
     'Turn tables faster with live queue and table status',
     'Fewer no-shows thanks to paid bookings with pre-orders',
     'A promise guests love: served in 15 minutes or it gets cheaper',
     'One dashboard for menu, kitchen, inventory and billing',
     'Your brand front and centre — guests feel they use your own app',
   ];
+
+  protected readonly steps = computed(() => this.site()?.how_it_works.steps ?? this.defaultSteps);
+  protected readonly features = computed(() => this.site()?.features.items ?? this.defaultFeatures);
+  protected readonly benefits = computed(() => this.site()?.for_restaurants.benefits ?? this.defaultBenefits);
+
+  constructor() {
+    inject(SiteContentService).load();
+  }
 
   protected search(q: string): void {
     void this.router.navigate(['/restaurants'], { queryParams: { q: q.trim() || null } });

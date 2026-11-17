@@ -1,3 +1,6 @@
+@if (banner()) {
+  <div class="pl-banner" role="status" data-testid="site-banner">{{ banner() }}</div>
+}
 <header class="pl-header">
   <div class="wl-container pl-header__inner">
     <a routerLink="/" class="pl-brand" aria-label="WaitLess home">
@@ -40,13 +43,23 @@
   <div class="wl-container pl-footer__inner">
     <div>
       <img src="brand/waitless-logo.svg" alt="WaitLess" width="160" height="38" class="pl-footer__logo" />
-      <p class="pl-footer__tag">{{ config.platformTagline }}</p>
+      <p class="pl-footer__tag">{{ site()?.branding?.tagline || config.platformTagline }}</p>
+      @if (site()?.contact; as c) {
+        <p class="pl-footer__contact" data-testid="footer-contact">
+          @if (c.email) { <a [href]="'mailto:' + c.email">{{ c.email }}</a> }
+          @if (c.phone) { · <a [href]="'tel:' + c.phone">{{ c.phone }}</a> }
+          @if (c.hours) { <br />{{ c.hours }} }
+          @if (c.address) { <br />{{ c.address }} }
+        </p>
+      }
     </div>
     <nav aria-label="Footer">
       <a routerLink="/about">About Us</a>
       <a routerLink="/restaurants">Find Restaurants</a>
       <a routerLink="/register-restaurant">Register your restaurant</a>
       <a routerLink="/status">System Status</a>
+      <a routerLink="/terms">Terms</a>
+      <a routerLink="/privacy">Privacy</a>
     </nav>
   </div>
   <div class="wl-container pl-footer__bottom">© {{ year }} WaitLess. All rights reserved.</div>

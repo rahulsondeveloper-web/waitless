@@ -79,6 +79,18 @@ export const routes: Routes = [
         loadComponent: () => import('./features/platform/about/about.page').then((m) => m.AboutPage),
       },
       {
+        path: 'terms',
+        title: 'Terms of use · WaitLess',
+        data: { section: 'terms' },
+        loadComponent: () => import('./features/platform/legal/legal.page').then((m) => m.LegalPage),
+      },
+      {
+        path: 'privacy',
+        title: 'Privacy policy · WaitLess',
+        data: { section: 'privacy' },
+        loadComponent: () => import('./features/platform/legal/legal.page').then((m) => m.LegalPage),
+      },
+      {
         path: 'restaurants',
         title: 'Find restaurants · WaitLess',
         loadComponent: () => import('./features/platform/restaurants/restaurants.page').then((m) => m.RestaurantsPage),
@@ -178,7 +190,6 @@ export const routes: Routes = [
       RESTAURANT_ADMIN_NAV,
       {
         profile: 3, branding: 3, gallery: 3,
-        reports: 11, settings: 10,
       },
       {
         '.': {
@@ -250,6 +261,16 @@ export const routes: Routes = [
           title: 'Purchases · WaitLess',
           loadComponent: () => import('./features/restaurant-admin/purchases/purchases.page').then((m) => m.PurchasesPage),
         },
+        reports: {
+          path: 'reports',
+          title: 'Reports · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/reports/reports.page').then((m) => m.ReportsPage),
+        },
+        settings: {
+          path: 'settings',
+          title: 'Settings · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/settings/settings.page').then((m) => m.SettingsPage),
+        },
         billing: {
           path: 'billing',
           title: 'Billing · WaitLess',
@@ -288,8 +309,44 @@ export const routes: Routes = [
     data: { area: 'Super Admin', nav: SUPER_ADMIN_NAV },
     children: adminChildren(
       SUPER_ADMIN_NAV,
-      { '.': 11, plans: 11, subscriptions: 11, content: 11, support: 11, audit: 11, settings: 11 },
+      {},
       {
+        '.': {
+          path: '',
+          title: 'Overview · Super Admin',
+          loadComponent: () => import('./features/super-admin/overview/overview.page').then((m) => m.SaOverviewPage),
+        },
+        plans: {
+          path: 'plans',
+          title: 'Plans · Super Admin',
+          loadComponent: () => import('./features/super-admin/plans/plans.page').then((m) => m.SaPlansPage),
+        },
+        subscriptions: {
+          path: 'subscriptions',
+          title: 'Subscriptions · Super Admin',
+          loadComponent: () =>
+            import('./features/super-admin/subscriptions/subscriptions.page').then((m) => m.SaSubscriptionsPage),
+        },
+        content: {
+          path: 'content',
+          title: 'Website content · Super Admin',
+          loadComponent: () => import('./features/super-admin/content/content.page').then((m) => m.SaContentPage),
+        },
+        support: {
+          path: 'support',
+          title: 'Support · Super Admin',
+          loadComponent: () => import('./features/super-admin/support/support.page').then((m) => m.SaSupportPage),
+        },
+        audit: {
+          path: 'audit',
+          title: 'Audit log · Super Admin',
+          loadComponent: () => import('./features/super-admin/audit/audit.page').then((m) => m.SaAuditPage),
+        },
+        settings: {
+          path: 'settings',
+          title: 'Settings · Super Admin',
+          loadComponent: () => import('./features/super-admin/settings/settings.page').then((m) => m.SaSettingsPage),
+        },
         restaurants: {
           path: 'restaurants',
           title: 'Restaurants · Super Admin',

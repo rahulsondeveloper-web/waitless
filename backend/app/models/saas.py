@@ -63,6 +63,8 @@ class Subscription(UUIDPkMixin, TimestampMixin, Base):
     current_period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     current_period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    auto_renew: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    grace_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # past due → expired after this
 
     __table_args__ = (
         CheckConstraint("status IN ('trialing', 'active', 'past_due', 'cancelled', 'expired')", name="status"),

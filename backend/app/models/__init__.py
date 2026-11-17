@@ -31,6 +31,14 @@ from app.models.menu import (
 )
 from app.models.orders import Order, OrderItem, OrderStatusHistory
 from app.models.platform import AuditLog, IdempotencyKey, OutboxEvent
+from app.models.platform_admin import (
+    NotificationTemplate,
+    PlatformContent,
+    PlatformSetting,
+    SaasInvoice,
+    SaasPayment,
+    SupportNote,
+)
 from app.models.profile import BusinessHours, GalleryImage, MediaFile, RestaurantBranding, RestaurantProfile, SocialLink
 from app.models.saas import Plan, PlanFeature, Subscription
 from app.models.sla import DiscountPolicy, OrderDiscount, OrderSla
@@ -39,6 +47,12 @@ from app.models.tables import RestaurantTable, TableAssignment, TableSection, Ta
 from app.models.tenancy import Branch, Membership, Permission, Role, RolePermission, Tenant, UserBranch
 
 __all__ = [
+    "NotificationTemplate",
+    "PlatformContent",
+    "PlatformSetting",
+    "SaasInvoice",
+    "SaasPayment",
+    "SupportNote",
     "Bill",
     "BillItem",
     "BillPayment",

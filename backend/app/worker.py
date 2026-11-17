@@ -3,7 +3,7 @@
     python -m app.worker
 
 Every job runs under a Redis lock so that running several workers never executes a job twice.
-Jobs: heartbeat, reservation_tick, sla_tick. Later phases (outbox dispatch, alerts) register here.
+Jobs: heartbeat, reservation_tick, sla_tick, subscription_tick. Later phases (outbox dispatch, alerts) register here.
 """
 
 import asyncio
@@ -77,10 +77,23 @@ async def sla_tick() -> None:
         log.info("sla tick: %d timers advanced", len(changed))
 
 
+@locked("subscription_tick", ttl_seconds=300)
+async def subscription_tick() -> None:
+    """WaitLess plans (PRD §17): renew free plans, invoice paid ones, past due → expired after the grace."""
+    from app.core.db import get_sessionmaker
+    from app.services.saas import tick
+
+    async with get_sessionmaker()() as session:
+        counts = await tick(session)
+    if any(counts.values()):
+        log.info("subscription tick: %s", counts)
+
+
 def build_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC", job_defaults={"coalesce": True, "max_instances": 1})
     scheduler.add_job(heartbeat, "interval", seconds=30, id="heartbeat", next_run_time=datetime.now(UTC))
     scheduler.add_job(reservation_tick, "interval", seconds=60, id="reservation_tick", next_run_time=datetime.now(UTC))
+    scheduler.add_job(subscription_tick, "interval", hours=1, id="subscription_tick", next_run_time=datetime.now(UTC))
     scheduler.add_job(sla_tick, "interval", seconds=15, id="sla_tick", next_run_time=datetime.now(UTC))
     return scheduler
 

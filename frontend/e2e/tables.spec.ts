@@ -103,6 +103,7 @@ test('the floor board updates live on another device', async ({ browser, page })
 });
 
 test('owner adds a waiter who signs in with a mobile code and sees the floor', async ({ browser, page }) => {
+  test.setTimeout(60_000); // several sign-ins and pages
   const { email, name } = await registerOwner(page.request);
   await signIn(page, email);
   await setupFloor(page);

@@ -33,6 +33,13 @@ async function seatGuests(
       const s = await r.json();
       const release = async () => {
         // Guests left: free the table so later tests (and the other device project) find one.
+        // Test orders still in the kitchen are cancelled, so they never show up on the next guests' table.
+        const active = await (
+          await request.get(`/api/v1/restaurant/orders?branch_id=${branch.id}&active=true`, { headers })
+        ).json();
+        for (const o of active.filter((x: { table_session_id: string }) => x.table_session_id === s.session.id)) {
+          await request.post(`/api/v1/restaurant/orders/${o.id}/cancel`, { headers, data: { reason: 'e2e test' } });
+        }
         // Unpaid test bills are written off first: a table cannot be closed with money due (Phase 10).
         const bills = await (await request.post(`/api/v1/restaurant/table-sessions/${s.session.id}/bill`, { headers })).json();
         for (const b of bills.bills ?? []) {

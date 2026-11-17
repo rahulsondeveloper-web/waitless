@@ -636,7 +636,11 @@ async def dashboard(session: AsyncSession, ctx: TenantContext, branch_id: uuid.U
         q, r = q.where(QueueEntry.branch_id == branch_id), r.where(Reservation.branch_id == branch_id)
     queue_length = (await session.execute(q)).scalar_one()
     upcoming = (await session.execute(r)).scalar_one()
+    from app.services.analytics import dashboard_extras  # Phase 11: revenue, serving & waiting times …
+
+    extras = await dashboard_extras(session, ctx, branch_id)
     return DashboardOut(
+        **extras,
         branch_id=branch_id,
         tables_total=sum(by_status.values()),
         tables_by_status=by_status,

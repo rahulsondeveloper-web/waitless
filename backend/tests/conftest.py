@@ -78,6 +78,10 @@ async def db(admin_engine: AsyncEngine) -> AsyncIterator[None]:
     async with admin_engine.begin() as conn:
         for table in ("tenants", "users", "otp_challenges", "outbox_events", "idempotency_keys", "support_tickets"):
             await conn.execute(text(f"DELETE FROM {table}"))
+        # Phase 11 platform data; plans created by tests (reference plans stay)
+        for table in ("platform_content", "platform_settings", "notification_templates"):
+            await conn.execute(text(f"DELETE FROM {table}"))
+        await conn.execute(text("DELETE FROM plans WHERE code NOT IN ('starter', 'professional', 'enterprise')"))
     redis = get_redis()
     if redis is not None:
         await redis.flushdb()

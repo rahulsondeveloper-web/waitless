@@ -112,7 +112,7 @@ export class AuthService {
 
   /** Where a user lands after signing in. */
   homeUrl(): string {
-    if (this.isSuperAdmin()) return '/super-admin/restaurants';
+    if (this.isSuperAdmin()) return '/super-admin';
     if (this.activeTenant()) return '/restaurant-admin';
     return '/customer';
   }

@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-/** WaitLess About Us (PRD §2.1). Becomes Super Admin editable content in Phase 11. */
+import { SiteContentService } from '../../../core/platform-admin/site-content.service';
+
+/** WaitLess About Us (PRD §2.1) — text editable in Super Admin → Content. */
 @Component({
   selector: 'wl-about-page',
   imports: [RouterLink],
@@ -9,20 +11,19 @@ import { RouterLink } from '@angular/router';
   template: `
     <section class="wl-page wl-container about">
       <p class="wl-eyebrow">About WaitLess</p>
-      <h1 class="wl-h2">Less waiting. <span class="wl-script">More dining.</span></h1>
+      <h1 class="wl-h2">{{ a()?.title ?? 'Less waiting.' }} <span class="wl-script">{{ a()?.title_script ?? 'More dining.' }}</span></h1>
       <p class="lead">
-        WaitLess helps restaurants digitise their operations and helps guests avoid unnecessary waiting — from finding
-        a table to the moment the bill is paid.
+        {{ a()?.lead ?? 'WaitLess helps restaurants digitise their operations and helps guests avoid unnecessary waiting — from finding a table to the moment the bill is paid.' }}
       </p>
 
       <div class="pair">
         <article class="wl-card">
           <h2>Our vision</h2>
-          <p>Every meal out should start on time. No guessing at the door, no wondering where the food is.</p>
+          <p>{{ a()?.vision ?? 'Every meal out should start on time. No guessing at the door, no wondering where the food is.' }}</p>
         </article>
         <article class="wl-card">
           <h2>Our mission</h2>
-          <p>Give every restaurant — from a single café to a chain — its own branded app and the tools to serve faster.</p>
+          <p>{{ a()?.mission ?? 'Give every restaurant — from a single café to a chain — its own branded app and the tools to serve faster.' }}</p>
         </article>
       </div>
 
@@ -111,4 +112,11 @@ import { RouterLink } from '@angular/router';
     }
   `,
 })
-export class AboutPage {}
+export class AboutPage {
+  private readonly site = inject(SiteContentService);
+  protected readonly a = () => this.site.content()?.about ?? null;
+
+  constructor() {
+    this.site.load();
+  }
+}

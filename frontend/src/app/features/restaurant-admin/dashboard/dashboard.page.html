@@ -43,15 +43,26 @@
   }
 
   @if (kpis(); as k) {
-    <section class="kpis" aria-label="Today">
-      <div class="kpi"><span>Tables free</span><b>{{ k.tables_by_status.available }}<small> / {{ k.tables_total }}</small></b></div>
-      <div class="kpi"><span>Occupied</span><b>{{ k.tables_by_status.occupied }}</b></div>
-      <div class="kpi"><span>Guests seated</span><b>{{ k.guests_seated }}</b></div>
-      <div class="kpi"><span>Reserved / cleaning</span><b>{{ k.tables_by_status.reserved }} / {{ k.tables_by_status.cleaning }}</b></div>
-      <div class="kpi"><span>Dishes live</span><b>{{ k.dishes_live }}</b></div>
-      <div class="kpi"><span>Team</span><b>{{ k.staff_active }}</b></div>
-      <div class="kpi soon"><span>Today's revenue</span><b>—</b><small>with billing</small></div>
-      <div class="kpi soon"><span>Orders · queue</span><b>—</b><small>with ordering & queue</small></div>
+    <section class="kpis" aria-label="Today" data-testid="dashboard-kpis">
+      @if (k.todays_revenue !== null) {
+        <a class="kpi kpi--money" routerLink="reports" data-testid="kpi-revenue"><span>Today's revenue</span><b>{{ price(k.todays_revenue) }}</b>
+          @if (k.discounts_today && +k.discounts_today > 0) { <small>{{ price(k.discounts_today) }} discounts</small> }</a>
+      }
+      <a class="kpi" routerLink="orders"><span>Orders today</span><b>{{ k.orders_today ?? '—' }}</b>
+        <small>{{ k.active_orders ?? 0 }} in progress</small></a>
+      <a class="kpi" routerLink="reservations"><span>Reservations (24 h)</span><b>{{ k.active_reservations ?? '—' }}</b></a>
+      <a class="kpi" routerLink="queue"><span>Queue</span><b>{{ k.queue_length ?? '—' }}</b>
+        <small>{{ k.average_wait_minutes !== null ? 'avg wait ' + k.average_wait_minutes + ' min' : 'no waits yet today' }}</small></a>
+      <a class="kpi" routerLink="tables"><span>Tables free</span><b>{{ k.tables_by_status.available }}<small> / {{ k.tables_total }}</small></b>
+        <small>{{ k.tables_by_status.occupied }} occupied · {{ k.guests_seated }} guests</small></a>
+      <a class="kpi" routerLink="kitchen" [class.kpi--warn]="(k.delayed_orders ?? 0) > 0"><span>Serving time</span>
+        <b>{{ k.average_serving_minutes !== null ? k.average_serving_minutes + ' min' : '—' }}</b>
+        <small>{{ k.delayed_orders ?? 0 }} delayed today</small></a>
+      @if (k.low_inventory_alerts !== null) {
+        <a class="kpi" routerLink="inventory" [class.kpi--warn]="k.low_inventory_alerts > 0"><span>Low stock</span>
+          <b>{{ k.low_inventory_alerts }}</b><small>items to reorder</small></a>
+      }
+      <div class="kpi"><span>Dishes live · team</span><b>{{ k.dishes_live }}<small> · {{ k.staff_active }}</small></b></div>
     </section>
   }
 

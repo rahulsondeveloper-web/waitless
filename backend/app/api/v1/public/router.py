@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Path, Query, status
 
@@ -27,6 +27,13 @@ async def register_restaurant(
     if client.ip:
         limit = get_settings().register_limit_per_hour
         await rate_limit.hit(f"register:{client.ip}", limit=limit, window_seconds=3600)
+    from app.core.errors import AppError
+    from app.services.saas import platform_settings
+
+    if not (await platform_settings(session))["allow_registration"]:
+        raise AppError(
+            "New restaurant sign-ups are paused. Please contact WaitLess.", code="REGISTRATION_CLOSED", status_code=403
+        )
     tenant, _owner = await registration.register_restaurant(session, body, ip=client.ip)
     return RegistrationResponse(
         tenant=TenantOut.model_validate(tenant),
@@ -112,3 +119,10 @@ async def slug_availability(
         return SlugAvailability(slug=clean, available=available, suggestion=suggestion)
     suggestion = await registration.suggest_slug(session, name or "restaurant", city)
     return SlugAvailability(slug=suggestion, available=True, suggestion=suggestion)
+
+
+@router.get("/content", summary="WaitLess website content (Super Admin editable)")
+async def website_content(session: SessionDep) -> dict[str, Any]:
+    from app.services.platform import public_content
+
+    return await public_content(session)

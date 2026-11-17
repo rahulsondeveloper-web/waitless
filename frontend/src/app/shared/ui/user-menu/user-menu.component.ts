@@ -32,7 +32,7 @@ import { ApiError } from '../../../core/http/api-error';
         </div>
         <mat-divider />
         @if (auth.isSuperAdmin()) {
-          <a mat-menu-item routerLink="/super-admin/restaurants"><mat-icon>admin_panel_settings</mat-icon>Super Admin</a>
+          <a mat-menu-item routerLink="/super-admin"><mat-icon>admin_panel_settings</mat-icon>Super Admin</a>
         }
         @if (auth.activeTenant(); as t) {
           <a mat-menu-item routerLink="/restaurant-admin"><mat-icon>storefront</mat-icon>{{ t.tenant_name }}</a>

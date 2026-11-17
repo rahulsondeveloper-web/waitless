@@ -215,36 +215,40 @@ Realtime: `inventory.changed {branch_id}` to the branch staff room; `notificatio
 
 ### Reports & subscription
 
+Implemented in Phase 11:
+
 | Method | Path | Permission |
 |---|---|---|
-| GET | `/dashboard` | any staff (fields filtered by permission) |
-| GET | `/reports/{sales\|orders\|sla\|discounts\|reservations\|queue\|inventory\|wastage\|valuation}` | `reports.view` |
-| GET | `/reports/{name}/export?format=csv` | `reports.view` |
-| GET | `/subscription` · `/subscription/invoices` | `subscription.manage` |
-| POST | `/subscription/change-plan` · `/subscription/invoices/{id}/pay` 🔁 | `subscription.manage` |
-| POST | `/alcohol-licence` | `settings.manage` |
+| GET | `/dashboard` | any staff — adds revenue, discounts, wait & serving times, delayed orders, low stock (money for sales/billing roles) |
+| GET | `/reports` | `reports.view` — the reports this user may open |
+| GET | `/reports/{sales\|payments\|orders\|serving\|discounts\|reservations\|queue\|top_items\|hours}?branch_id=&from=&to=` | `reports.view` (money reports `reports.sales.view`); 402 when the plan lacks `analytics.basic` / `analytics.advanced`. Returns `{columns, rows, totals, chart}` |
+| GET | `/subscription` | any staff — plan, usage vs limits, features, last 30 days |
+| GET | `/saas-invoices` · POST `/saas-invoices/{id}/pay` | `subscription.manage` — WaitLess invoices; pay online (gateway) |
+| GET · PUT | `/settings/limits` | GET any staff; PUT `settings.manage` — manager discount % and refund limits |
+| GET · POST | `/support` | any staff — help requests to WaitLess |
+
+Public: `GET /public/content` — website content + support contacts, banner, sign-up switch.
 
 ## 6. Super Admin
 
-Prefix `/super-admin`. All writes audited.
+Prefix `/super-admin`. All writes audited. Implemented in Phase 11:
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/overview` | Platform KPIs |
-| GET / POST | `/restaurants` | List (filters by status) / register on behalf |
-| GET / PATCH | `/restaurants/{id}` | Detail / edit |
-| PATCH | `/restaurants/{id}/status` | approve, reject, activate, suspend, deactivate (`reason` required) |
+| GET | `/overview` | Restaurants by status, branches, customers, orders, reservations, SaaS revenue, MRR, unpaid, open tickets |
+| GET / POST | `/restaurants` · GET `/restaurants/{id}` · PATCH `/restaurants/{id}/status` | List / register / detail / approve, reject, activate, suspend, deactivate |
 | GET | `/restaurants/{id}/usage` | Usage vs plan limits |
-| POST | `/restaurants/{id}/view-as` | Start audited read-only access session |
-| POST | `/restaurants/{id}/alcohol-licence/approve` · `/reject` | Licence review |
-| CRUD | `/plans` (+ `/features`) | Plans without code changes |
-| GET / POST | `/subscriptions` | List / assign |
-| POST | `/subscriptions/{id}/change-plan` · `/renew` · `/cancel` | Lifecycle |
-| GET | `/saas-invoices` · POST `/saas-invoices` | SaaS billing (separate from restaurant billing) |
-| CRUD | `/content` | Landing page blocks, about, features, how-it-works, terms, privacy |
-| GET / PATCH | `/support/tickets` (+ `/notes`) | Support |
-| GET | `/audit-logs` | Filter by actor, tenant, entity, date |
-| GET / PUT | `/settings` · `/integrations` | Platform settings (e.g. `gallery_max_photos`), integration keys |
+| POST | `/restaurants/{id}/subscription` `{plan_id, billing_cycle, trial, waive_first_invoice}` | Assign / upgrade / downgrade (immediate) |
+| GET | `/features` · `/plans/full` · POST `/plans` · PUT `/plans/{id}` | Feature catalogue; plans with features, limits, subscribers |
+| GET | `/subscriptions?status=&q=` · POST `/subscriptions/{id}/actions` `{action, days?}` · POST `/subscriptions/run-renewals` | renew, extend, cancel, stop/resume renewal, expire |
+| GET · POST | `/saas-invoices` · POST `/saas-invoices/{id}/payments` · `/void` | SaaS invoices (separate from restaurant billing) |
+| GET · PUT | `/content` · `/content/{key}` | Website sections |
+| GET · PATCH | `/support/tickets` · `/support/tickets/{id}` · POST `/support/tickets/{id}/notes` · GET `/admins` | Support desk |
+| GET | `/audit?tenant_id=&actor_id=&admins_only=&action=&from=&to=&page=` | Audit log |
+| GET · PUT | `/settings` | Platform settings + integration status (no secrets) |
+| GET · PUT | `/notification-templates` · `/notification-templates/{event}` | Notification wording / on-off |
+
+Still planned: "view as" restaurant, alcohol-licence review.
 
 ## 7. Webhooks
 

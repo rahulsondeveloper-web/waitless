@@ -577,4 +577,24 @@ async def seed_demo(session: AsyncSession, *, e2e: bool = False) -> list[str]:
         variant = _e2e_variant(d, i + 1)
         out.append(await _seed_one(session, variant, i + 11))
         await _reset_e2e(session, variant)
+    out.append(await _ensure_e2e_admin(session))
     return out
+
+
+E2E_ADMIN_EMAIL = "e2e.admin@waitless.example.com"
+
+
+async def _ensure_e2e_admin(session: AsyncSession) -> str:
+    """Phase 11: a test-only Super Admin for the end-to-end tests (development databases only)."""
+    from app.core.security import hash_password
+    from app.models import User
+
+    await use_system(session)
+    user = (await session.execute(select(User).where(User.email == E2E_ADMIN_EMAIL))).scalar_one_or_none()
+    if user is None:
+        user = User(email=E2E_ADMIN_EMAIL, full_name="E2E Admin (tests)")
+        session.add(user)
+    user.password_hash = hash_password(DEMO_PASSWORD)
+    user.is_super_admin, user.is_active = True, True
+    await session.commit()
+    return f"super admin: {E2E_ADMIN_EMAIL}"

@@ -13,6 +13,7 @@ import { RestaurantService } from '../../../core/restaurant/restaurant.service';
 import { RestaurantMe } from '../../../core/tenancy/tenancy.models';
 import { TenancyService } from '../../../core/tenancy/tenancy.service';
 import { ErrorStateComponent, LoadingStateComponent } from '../../../shared/ui/state/state.components';
+import { formatPrice } from '../../../core/storefront/storefront.models';
 
 /**
  * Phase 2 dashboard: approval status, plan/trial and branches.
@@ -43,6 +44,7 @@ export class DashboardPage implements OnInit {
 
   protected readonly checklist = signal<PublishChecklist | null>(null);
   protected readonly kpis = signal<Dashboard | null>(null);
+  protected readonly price = (v: string | number) => formatPrice(v);
   protected readonly publishing = signal(false);
   protected readonly canPublish = computed(() => this.auth.hasPermission('restaurant.profile.manage'));
   protected readonly remaining = computed(

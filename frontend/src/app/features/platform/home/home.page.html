@@ -1,11 +1,10 @@
 <section class="hero">
   <div class="wl-container hero__grid">
     <div>
-      <p class="wl-eyebrow">Restaurant technology platform</p>
-      <h1 class="hero__title">Skip the wait.<br /><span class="wl-script">Dine delightfully.</span></h1>
+      <p class="wl-eyebrow">{{ site()?.home?.eyebrow ?? 'Restaurant technology platform' }}</p>
+      <h1 class="hero__title">{{ site()?.home?.title ?? 'Skip the wait.' }}<br /><span class="wl-script">{{ site()?.home?.title_script ?? 'Dine delightfully.' }}</span></h1>
       <p class="hero__lead">
-        Find a restaurant, book or queue from your phone, and get your food within 15 minutes — or a discount that
-        grows while you wait.
+        {{ site()?.home?.lead ?? 'Find a restaurant, book or queue from your phone, and get your food within 15 minutes — or a discount that grows while you wait.' }}
       </p>
       <form class="hero__search" role="search" (submit)="$event.preventDefault(); search(q.value)">
         <span class="material-symbols-outlined" aria-hidden="true">search</span>
@@ -50,7 +49,7 @@
     <p class="wl-eyebrow">How it works</p>
     <h2 id="h-how" class="wl-h2">From kitchen to <span class="wl-script">your table</span></h2>
     <ol class="steps">
-      @for (s of steps; track s.title; let i = $index) {
+      @for (s of steps(); track s.title; let i = $index) {
         <li class="wl-card step">
           <span class="step__n">{{ i + 1 }}</span>
           <span class="material-symbols-outlined step__icon" aria-hidden="true">{{ s.icon }}</span>
@@ -67,7 +66,7 @@
     <p class="wl-eyebrow">Features</p>
     <h2 id="h-features" class="wl-h2">Everything a restaurant runs on</h2>
     <ul class="features">
-      @for (f of features; track f.title) {
+      @for (f of features(); track f.title) {
         <li>
           <span class="material-symbols-outlined" aria-hidden="true">{{ f.icon }}</span>
           <div>
@@ -86,11 +85,11 @@
       <p class="wl-eyebrow">For restaurants</p>
       <h2 id="h-owners" class="wl-h2">Your brand, <span class="wl-script">your app</span></h2>
       <ul class="benefits">
-        @for (b of benefits; track b) {
+        @for (b of benefits(); track b) {
           <li><span class="material-symbols-outlined" aria-hidden="true">check_circle</span> {{ b }}</li>
         }
       </ul>
-      <a routerLink="/register-restaurant" class="wl-btn wl-btn--primary">Start your 14-day free trial</a>
+      <a routerLink="/register-restaurant" class="wl-btn wl-btn--primary">{{ site()?.for_restaurants?.cta ?? 'Start your 14-day free trial' }}</a>
     </div>
     <div class="owners__quote">
       <p>"Guests see our restaurant, our colours, our menu — WaitLess just makes everything run on time."</p>

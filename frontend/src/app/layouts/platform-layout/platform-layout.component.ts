@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { APP_CONFIG } from '../../core/config/app-config';
+import { SiteContentService } from '../../core/platform-admin/site-content.service';
 import { ThemeService } from '../../core/theme/theme.service';
 import { UserMenuComponent } from '../../shared/ui/user-menu/user-menu.component';
 
@@ -17,6 +18,9 @@ export class PlatformLayoutComponent {
   protected readonly config = APP_CONFIG;
   protected readonly menuOpen = signal(false);
   protected readonly year = new Date().getFullYear();
+  /** Super Admin → Content / Settings: tagline, announcement, maintenance banner, contact details. */
+  protected readonly site = inject(SiteContentService).content;
+  protected readonly banner = computed(() => this.site()?.platform.maintenance_banner || this.site()?.branding.announcement || '');
 
   protected readonly nav = [
     { label: 'Home', link: '/', fragment: undefined },
@@ -31,6 +35,7 @@ export class PlatformLayoutComponent {
   constructor() {
     // Entering the platform site always restores WaitLess branding (PRD §2.2).
     inject(ThemeService).reset();
+    inject(SiteContentService).load();
   }
 
   protected toggleMenu(): void {

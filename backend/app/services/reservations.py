@@ -528,8 +528,11 @@ async def process_payment_event(session: AsyncSession, provider: str, event: Pay
     ).scalar_one_or_none()
     if pay is None:
         from app.services.billing import process_payment_event as bill_event  # bills share the webhook
+        from app.services.saas import process_payment_event as saas_event  # WaitLess invoices
 
-        return await bill_event(session, provider, event) or "unknown_order"
+        return (
+            await bill_event(session, provider, event) or await saas_event(session, provider, event) or "unknown_order"
+        )
     if pay.status != "created":
         return "already_processed"
     await use_tenant(session, pay.tenant_id)

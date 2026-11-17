@@ -24,6 +24,13 @@ async def notify_guest(
     body: str,
     link: str | None = None,
 ) -> None:
+    from app.services.platform import render  # Super Admin wording / switched-off events (Phase 11)
+
+    rendered = await render(event, title, body)
+    if rendered is None:
+        log.info("notify %s skipped (switched off)", event)
+        return
+    title, body = rendered
     masked = (phone[:-4] + "****") if phone else "-"
     log.info("notify %s to %s: %s — %s", event, masked, title, body)
     if user_id is not None:
