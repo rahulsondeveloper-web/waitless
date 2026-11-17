@@ -1,4 +1,4 @@
-"""Staff ordering and the kitchen display (PRD §13)."""
+"""Staff ordering, the kitchen display (PRD §13) and the serving-time discount policy (PRD §14)."""
 
 import uuid
 from typing import Annotated
@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends, Header, Query, Response
 
 from app.api.deps import SessionDep, TenantCtx, require_feature, require_permission
 from app.schemas.orders import CancelIn, OrderOut, StaffOrderIn, StatusIn
+from app.schemas.sla import DiscountPolicyIn, DiscountPolicyOut
 from app.services import orders as svc
+from app.services import sla as sla_svc
 from app.services.access import TenantContext
 
 router = APIRouter(
@@ -47,3 +49,19 @@ async def set_status(order_id: uuid.UUID, body: StatusIn, session: SessionDep, c
 @router.post("/orders/{order_id}/cancel", response_model=OrderOut, summary="Cancel an order (with a reason)")
 async def cancel(order_id: uuid.UUID, body: CancelIn, session: SessionDep, ctx: TenantCtx) -> OrderOut:
     return await svc.staff_cancel(session, ctx, order_id, body.reason)
+
+
+# ---------- serving-time discount policy (PRD §14) ----------
+
+PolicyManage = Annotated[TenantContext, Depends(require_permission("discounts.policy.manage"))]
+
+
+@router.get("/discount-policy", response_model=DiscountPolicyOut, summary="The serving-time promise & discounts")
+async def get_discount_policy(session: SessionDep, ctx: PolicyManage) -> DiscountPolicyOut:
+    return await sla_svc.get_policy(session, ctx)
+
+
+@router.put("/discount-policy", response_model=DiscountPolicyOut, summary="Save the policy (new orders only)")
+async def save_discount_policy(body: DiscountPolicyIn, session: SessionDep, ctx: PolicyManage) -> DiscountPolicyOut:
+    """Running and past orders keep the policy copied when their timer started."""
+    return await sla_svc.save_policy(session, ctx, body)

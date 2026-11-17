@@ -1,6 +1,7 @@
 import { APIRequestContext, Browser, Page, expect, test } from '@playwright/test';
 
-/** Phase 7: "Have an order ID?" → order from the table → kitchen display → served (live), waiter orders. */
+/** Phases 7–8: "Have an order ID?" → order from the table → kitchen display → served (live) with the serving
+ * timer; waiter orders; the discount settings screen. */
 
 const SLUG = 'e2e-urban-bites';
 const OWNER = 'e2e.owner@urbanbites.example.com';
@@ -19,7 +20,8 @@ async function seatGuests(request: APIRequestContext, guest: string): Promise<{ 
   const me = await (await request.get('/api/v1/restaurant/me', { headers })).json();
   const branch = me.branches.find((b: { is_primary: boolean }) => b.is_primary) ?? me.branches[0];
   const board = await (await request.get(`/api/v1/restaurant/tables/board?branch_id=${branch.id}`, { headers })).json();
-  for (const t of board.tables.filter((x: { status: string }) => x.status === 'available')) {
+  // From the end of the floor: the booking tests hold the first tables (T1…) for their guests.
+  for (const t of board.tables.filter((x: { status: string }) => x.status === 'available').reverse()) {
     const r = await request.post('/api/v1/restaurant/table-sessions', {
       headers,
       data: { table_id: t.id, party_size: 2, guest_name: guest },
@@ -67,6 +69,8 @@ test('guest enters the order ID + PIN, orders, and follows it live to Served', a
   await expect(page).toHaveURL(new RegExp(`/r/${SLUG}/session$`));
   const order = page.getByTestId('table-order').first();
   await expect(order).toContainText('Sent to kitchen');
+  await expect(page.getByTestId('serving-promise')).toContainText('Served within 15 min');
+  await expect(order.getByTestId('serving-timer')).toHaveText(/Timer starts when the kitchen accepts/);
 
   // Kitchen moves the ticket along; the guest's page follows without reloading.
   const kitchen = await ownerPage(browser, '/restaurant-admin/kitchen');
@@ -74,11 +78,17 @@ test('guest enters the order ID + PIN, orders, and follows it live to Served', a
   await expect(ticket).toBeVisible();
   await ticket.getByRole('button', { name: 'Accept' }).click();
   await expect(order).toContainText('Accepted', { timeout: 15_000 });
+  // The 15-minute timer starts when the kitchen accepts (PRD §14) — on the guest's phone and on the ticket.
+  await expect(order.getByTestId('serving-timer')).toHaveText(/1[45]:\d\d left to serve/);
+  await expect(kitchen.getByTestId('ticket').filter({ hasText: `Table ${seated.label}` }).getByTestId('serving-timer')).toContainText(
+    'left to serve',
+  );
   await kitchen.getByTestId('ticket').filter({ hasText: `Table ${seated.label}` }).getByRole('button', { name: 'Start cooking' }).click();
   await kitchen.getByTestId('ticket').filter({ hasText: `Table ${seated.label}` }).getByRole('button', { name: 'Ready' }).click();
   await expect(order).toContainText('Ready', { timeout: 15_000 });
   await kitchen.getByTestId('ticket').filter({ hasText: `Table ${seated.label}` }).getByRole('button', { name: 'Served' }).click();
   await expect(order).toContainText('Served', { timeout: 15_000 });
+  await expect(order.getByTestId('serving-timer')).toHaveText(/Served in \d+ min/);
   await expect(page.getByTestId('table-total')).not.toHaveText('₹0');
   await kitchen.context().close();
 });
@@ -102,4 +112,25 @@ test('waiter places an order for a seated table from the Orders page', async ({ 
   await expect(row).toContainText('Sent to kitchen');
   await expect(row).toContainText(seated.code);
   await staff.context().close();
+});
+
+test('owner sees the serving-time discount policy and what guests get', async ({ browser }) => {
+  const owner = await ownerPage(browser, '/restaurant-admin/discounts');
+  await expect(owner.getByRole('heading', { name: 'Discount settings' })).toBeVisible();
+  const preview = owner.getByTestId('policy-preview');
+  await expect(preview).toContainText('Up to 15 min');
+  await expect(preview.getByRole('row', { name: /15–20 min/ })).toContainText('2%');
+  await expect(preview.getByRole('row', { name: /20–25 min/ })).toContainText('4%');
+  await expect(preview).toContainText('20%');
+
+  // Editing updates the explanation and table immediately (not saved: other tests share this restaurant).
+  await owner.getByTestId('policy-serving').fill('20');
+  await expect(owner.getByTestId('policy-summary')).toContainText('Served within 20 min');
+  await expect(preview.getByRole('row', { name: /20–25 min/ })).toContainText('2%');
+
+  await owner.getByRole('button', { name: 'Use defaults' }).click();
+  await owner.getByTestId('save-discounts').click();
+  await expect(owner.getByText('Saved. New orders use this policy')).toBeVisible();
+  await expect(owner.getByTestId('policy-summary')).toContainText('Served within 15 min');
+  await owner.context().close();
 });

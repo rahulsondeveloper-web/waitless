@@ -15,13 +15,14 @@ import { RealtimeService } from '../../../core/realtime/realtime.service';
 import { formatPrice } from '../../../core/storefront/storefront.models';
 import { Branch } from '../../../core/tenancy/tenancy.models';
 import { TenancyService } from '../../../core/tenancy/tenancy.service';
+import { ServingTimerComponent } from '../../../shared/ui/serving-timer/serving-timer.component';
 import { ErrorStateComponent, LoadingStateComponent } from '../../../shared/ui/state/state.components';
 import { NewOrderData, NewOrderDialogComponent } from './new-order-dialog.component';
 
 /** Orders (PRD §13): today's orders, waiter ordering for a table, mark served, cancel with reason. */
 @Component({
   selector: 'wl-orders-page',
-  imports: [MatButtonModule, MatIconModule, MatMenuModule, LoadingStateComponent, ErrorStateComponent],
+  imports: [MatButtonModule, MatIconModule, MatMenuModule, LoadingStateComponent, ErrorStateComponent, ServingTimerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './orders.page.html',
   styleUrls: ['../admin-bookings.scss', './orders.page.scss'],

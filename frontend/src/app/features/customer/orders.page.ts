@@ -6,11 +6,12 @@ import { ApiError } from '../../core/http/api-error';
 import { ORDER_STATUS_LABEL, Order, OrderingService } from '../../core/ordering/ordering.service';
 import { RealtimeService } from '../../core/realtime/realtime.service';
 import { formatPrice } from '../../core/storefront/storefront.models';
+import { ServingTimerComponent } from '../../shared/ui/serving-timer/serving-timer.component';
 
 /** Customer "My orders": pre-orders and orders placed while signed in, at every restaurant. */
 @Component({
   selector: 'wl-my-orders',
-  imports: [RouterLink],
+  imports: [RouterLink, ServingTimerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="wl-container bk-page">
@@ -32,7 +33,9 @@ import { formatPrice } from '../../core/storefront/storefront.models';
             <p class="bk-muted">
               {{ o.order_type === 'paid_preorder' ? 'Pre-order for booking ' + o.reservation_code : 'At your table' }}
               · {{ price(o.total) }}
+              @if (+o.discount_total > 0) { · <b>{{ price(o.discount_total) }} off — you pay {{ price(o.payable_total) }}</b> }
             </p>
+            <wl-serving-timer [order]="o" />
             <ul class="lines">
               @for (l of o.items; track l.id) {
                 <li>{{ l.quantity }} × {{ l.name }}{{ l.variant_name ? ' (' + l.variant_name + ')' : '' }}</li>

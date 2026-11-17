@@ -728,7 +728,7 @@ async def arrive(
         held.active = False  # seated elsewhere; free the originally held table for other bookings
     from app.services.orders import attach_preorders  # local: orders imports reservation models only
 
-    await attach_preorders(session, r.id, seated.session.id)
+    await attach_preorders(session, r.id, seated.session.id, r.staff_confirmed_at)
     write_audit(
         session,
         action="reservation.arrived",

@@ -29,12 +29,13 @@
       <section class="lane" [attr.data-lane]="lane.key" [attr.aria-label]="lane.title">
         <h2>{{ lane.title }} <span class="count">{{ byLane()[lane.key].length }}</span></h2>
         @for (o of byLane()[lane.key]; track o.id) {
-          <article class="ticket" [class.late]="minutes(o) >= 15 && lane.key !== 'ready'" data-testid="ticket">
+          <article class="ticket" [class.late]="late(o) && lane.key !== 'ready'" data-testid="ticket">
             <header>
               <b>#{{ o.number }}</b>
               <span>{{ where(o) }}</span>
               <span class="mins" [attr.aria-label]="minutes(o) + ' minutes since ordered'">{{ minutes(o) }}′</span>
             </header>
+            <wl-serving-timer [order]="o" [compact]="true" />
             <ul>
               @for (l of o.items; track l.id) {
                 <li>
@@ -62,7 +63,7 @@
   @if (waiting().length) {
     <section class="panel preorders" aria-labelledby="h-pre">
       <h2 id="h-pre">Pre-orders waiting for arrival</h2>
-      <p class="muted">Start these after staff confirm the guests' arrival — the 15-minute promise starts then.</p>
+      <p class="muted">Start these after staff confirm the guests' arrival — their serving timer starts then.</p>
       <ul class="rows">
         @for (o of waiting(); track o.id) {
           <li class="row">

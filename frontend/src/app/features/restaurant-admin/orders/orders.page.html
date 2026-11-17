@@ -53,7 +53,9 @@
             {{ time(o.placed_at) }}
             @if (o.session_code) { · order ID {{ o.session_code }} }
             · {{ price(o.total) }}
+            @if (+o.discount_total > 0) { · <b class="disc" data-testid="order-discount">−{{ price(o.discount_total) }} late discount</b> }
           </span>
+          <wl-serving-timer [order]="o" [compact]="true" />
           <span class="items">
             @for (l of o.items; track l.id) { {{ l.quantity }}× {{ l.name }}{{ l.variant_name ? ' (' + l.variant_name + ')' : '' }}{{ $last ? '' : ', ' }} }
           </span>

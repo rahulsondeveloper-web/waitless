@@ -12,6 +12,7 @@ import { Order, OrderingService } from '../../../core/ordering/ordering.service'
 import { RealtimeService } from '../../../core/realtime/realtime.service';
 import { Branch } from '../../../core/tenancy/tenancy.models';
 import { TenancyService } from '../../../core/tenancy/tenancy.service';
+import { ServingTimerComponent } from '../../../shared/ui/serving-timer/serving-timer.component';
 import { ErrorStateComponent, LoadingStateComponent } from '../../../shared/ui/state/state.components';
 
 type Lane = { key: 'placed' | 'accepted' | 'preparing' | 'ready'; title: string; next?: 'accepted' | 'preparing' | 'ready' | 'served'; action?: string };
@@ -26,7 +27,7 @@ const LANES: Lane[] = [
 /** Kitchen display (PRD §13): live tickets by status, elapsed time, pre-orders waiting for arrival. */
 @Component({
   selector: 'wl-kitchen-page',
-  imports: [MatButtonModule, MatIconModule, LoadingStateComponent, ErrorStateComponent],
+  imports: [MatButtonModule, MatIconModule, LoadingStateComponent, ErrorStateComponent, ServingTimerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './kitchen.page.html',
   styleUrls: ['../admin-bookings.scss', './kitchen.page.scss'],
@@ -96,6 +97,11 @@ export class KitchenPage implements OnInit {
     const id = this.branchId();
     if (!id) return;
     this.api.orders(id, true).subscribe({ next: (o) => this.orders.set(o), error: (e: ApiError) => this.error.set(e) });
+  }
+
+  /** Past the serving promise (PRD §14) — the ticket turns red. */
+  protected late(o: Order): boolean {
+    return !!o.sla && o.sla.status === 'running' && this.now() > Date.parse(o.sla.deadline_at);
   }
 
   protected minutes(o: Order): number {

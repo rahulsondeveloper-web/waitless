@@ -89,3 +89,14 @@
 .center {
   text-align: center;
 }
+.promise {
+  margin: 0.2rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--wl-secondary) 12%, transparent);
+  font-size: 0.9rem;
+}
+.saved {
+  color: #2e8b57;
+  font-weight: 600;
+}

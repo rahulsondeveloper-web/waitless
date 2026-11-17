@@ -1,0 +1,84 @@
+<header class="page-head">
+  <div>
+    <h1>Discount settings</h1>
+    <p class="muted">Your serving-time promise. When an order takes longer, the guest gets a discount automatically.</p>
+  </div>
+</header>
+
+@if (error(); as e) {
+  @if (e.status === 403) {
+    <wl-empty-state icon="lock" title="Only the owner can change this" message="Ask the restaurant owner to update the serving-time discount." />
+  } @else {
+    <wl-error-state [message]="e.message" (retry)="load()" />
+  }
+} @else if (policy(); as p) {
+  <form class="policy" (ngSubmit)="save()">
+    <fieldset [disabled]="!canEdit()">
+      <section class="panel">
+        <mat-slide-toggle [checked]="p.is_active" (change)="patch('is_active', $event.checked)" data-testid="policy-active">
+          Give automatic discounts when an order is late</mat-slide-toggle>
+        <p class="summary" data-testid="policy-summary">{{ summary() }}</p>
+        @if (p.is_default) { <p class="muted">These are the WaitLess defaults — save to make them yours.</p> }
+      </section>
+
+      <section class="panel grid">
+        <h2>The promise</h2>
+        <label class="field"><span>Serve within (minutes)</span>
+          <input type="number" min="1" max="180" name="serving" [ngModel]="p.serving_minutes"
+                 (ngModelChange)="patch('serving_minutes', +$event)" data-testid="policy-serving" /></label>
+        <label class="field"><span>First discount (%)</span>
+          <input type="number" min="0" max="100" step="0.5" name="initial" [ngModel]="p.initial_pct"
+                 (ngModelChange)="patch('initial_pct', $event)" data-testid="policy-initial" /></label>
+        <label class="field"><span>Then every (minutes)</span>
+          <input type="number" min="1" max="60" name="interval" [ngModel]="p.interval_minutes"
+                 (ngModelChange)="patch('interval_minutes', +$event)" /></label>
+        <label class="field"><span>Add (%)</span>
+          <input type="number" min="0" max="100" step="0.5" name="increment" [ngModel]="p.increment_pct"
+                 (ngModelChange)="patch('increment_pct', $event)" /></label>
+        <label class="field"><span>Maximum discount (%)</span>
+          <input type="number" min="0" max="100" step="0.5" name="max" [ngModel]="p.max_pct"
+                 (ngModelChange)="patch('max_pct', $event)" data-testid="policy-max" /></label>
+        <label class="field"><span>Discount is taken off</span>
+          <select name="base" [ngModel]="p.base" (ngModelChange)="patch('base', $event)">
+            <option value="food_subtotal">Food before tax (tax charged on the rest)</option>
+            <option value="order_total">Order total including tax</option>
+          </select></label>
+      </section>
+
+      <section class="panel">
+        <h2>Which orders get it</h2>
+        @for (t of types; track t) {
+          <label class="check">
+            <input type="checkbox" [checked]="p.eligible_order_types.includes(t)" (change)="toggleType(t, $any($event.target).checked)" />
+            {{ typeLabel[t] }}
+          </label>
+        }
+        <p class="muted">The timer starts when the kitchen accepts the order. For paid pre-orders it starts when staff
+          press <b>Confirm arrival</b> — never when the guest ordered.</p>
+      </section>
+
+      <section class="panel">
+        <h2>What guests get</h2>
+        <table class="preview" data-testid="policy-preview">
+          <thead><tr><th scope="col">Served after</th><th scope="col">Discount on that order</th></tr></thead>
+          <tbody>
+            @for (r of preview(); track r.when) {
+              <tr><td>{{ r.when }}</td><td>{{ p.is_active ? r.pct + '%' : '—' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    </fieldset>
+
+    @if (saveError(); as m) { <p class="err" role="alert">{{ m }}</p> }
+    @if (canEdit()) {
+      <div class="save">
+        <button mat-button type="button" (click)="resetDefaults()">Use defaults</button>
+        <button mat-flat-button type="submit" [disabled]="busy()" data-testid="save-discounts">Save</button>
+      </div>
+      <p class="muted right">Changes apply to new orders. Orders already being timed keep the rules they started with.</p>
+    }
+  </form>
+} @else {
+  <wl-loading-state />
+}

@@ -6,7 +6,8 @@ Rules
 - Idempotency: a retried submission with the same `Idempotency-Key` returns the original order.
 - Status flow: placed → accepted → preparing → ready (kitchen) → served (waiter: `orders.mark_served`).
 - Paid pre-orders wait until the guests arrive (staff "Confirm arrival") before the kitchen starts —
-  the 15-minute promise starts at arrival (Phase 8).
+  the 15-minute promise starts at arrival; every other order's timer starts when the kitchen accepts
+  (PRD §14, `app.services.sla`).
 - Free bookings cannot pre-order: `PREORDER_NOT_ALLOWED`.
 """
 
@@ -50,6 +51,7 @@ from app.schemas.orders import (
     TableJoinOut,
     TableSessionView,
 )
+from app.services import sla as sla_svc
 from app.services.access import TenantContext
 from app.services.audit import write_audit
 from app.services.notify import notify_guest, user_room
@@ -349,9 +351,13 @@ async def orders_out(
         if rids
         else {}
     )
+    slas = await sla_svc.load(session, ids)
+    now = _now()
     out = []
     for o in orders:
         s = sessions.get(o.table_session_id) if o.table_session_id else None
+        timer = slas.get(o.id)
+        sla_view, discount, payable = sla_svc.sla_out(timer, o, now) if timer else (None, Decimal("0.00"), o.total)
         r = reservations.get(o.reservation_id) if o.reservation_id else None
         cancellable = GUEST_CANCELLABLE if viewer == "guest" else STAFF_CANCELLABLE
         out.append(
@@ -381,6 +387,9 @@ async def orders_out(
                 served_at=o.served_at,
                 cancelled_at=o.cancelled_at,
                 cancel_reason=o.cancel_reason,
+                sla=sla_view,
+                discount_total=discount,
+                payable_total=Decimal("0.00") if o.status == "cancelled" else payable,
                 can_cancel=o.status in cancellable,
                 restaurant_name=tenant.name if tenant else None,
                 restaurant_slug=tenant.slug if tenant else None,
@@ -467,6 +476,9 @@ async def table_view(session: AsyncSession, token: str | None) -> TableSessionVi
         subtotal=sum((o.subtotal for o in live), Decimal("0")),
         tax_total=sum((o.tax_total for o in live), Decimal("0")),
         total=sum((o.total for o in live), Decimal("0")),
+        discount_total=sum((o.discount_total for o in out if o.status != "cancelled"), Decimal("0")),
+        payable_total=sum((o.payable_total or Decimal("0") for o in out if o.status != "cancelled"), Decimal("0")),
+        promise=sla_svc.promise_out(await sla_svc.current_policy(session, tenant.id)),
         ordering_open=s.status == "open" and await feature_enabled(session, tenant.id, "ordering"),
         server_time=_now(),
     )
@@ -519,6 +531,7 @@ async def guest_cancel(session: AsyncSession, token: str | None, order_id: uuid.
         raise ConflictError("The kitchen has already started on this order — ask your waiter.", code="NOT_CANCELLABLE")
     _set(session, o, "cancelled", None, "guest_cancelled")
     o.cancel_reason = "Cancelled by guest"
+    await sla_svc.finish(session, o, "cancelled", o.cancelled_at or _now())
     await session.commit()
     await _changed(o)
     return await _one(session, o, viewer="guest")
@@ -623,19 +636,38 @@ async def cancel_mine(session: AsyncSession, user: User, order_id: uuid.UUID) ->
         raise ConflictError("The kitchen has already started on this order.", code="NOT_CANCELLABLE")
     _set(session, o, "cancelled", user.id, "guest_cancelled")
     o.cancel_reason = "Cancelled by guest"
+    await sla_svc.finish(session, o, "cancelled", o.cancelled_at or _now())
     await session.commit()
     await _changed(o)
     return await _one(session, o, viewer="guest", tenant=await session.get(Tenant, o.tenant_id))
 
 
-async def attach_preorders(session: AsyncSession, reservation_id: uuid.UUID, table_session_id: uuid.UUID) -> int:
-    """Confirm Arrival: the paid pre-orders join the guests' table session (caller commits)."""
-    res = await session.execute(
+async def attach_preorders(
+    session: AsyncSession, reservation_id: uuid.UUID, table_session_id: uuid.UUID, arrived_at: datetime
+) -> int:
+    """Confirm Arrival: the paid pre-orders join the guests' table session and their serving timers
+    start now — at `staff_confirmed_at`, never when the pre-order was placed (PRD §12/§14). Caller commits."""
+    await session.execute(
         update(Order)
         .where(Order.reservation_id == reservation_id, Order.table_session_id.is_(None))
         .values(table_session_id=table_session_id)
     )
-    return res.rowcount or 0
+    pre = (
+        (
+            await session.execute(
+                select(Order).where(
+                    Order.reservation_id == reservation_id,
+                    Order.order_type == "paid_preorder",
+                    Order.status != "cancelled",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for o in pre:
+        await sla_svc.start(session, o, arrived_at, "arrival_confirmed")
+    return len(pre)
 
 
 # ---------- staff ----------
@@ -738,7 +770,12 @@ async def set_status(session: AsyncSession, ctx: TenantContext, order_id: uuid.U
         raise ConflictError(
             "This is a pre-order — start it when the guests arrive (Confirm arrival).", code="PREORDER_NOT_ARRIVED"
         )
+    was = o.status
     _set(session, o, to, ctx.user_id)
+    if was == "placed" and to in ("accepted", "preparing") and o.order_type != "paid_preorder":
+        await sla_svc.start(session, o, o.accepted_at or _now(), "accepted")
+    elif to == "served":
+        await sla_svc.finish(session, o, "served", o.served_at or _now())
     await session.commit()
     await _changed(o)
     if to == "ready" and o.customer_id:
@@ -760,6 +797,7 @@ async def staff_cancel(session: AsyncSession, ctx: TenantContext, order_id: uuid
         raise ConflictError(f"An order that is {o.status} cannot be cancelled.", code="NOT_CANCELLABLE")
     _set(session, o, "cancelled", ctx.user_id, reason or None)
     o.cancel_reason = reason.strip() or "Cancelled by the restaurant"
+    await sla_svc.finish(session, o, "cancelled", o.cancelled_at or _now())
     write_audit(
         session,
         action="order.cancelled",

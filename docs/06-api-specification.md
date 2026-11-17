@@ -61,7 +61,7 @@ Auth column legend: **P** public · **C** customer · **S:perm** staff with perm
 | GET | `/me/bookings` · `/me/reservations/{id}` | C | All my reservations + queue tokens across restaurants / one booking *(Phase 6)* |
 | POST | `/me/reservations/{id}/cancel` | C | Cancel (refund per policy, D58) *(Phase 6)* |
 | POST | `/public/restaurants/{slug}/table-sessions/join` | — | `{ code, pin }` → table token (12 h). 401 `INVALID_TABLE_PIN`, 429 after 5 tries *(Phase 7)* |
-| GET | `/table-session` | header `X-Table-Token` | Orders, statuses, times, running total *(Phase 7; SLA timers & discounts Phase 8)* |
+| GET | `/table-session` | header `X-Table-Token` | Orders, statuses, timers (`sla`), discounts, running total, `promise`, `server_time` *(Phases 7–8)* |
 | POST | `/table-session/orders` | `X-Table-Token` 🔁 | Order from the table; same `Idempotency-Key` → original order (200) *(Phase 7)* |
 | POST | `/table-session/orders/{id}/cancel` | `X-Table-Token` | Only while "placed" *(Phase 7)* |
 | POST · GET | `/me/reservations/{id}/orders` | C 🔁 | Pre-order (paid bookings only → 403 `PREORDER_NOT_ALLOWED`) / list *(Phase 7)* |
@@ -150,6 +150,15 @@ Implemented in Phase 7 (plan feature `ordering`):
 
 Order errors: 422 `VARIANT_REQUIRED` · `INVALID_VARIANT` · `INVALID_ADDON` · `ADDON_RULES`; 409 `ITEM_UNAVAILABLE` · `ITEM_NOT_AVAILABLE_NOW` · `SESSION_CLOSED`.
 
+Implemented in Phase 8 (serving-time promise, PRD §14):
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/discount-policy` | `discounts.policy.manage` — the policy, or the defaults (`is_default: true`) |
+| PUT | `/discount-policy` `{is_active, serving_minutes, initial_pct, interval_minutes, increment_pct, max_pct, eligible_order_types[], base}` | `discounts.policy.manage` — new timers only; 422 if `max_pct < initial_pct` |
+
+Every order now carries `sla` (`started_at, deadline_at, start_reason, status, ended_at, eligible, discount_pct, discount_amount, next_boundary_at` + the copied rule), `discount_total` and `payable_total`.
+
 Planned (later phases):
 
 | Method | Path | Permission |
@@ -160,7 +169,6 @@ Planned (later phases):
 | GET | `/kitchen/tickets` | `kitchen.operate` |
 | POST | `/kitchen/orders/{id}/accept` · `/preparing` · `/ready` | `kitchen.operate` |
 | POST | `/orders/{id}/serve` · `/orders/{id}/items/{item_id}/serve` | `orders.mark_served` |
-| GET / PUT | `/discount-policy` | `discounts.policy.manage` |
 
 ### Billing & payments
 
@@ -245,8 +253,8 @@ Namespace `/rt`. Connect with `auth: { token }` (staff/customer JWT or table-ses
 | `reservation.created` · `.confirmed` · `.arrived` · `.expired` | staff / customer | `reservation_id, status` |
 | `order.placed` | staff, kitchen | `order_id, number, table` |
 | `order.status_changed` | staff, kitchen, session | `order_id, status, at` |
-| `sla.started` | session, staff | `order_id, sla_started_at, deadline, policy, server_time` |
-| `discount.changed` | session, staff | `order_id, pct, amount` |
+| `sla.started` | session, staff | *Phase 8: sent as `orders.changed` (clients refetch the order with its `sla`)* |
+| `discount.changed` | session, staff | *Phase 8: sent as `orders.changed` at each boundary by the worker* |
 | `bill.updated` | session, staff | `bill_id, totals` |
 | `inventory.low_stock` | staff | `item_id, on_hand, reorder_level` |
 | `notification.new` | user | `notification` |

@@ -178,7 +178,7 @@ export const routes: Routes = [
       RESTAURANT_ADMIN_NAV,
       {
         profile: 3, branding: 3, gallery: 3, inventory: 9, suppliers: 9, purchases: 9,
-        billing: 10, payments: 10, discounts: 8, reports: 11, settings: 10,
+        billing: 10, payments: 10, reports: 11, settings: 10,
       },
       {
         '.': {
@@ -234,6 +234,12 @@ export const routes: Routes = [
           path: 'kitchen',
           title: 'Kitchen · WaitLess',
           loadComponent: () => import('./features/restaurant-admin/kitchen/kitchen.page').then((m) => m.KitchenPage),
+        },
+        discounts: {
+          path: 'discounts',
+          title: 'Discount settings · WaitLess',
+          loadComponent: () =>
+            import('./features/restaurant-admin/discounts/discounts.page').then((m) => m.DiscountsPage),
         },
         menu: {
           path: 'menu',

@@ -7,19 +7,21 @@ import { interval } from 'rxjs';
 import { ApiError } from '../../../core/http/api-error';
 import { CartService } from '../../../core/ordering/cart.service';
 import { ORDER_STATUS_LABEL, Order, OrderingService, TableView } from '../../../core/ordering/ordering.service';
+import { promiseText } from '../../../core/ordering/sla';
 import { RealtimeService } from '../../../core/realtime/realtime.service';
 import { formatPrice } from '../../../core/storefront/storefront.models';
 import { TenantContextService } from '../../../core/storefront/tenant-context.service';
+import { ServingTimerComponent } from '../../../shared/ui/serving-timer/serving-timer.component';
 
 const STEPS = ['placed', 'accepted', 'preparing', 'ready', 'served'] as const;
 
 /**
  * "Have an order ID?" (PRD §13): guests enter the code + PIN the waiter gave them, then see their
- * orders, times and running total live, and can order more from the menu.
+ * orders, the serving timer and any delay discount (PRD §14), the running total live, and can order more.
  */
 @Component({
   selector: 'wl-storefront-session',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, ServingTimerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './session.page.html',
   styleUrls: ['../booking-shared.scss', './session.page.scss'],
@@ -38,6 +40,9 @@ export class StorefrontSessionPage implements OnInit {
   protected readonly busy = signal(false);
   protected readonly loading = signal(false);
   protected readonly now = signal(Date.now());
+  /** server time − device time, so the countdown is right even on a phone with a wrong clock */
+  protected readonly offset = signal(0);
+  protected readonly promiseText = promiseText;
   protected code = '';
   protected pin = '';
   private watching: string | null = null;
@@ -120,6 +125,7 @@ export class StorefrontSessionPage implements OnInit {
           this.leave(); // a token from another restaurant never shows here
           return;
         }
+        this.offset.set(Date.parse(v.server_time) - Date.now());
         this.view.set(v);
         if (this.watching !== token) {
           this.watching = token;

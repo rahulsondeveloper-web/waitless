@@ -3,7 +3,7 @@
     python -m app.worker
 
 Every job runs under a Redis lock so that running several workers never executes a job twice.
-Jobs: heartbeat, reservation_tick. Later phases add SLA boundaries, outbox dispatch, alerts) register here.
+Jobs: heartbeat, reservation_tick, sla_tick. Later phases (outbox dispatch, alerts) register here.
 """
 
 import asyncio
@@ -62,10 +62,26 @@ async def reservation_tick() -> None:
         log.info("reservation tick: %s", counts)
 
 
+@locked("sla_tick", ttl_seconds=14)
+async def sla_tick() -> None:
+    """Serving timers (PRD §14): at each boundary (15, 20, 25 … min) store the new discount and push it."""
+    from app.core.db import get_sessionmaker
+    from app.services.orders import _changed
+    from app.services.sla import tick
+
+    async with get_sessionmaker()() as session:
+        changed = await tick(session)
+    for order in changed:
+        await _changed(order)
+    if changed:
+        log.info("sla tick: %d timers advanced", len(changed))
+
+
 def build_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC", job_defaults={"coalesce": True, "max_instances": 1})
     scheduler.add_job(heartbeat, "interval", seconds=30, id="heartbeat", next_run_time=datetime.now(UTC))
     scheduler.add_job(reservation_tick, "interval", seconds=60, id="reservation_tick", next_run_time=datetime.now(UTC))
+    scheduler.add_job(sla_tick, "interval", seconds=15, id="sla_tick", next_run_time=datetime.now(UTC))
     return scheduler
 
 

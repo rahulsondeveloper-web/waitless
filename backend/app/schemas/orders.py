@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import Field, field_validator
 
 from app.schemas.common import ApiModel
+from app.schemas.sla import PromiseOut, SlaOut
 
 OrderStatus = Literal["placed", "accepted", "preparing", "ready", "served", "cancelled"]
 
@@ -102,6 +103,9 @@ class OrderOut(ApiModel):
     served_at: datetime | None
     cancelled_at: datetime | None
     cancel_reason: str | None
+    sla: SlaOut | None = None  # serving timer (Phase 8): starts on accept, or at arrival for paid pre-orders
+    discount_total: Decimal = Decimal("0.00")
+    payable_total: Decimal | None = None  # total after the serving-time discount
     can_cancel: bool = False  # for the viewer (guest: only while "placed")
     restaurant_name: str | None = None
     restaurant_slug: str | None = None
@@ -131,5 +135,8 @@ class TableSessionView(ApiModel):
     subtotal: Decimal
     tax_total: Decimal
     total: Decimal
+    discount_total: Decimal = Decimal("0.00")
+    payable_total: Decimal = Decimal("0.00")
+    promise: PromiseOut | None = None
     ordering_open: bool
     server_time: datetime

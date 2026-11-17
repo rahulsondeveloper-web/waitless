@@ -18,6 +18,9 @@
           <p>{{ v.party_size }} guests{{ v.guest_name ? ' · ' + v.guest_name : '' }}</p>
         </div>
       </div>
+      @if (v.promise; as pr) {
+        <p class="promise" data-testid="serving-promise"><span aria-hidden="true">⏱</span> {{ promiseText(pr) }}</p>
+      }
       <div class="bk-actions">
         @if (v.ordering_open) {
           <a routerLink="../menu" class="wl-btn wl-btn--primary" data-testid="order-more">
@@ -37,8 +40,9 @@
           <span class="bk-badge" [attr.data-status]="o.status === 'ready' ? 'notified' : o.status === 'served' ? 'seated' : o.status === 'cancelled' ? 'cancelled' : 'waiting'">
             {{ statusLabel[o.status] }}
           </span>
-          <span class="bk-muted time">{{ minutes(o) }} min{{ o.served_at ? ' to serve' : ' ago' }}</span>
+          <span class="bk-muted time">ordered {{ minutes(o) }} min ago</span>
         </header>
+        <wl-serving-timer [order]="o" [offsetMs]="offset()" [currency]="ctx.restaurant()?.currency ?? 'INR'" />
         @if (o.status !== 'cancelled') {
           <ol class="steps" aria-label="Progress">
             @for (s of steps; track s; let i = $index) {
@@ -59,7 +63,12 @@
         </ul>
         <footer class="order__foot">
           <span class="bk-muted">{{ o.source === 'staff' ? 'Placed by your waiter' : 'Placed from your phone' }}</span>
-          <b>{{ price(o.total) }}</b>
+          @if (+o.discount_total > 0) {
+            <s class="bk-muted">{{ price(o.total) }}</s>
+            <b data-testid="order-payable">{{ price(o.payable_total) }}</b>
+          } @else {
+            <b>{{ price(o.total) }}</b>
+          }
           @if (o.can_cancel) {
             <button type="button" class="bk-link" (click)="cancel(o)">Cancel</button>
           }
@@ -73,9 +82,14 @@
     @if (active().length) {
       <article class="bk-card totals">
         <div><span>Food</span><span>{{ price(v.subtotal) }}</span></div>
-        <div><span>Taxes</span><span>{{ price(v.tax_total) }}</span></div>
-        <div class="grand"><span>Total so far</span><span data-testid="table-total">{{ price(v.total) }}</span></div>
-        <p class="bk-muted">The final bill with any serving-time discount comes when you finish.</p>
+        @if (+v.discount_total > 0) {
+          <div class="saved" data-testid="table-discount"><span>Serving-time discount</span><span>− {{ price(v.discount_total) }}</span></div>
+          <div><span>Taxes (on the discounted food)</span><span>{{ price(+v.payable_total - +v.subtotal + +v.discount_total) }}</span></div>
+        } @else {
+          <div><span>Taxes</span><span>{{ price(v.tax_total) }}</span></div>
+        }
+        <div class="grand"><span>Total so far</span><span data-testid="table-total">{{ price(v.payable_total) }}</span></div>
+        <p class="bk-muted">Discounts grow while an order is late and are fixed once it is served. The final bill comes when you finish.</p>
       </article>
     }
   } @else if (loading()) {

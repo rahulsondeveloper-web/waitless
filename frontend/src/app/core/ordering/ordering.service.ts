@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 
 import { ApiService } from '../http/api.service';
 import { MenuWindow, PublicItem } from '../storefront/storefront.models';
+import { ServingPromise, Sla } from './sla';
 
 /** Ordering & kitchen (PRD §13): table code + PIN, guest/staff orders, paid pre-orders. */
 
@@ -57,6 +58,9 @@ export interface Order {
   served_at: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
+  sla: Sla | null;
+  discount_total: string;
+  payable_total: string;
   can_cancel: boolean;
   restaurant_name: string | null;
   restaurant_slug: string | null;
@@ -78,6 +82,9 @@ export interface TableView {
   subtotal: string;
   tax_total: string;
   total: string;
+  discount_total: string;
+  payable_total: string;
+  promise: ServingPromise | null;
   ordering_open: boolean;
   server_time: string;
 }

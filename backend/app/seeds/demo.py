@@ -32,6 +32,7 @@ from app.models.profile import (
     RestaurantProfile,
     SocialLink,
 )
+from app.models.sla import DiscountPolicy
 from app.models.tables import RestaurantTable, TableAssignment, TableSection, TableSession
 from app.schemas.tenancy import RestaurantRegistration
 from app.services.media import process_image
@@ -436,6 +437,7 @@ async def _reset_e2e(session: AsyncSession, demo: DemoRestaurant) -> None:
     await session.execute(delete(QueueEntry).where(QueueEntry.tenant_id == tid))
     await session.execute(delete(Reservation).where(Reservation.tenant_id == tid))
     await session.execute(delete(ReservationPolicy).where(ReservationPolicy.tenant_id == tid))
+    await session.execute(delete(DiscountPolicy).where(DiscountPolicy.tenant_id == tid))  # Phase 8: defaults
     now = datetime.now(UTC)
     await session.execute(
         update(TableAssignment)

@@ -19,6 +19,7 @@ from app.models.orders import Order, OrderItem, OrderStatusHistory
 from app.models.platform import AuditLog, IdempotencyKey, OutboxEvent
 from app.models.profile import BusinessHours, GalleryImage, MediaFile, RestaurantBranding, RestaurantProfile, SocialLink
 from app.models.saas import Plan, PlanFeature, Subscription
+from app.models.sla import DiscountPolicy, OrderDiscount, OrderSla
 from app.models.support import SupportTicket
 from app.models.tables import RestaurantTable, TableAssignment, TableSection, TableSession
 from app.models.tenancy import Branch, Membership, Permission, Role, RolePermission, Tenant, UserBranch
@@ -45,7 +46,10 @@ __all__ = [
     "MenuItemAvailability",
     "MenuItemBranchOverride",
     "MenuItemVariant",
+    "DiscountPolicy",
     "Order",
+    "OrderDiscount",
+    "OrderSla",
     "OrderItem",
     "OrderStatusHistory",
     "MediaFile",
