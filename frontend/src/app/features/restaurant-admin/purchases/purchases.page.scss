@@ -1,0 +1,25 @@
+.filters {
+  display: flex;
+  gap: 0.4rem;
+  margin: 1rem 0;
+  flex-wrap: wrap;
+  .on {
+    background: var(--wl-primary);
+    color: #fff;
+    border-color: var(--wl-primary);
+  }
+}
+.link {
+  justify-self: start;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--wl-primary);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.table {
+  margin-top: 0.4rem;
+}

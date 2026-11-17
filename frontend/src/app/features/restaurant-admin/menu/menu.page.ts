@@ -19,6 +19,7 @@ import { ErrorStateComponent, LoadingStateComponent } from '../../../shared/ui/s
 import { CategoryDialogComponent, CategoryDialogData } from './category-dialog.component';
 import { ItemDialogComponent, ItemDialogData } from './item-dialog.component';
 import { OptionsDialogComponent, OptionsDialogData } from './options-dialog.component';
+import { RecipeDialogComponent } from './recipe-dialog.component';
 
 /** Menu management (PRD §7): categories, subcategories, dishes, photos, sold-out, archive. */
 @Component({
@@ -34,6 +35,8 @@ export class MenuAdminPage implements OnInit {
   private readonly snack = inject(MatSnackBar);
   private readonly tenancy = inject(TenancyService);
   protected readonly auth = inject(AuthService);
+  /** Recipes need the Inventory plan feature and `recipes.manage` (PRD §8.5). */
+  protected readonly canRecipe = computed(() => this.auth.hasFeature('inventory') && this.auth.hasPermission('recipes.manage'));
 
   protected readonly menu = signal<AdminMenu | null>(null);
   protected readonly error = signal<ApiError | null>(null);
@@ -166,6 +169,13 @@ export class MenuAdminPage implements OnInit {
           this.snack.open('Options saved.', undefined, { duration: 2000 });
         });
     });
+  }
+
+  protected openRecipe(item: AdminItem): void {
+    this.dialog
+      .open(RecipeDialogComponent, { data: item, width: '760px', maxWidth: '96vw' })
+      .afterClosed()
+      .subscribe((r) => r && this.snack.open(`Recipe saved — ${r.lines.length} ingredients.`, undefined, { duration: 2500 }));
   }
 
   protected setStock(item: AdminItem, available: boolean): void {

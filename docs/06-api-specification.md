@@ -186,16 +186,23 @@ Planned (later phases):
 
 ### Inventory, suppliers, purchases
 
+Implemented in Phase 9 (plan feature `inventory`):
+
 | Method | Path | Permission |
 |---|---|---|
-| CRUD | `/inventory/categories` · `/inventory/items` | `inventory.adjust` (GET: `inventory.view`) |
-| GET | `/inventory` (stock by branch) · `/inventory/movements` | `inventory.view` |
-| POST | `/inventory/adjustments` 🔁 | `inventory.adjust` (reason required) |
-| POST | `/inventory/transfers` 🔁 · `/inventory/transfers/{id}/receive` | `inventory.transfer` |
-| GET | `/inventory/alerts` | `inventory.view` |
-| CRUD | `/suppliers` | `suppliers.manage` |
-| CRUD | `/inventory/purchases` (+ `/receive`, `/payments`) | `purchases.manage` |
-| GET / PUT | `/menu/items/{id}/recipe` | `recipes.manage` |
+| GET · POST · PUT · DELETE | `/inventory/categories` | GET `inventory.view`; changes `inventory.adjust` |
+| GET · POST · PUT | `/inventory/items` | GET `inventory.view` / `purchases.manage` / `recipes.manage`; changes `inventory.adjust`. 409 `DUPLICATE_NAME`, `UNIT_LOCKED` |
+| GET | `/inventory/stock?branch_id=&include_inactive=` | `inventory.view` — on hand, avg cost, value, `ok/low/out` |
+| POST | `/inventory/movements` `{branch_id, item_id, type, quantity, reason, unit_cost?, expiry_date?}` | `inventory.adjust` — opening · addition · wastage · damage · return · adjustment (counted qty). 409 `INSUFFICIENT_STOCK`, `OPENING_EXISTS` |
+| GET | `/inventory/movements?branch_id=&item_id=&type=&from=&to=` | `inventory.view` — the ledger |
+| GET | `/inventory/alerts?branch_id=&days=7` | `inventory.view` — low, out (with suggested quantities), expiring |
+| GET | `/inventory/reports/{current\|valuation\|movements\|consumption\|wastage\|purchases\|low_stock\|expiry}?branch_id=&from=&to=` | `inventory.view` — `{title, columns, rows, totals}` (CSV in the browser) |
+| GET · POST | `/inventory/transfers` · POST `/inventory/transfers/{id}/receive` · `/cancel` | `inventory.view` / `inventory.transfer` |
+| GET · POST · PUT | `/suppliers` | `suppliers.manage` (GET also `purchases.manage`, `inventory.adjust`) — with purchase totals and amount outstanding |
+| GET · POST · PUT | `/purchases` (`?branch_id=&supplier_id=`) · POST `/purchases/{id}/order` · `/cancel` · `/receive` · `/payments` | `purchases.manage`. 409 `PURCHASE_LOCKED`, `OVERPAYMENT`; 422 `EXPIRY_REQUIRED` |
+| GET · PUT | `/menu/items/{id}/recipe` | `recipes.manage`. 422 `UNIT_MISMATCH`, `INVALID_VARIANT` |
+
+Realtime: `inventory.changed {branch_id}` to the branch staff room; `notification` (`inventory.low_stock`) to stock managers.
 
 ### Reports & subscription
 

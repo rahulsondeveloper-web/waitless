@@ -3,6 +3,19 @@
 from app.models.base import Base
 from app.models.booking import QueueEntry, Reservation, ReservationPayment, ReservationPolicy, ReservationTable
 from app.models.identity import OtpChallenge, RefreshToken, User
+from app.models.inventory import (
+    InventoryCategory,
+    InventoryItem,
+    InventoryMovement,
+    InventoryStock,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    PurchasePayment,
+    RecipeIngredient,
+    StockTransfer,
+    StockTransferItem,
+    Supplier,
+)
 from app.models.menu import (
     CategoryMealType,
     MealType,
@@ -25,6 +38,17 @@ from app.models.tables import RestaurantTable, TableAssignment, TableSection, Ta
 from app.models.tenancy import Branch, Membership, Permission, Role, RolePermission, Tenant, UserBranch
 
 __all__ = [
+    "InventoryCategory",
+    "InventoryItem",
+    "InventoryMovement",
+    "InventoryStock",
+    "PurchaseOrder",
+    "PurchaseOrderItem",
+    "PurchasePayment",
+    "RecipeIngredient",
+    "StockTransfer",
+    "StockTransferItem",
+    "Supplier",
     "AuditLog",
     "Base",
     "Branch",

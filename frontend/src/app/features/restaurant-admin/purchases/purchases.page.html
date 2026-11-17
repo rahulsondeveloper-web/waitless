@@ -1,0 +1,79 @@
+<header class="page-head">
+  <div>
+    <h1>Purchases</h1>
+    <p class="muted">Purchase orders, deliveries and what you owe suppliers.@if (due() > 0) { <b> {{ price(due()) }} due.</b> }</p>
+  </div>
+  <div class="head-tools">
+    <button mat-flat-button (click)="edit(null)" data-testid="new-purchase"><mat-icon>add</mat-icon>New purchase order</button>
+  </div>
+</header>
+
+<div class="filters" role="tablist" aria-label="Show">
+  <button mat-stroked-button role="tab" [class.on]="filter() === 'open'" [attr.aria-selected]="filter() === 'open'" (click)="filter.set('open')">Open</button>
+  <button mat-stroked-button role="tab" [class.on]="filter() === 'unpaid'" [attr.aria-selected]="filter() === 'unpaid'" (click)="filter.set('unpaid')">Unpaid</button>
+  <button mat-stroked-button role="tab" [class.on]="filter() === 'all'" [attr.aria-selected]="filter() === 'all'" (click)="filter.set('all')">All</button>
+</div>
+
+@if (error(); as e) {
+  <wl-error-state title="Could not load purchases" [message]="e.message" (retry)="reload()" />
+} @else if (!purchases()) {
+  <wl-loading-state />
+} @else if (!shown().length) {
+  <wl-empty-state icon="shopping_cart" title="No purchases here" message="Create a purchase order, or start from Inventory → Alerts." />
+} @else {
+  <ul class="rows">
+    @for (p of shown(); track p.id) {
+      <li class="row" data-testid="purchase-row">
+        <span class="row__lead">{{ p.number }}</span>
+        <div class="row__main">
+          <div>
+            <b>{{ p.supplier_name ?? 'No supplier' }}</b> · {{ p.branch_name }}
+            <span class="badge" [attr.data-status]="badge[p.status]">{{ statusLabel[p.status] }}</span>
+            @if (p.status === 'received') {
+              <span class="badge" [attr.data-status]="p.payment_status === 'paid' ? 'seated' : 'notified'">
+                {{ p.payment_status === 'paid' ? 'Paid' : p.payment_status === 'partial' ? 'Part paid' : 'Unpaid' }}</span>
+            }
+          </div>
+          <span class="muted">
+            {{ p.order_date | date: 'd MMM y' }} · {{ p.items.length }} items · <b>{{ price(p.grand_total) }}</b>
+            @if (+p.amount_paid > 0 && p.payment_status !== 'paid') { · paid {{ price(p.amount_paid) }} }
+            @if (p.invoice_number) { · invoice {{ p.invoice_number }} }
+          </span>
+          <button type="button" class="link" (click)="open.set(open() === p.id ? null : p.id)" [attr.aria-expanded]="open() === p.id">
+            {{ open() === p.id ? 'Hide items' : 'Show items' }}</button>
+          @if (open() === p.id) {
+            <table class="table">
+              <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Received</th><th class="num">Price</th><th class="num">Tax</th><th class="num">Amount</th></tr></thead>
+              <tbody>
+                @for (l of p.items; track l.item_id) {
+                  <tr><td>{{ l.name }}</td><td class="num">{{ qty(l.quantity) }} {{ l.unit }}</td>
+                    <td class="num">{{ l.received_quantity !== null ? qty(l.received_quantity) : '—' }}</td>
+                    <td class="num">{{ price(l.unit_price) }}</td><td class="num">{{ +l.tax_pct }}%</td>
+                    <td class="num">{{ price(+l.line_total + +l.tax_amount) }}</td></tr>
+                }
+              </tbody>
+            </table>
+            @for (pay of p.payments; track pay.id) {
+              <p class="muted">Paid {{ price(pay.amount) }} by {{ pay.method }} on {{ pay.paid_on | date: 'd MMM' }}{{ pay.reference ? ' · ' + pay.reference : '' }}</p>
+            }
+          }
+        </div>
+        <div class="row__actions">
+          @if (p.status === 'draft' || p.status === 'ordered') {
+            <button mat-flat-button (click)="receive(p)" data-testid="receive-purchase"><mat-icon>inventory</mat-icon>Receive</button>
+            <button mat-icon-button [matMenuTriggerFor]="more" aria-label="More actions"><mat-icon>more_vert</mat-icon></button>
+            <mat-menu #more="matMenu">
+              <button mat-menu-item (click)="edit(p)"><mat-icon>edit</mat-icon>Edit</button>
+              @if (p.status === 'draft') {
+                <button mat-menu-item (click)="action(p, 'order')"><mat-icon>send</mat-icon>Mark as ordered</button>
+              }
+              <button mat-menu-item (click)="action(p, 'cancel')"><mat-icon>block</mat-icon>Cancel</button>
+            </mat-menu>
+          } @else if (p.status === 'received' && p.payment_status !== 'paid') {
+            <button mat-stroked-button (click)="pay(p)" data-testid="pay-purchase"><mat-icon>payments</mat-icon>Record payment</button>
+          }
+        </div>
+      </li>
+    }
+  </ul>
+}

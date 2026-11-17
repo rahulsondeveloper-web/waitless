@@ -22,6 +22,14 @@ from app.core.db import use_system
 from app.core.storage import get_storage
 from app.models import Branch, Tenant
 from app.models.booking import QueueEntry, Reservation, ReservationPolicy
+from app.models.inventory import (
+    InventoryCategory,
+    InventoryItem,
+    PurchaseOrder,
+    RecipeIngredient,
+    StockTransfer,
+    Supplier,
+)
 from app.models.menu import CategoryMealType, MealType, MenuCategory, MenuItem, MenuSubcategory
 from app.models.orders import Order
 from app.models.profile import (
@@ -298,6 +306,97 @@ async def _ensure_tables(session: AsyncSession, tenant_id: uuid.UUID, branch_id:
 # ---------- seeding ----------
 
 
+# Phase 9: a small pantry so Inventory, recipes and deductions can be tried right away.
+_PANTRY = [  # name, unit, opening, reorder level, price, expiry in days
+    ("Flour", "kg", "25", "8", "45", None),
+    ("Mozzarella", "kg", "6", "3", "420", 10),
+    ("Tomato", "kg", "12", "5", "40", 6),
+    ("Olive Oil", "l", "5", "2", "650", None),
+    ("Milk", "l", "18", "6", "56", 3),
+    ("Coffee Beans", "kg", "3", "1", "900", None),
+    ("Butter", "kg", "2", "3", "520", 20),  # already below its reorder level → shows in Alerts
+    ("Mixed Vegetables", "kg", "10", "4", "60", 4),
+]
+_RECIPES = [  # dish name contains → (ingredient, quantity, unit)
+    (
+        ("pizza", "margherita", "focaccia"),
+        [("Flour", "200", "g"), ("Mozzarella", "120", "g"), ("Tomato", "80", "g"), ("Olive Oil", "10", "ml")],
+    ),
+    (("coffee", "latte", "cappuccino", "espresso", "mocha"), [("Coffee Beans", "18", "g"), ("Milk", "150", "ml")]),
+    (("soup", "salad", "bowl", "pasta"), [("Mixed Vegetables", "150", "g"), ("Olive Oil", "10", "ml")]),
+    (
+        ("croissant", "toast", "bread", "brioche", "pancake"),
+        [("Flour", "80", "g"), ("Butter", "25", "g"), ("Milk", "50", "ml")],
+    ),
+]
+
+
+async def _ensure_inventory(session: AsyncSession, tenant_id: uuid.UUID, branch_id: uuid.UUID) -> int:
+    """Pantry items with opening stock, one supplier and recipes for matching dishes (only if empty)."""
+    from datetime import timedelta
+
+    from app.models.tenancy import Membership
+    from app.services.inventory import apply
+
+    if (await session.execute(select(InventoryItem.id).where(InventoryItem.tenant_id == tenant_id).limit(1))).first():
+        return 0
+    owner = (
+        await session.execute(select(Membership.user_id).where(Membership.tenant_id == tenant_id).limit(1))
+    ).scalar_one()
+    supplier = Supplier(
+        tenant_id=tenant_id, name="City Wholesale Traders", contact_name="Mahesh", phone="+919000000999"
+    )
+    session.add(supplier)
+    await session.flush()
+    items: dict[str, InventoryItem] = {}
+    today = datetime.now(UTC).date()
+    for name, unit, qty, level, price, days in _PANTRY:
+        item = InventoryItem(
+            tenant_id=tenant_id,
+            supplier_id=supplier.id,
+            name=name,
+            unit=unit,
+            reorder_level=Decimal(level),
+            min_stock=Decimal(level) / 2,
+            purchase_price=Decimal(price),
+            tracks_expiry=days is not None,
+            storage_location="Cold room" if days else "Dry store",
+        )
+        session.add(item)
+        await session.flush()
+        items[name] = item
+        await apply(
+            session,
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            item=item,
+            delta=Decimal(qty),
+            type="opening",
+            reason="Opening stock (demo)",
+            actor_user_id=owner,
+            unit_cost=Decimal(price),
+            expiry_date=today + timedelta(days=days) if days else None,
+        )
+    dishes = (await session.execute(select(MenuItem).where(MenuItem.tenant_id == tenant_id))).scalars()
+    for dish in dishes:
+        lowered = dish.name.lower()
+        for keys, lines in _RECIPES:
+            if any(k in lowered for k in keys):
+                for ing, q, u in lines:
+                    session.add(
+                        RecipeIngredient(
+                            tenant_id=tenant_id,
+                            menu_item_id=dish.id,
+                            inventory_item_id=items[ing].id,
+                            quantity=Decimal(q),
+                            unit=u,
+                        )
+                    )
+                break
+    session.info.pop("inventory_alerts", None)  # no notifications while seeding
+    return len(items)
+
+
 async def _seed_one(session: AsyncSession, demo: DemoRestaurant, idx: int) -> str:
     await use_system(session)
     existing = (await session.execute(select(Tenant.id).where(Tenant.slug == demo.slug))).scalar_one_or_none()
@@ -306,8 +405,11 @@ async def _seed_one(session: AsyncSession, demo: DemoRestaurant, idx: int) -> st
             await session.execute(select(Branch.id).where(Branch.tenant_id == existing, Branch.is_primary))
         ).scalar_one()
         added = await _ensure_tables(session, existing, branch_id)
+        stocked = await _ensure_inventory(session, existing, branch_id)
         await session.commit()
-        return f"{demo.slug}: already exists" + (f" (added {added} tables)" if added else " (skipped)")
+        extra = [f"added {added} tables"] if added else []
+        extra += [f"added {stocked} inventory items"] if stocked else []
+        return f"{demo.slug}: already exists" + (f" ({', '.join(extra)})" if extra else " (skipped)")
     tenant, _ = await register_restaurant(
         session,
         RestaurantRegistration(
@@ -395,6 +497,8 @@ async def _seed_one(session: AsyncSession, demo: DemoRestaurant, idx: int) -> st
             )
 
     await _ensure_tables(session, tid, branch.id)
+    await session.flush()
+    await _ensure_inventory(session, tid, branch.id)
 
     tenant.status = "active"
     tenant.approved_at = datetime.now(UTC)
@@ -420,6 +524,10 @@ async def _reset_e2e(session: AsyncSession, demo: DemoRestaurant) -> None:
     """Undo whatever earlier test runs changed: every dish live and available, original theme, published."""
     await use_system(session)
     tenant = (await session.execute(select(Tenant).where(Tenant.slug == demo.slug))).scalar_one()
+    dish_names = {d.name for dishes in demo.menu.values() for d in dishes}
+    await session.execute(  # dishes created by tests go away; the demo menu stays
+        delete(MenuItem).where(MenuItem.tenant_id == tenant.id, MenuItem.name.not_in(dish_names))
+    )
     for item in (await session.execute(select(MenuItem).where(MenuItem.tenant_id == tenant.id))).scalars():
         item.archived_at = None
         item.is_available = True
@@ -450,6 +558,11 @@ async def _reset_e2e(session: AsyncSession, demo: DemoRestaurant) -> None:
         .values(status="closed", closed_at=now)
     )
     await session.execute(update(RestaurantTable).where(RestaurantTable.tenant_id == tid).values(status="available"))
+    # Phase 9: back to the demo pantry (fresh stock, recipes, one supplier).
+    for model in (PurchaseOrder, StockTransfer, InventoryItem, Supplier, InventoryCategory):
+        await session.execute(delete(model).where(model.tenant_id == tid))
+    primary = (await session.execute(select(Branch.id).where(Branch.tenant_id == tid, Branch.is_primary))).scalar_one()
+    await _ensure_inventory(session, tid, primary)
     await session.commit()
     await invalidate_storefront(demo.slug)
 

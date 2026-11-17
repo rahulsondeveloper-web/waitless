@@ -51,6 +51,7 @@ from app.schemas.orders import (
     TableJoinOut,
     TableSessionView,
 )
+from app.services import inventory as inventory_svc
 from app.services import sla as sla_svc
 from app.services.access import TenantContext
 from app.services.audit import write_audit
@@ -772,11 +773,15 @@ async def set_status(session: AsyncSession, ctx: TenantContext, order_id: uuid.U
         )
     was = o.status
     _set(session, o, to, ctx.user_id)
-    if was == "placed" and to in ("accepted", "preparing") and o.order_type != "paid_preorder":
-        await sla_svc.start(session, o, o.accepted_at or _now(), "accepted")
+    if was == "placed" and to in ("accepted", "preparing"):
+        # Stock is deducted once, when the kitchen accepts (decision D22).
+        await inventory_svc.consume_order(session, o, ctx.user_id)
+        if o.order_type != "paid_preorder":
+            await sla_svc.start(session, o, o.accepted_at or _now(), "accepted")
     elif to == "served":
         await sla_svc.finish(session, o, "served", o.served_at or _now())
     await session.commit()
+    await inventory_svc.flush_alerts(session)
     await _changed(o)
     if to == "ready" and o.customer_id:
         await notify_guest(
@@ -798,6 +803,7 @@ async def staff_cancel(session: AsyncSession, ctx: TenantContext, order_id: uuid
     _set(session, o, "cancelled", ctx.user_id, reason or None)
     o.cancel_reason = reason.strip() or "Cancelled by the restaurant"
     await sla_svc.finish(session, o, "cancelled", o.cancelled_at or _now())
+    await inventory_svc.reverse_order(session, o, ctx.user_id)  # puts back what Accept deducted
     write_audit(
         session,
         action="order.cancelled",

@@ -1,0 +1,252 @@
+<header class="page-head">
+  <div>
+    <h1>Inventory</h1>
+    <p class="muted">
+      @if (stock()) {
+        Stock value {{ price(totals().value) }}
+        @if (totals().low) { · <b class="warn">{{ totals().low }} low</b> }
+        @if (totals().out) { · <b class="bad">{{ totals().out }} out</b> }
+      } @else {
+        Raw materials and stock per branch
+      }
+    </p>
+  </div>
+  <div class="head-tools">
+    @if (branches().length > 1) {
+      <label class="field">
+        <span>Branch</span>
+        <select [value]="branchId() ?? ''" (change)="selectBranch($any($event.target).value)" aria-label="Branch" data-testid="inv-branch">
+          @for (b of branches(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+        </select>
+      </label>
+    }
+    @if (canAdjust()) {
+      <button mat-flat-button (click)="editItem(null)" data-testid="new-inventory-item"><mat-icon>add</mat-icon>New item</button>
+    }
+  </div>
+</header>
+
+@if (error(); as e) {
+  @if (e.status === 402) {
+    <wl-empty-state icon="workspace_premium" title="Inventory is part of the Professional plan" message="Upgrade to track stock, suppliers and recipes." />
+  } @else {
+    <wl-error-state title="Could not load inventory" [message]="e.message" (retry)="reload()" />
+  }
+} @else if (!stock()) {
+  <wl-loading-state />
+} @else {
+  <mat-tab-group animationDuration="150ms" mat-stretch-tabs="false">
+    <!-- ---------------- Stock ---------------- -->
+    <mat-tab label="Stock">
+      <div class="toolbar">
+        <label class="field grow"><span>Search</span>
+          <input type="search" [value]="search()" (input)="search.set($any($event.target).value)" placeholder="Item, SKU or category"
+                 data-testid="inv-search" /></label>
+        <label class="field"><span>Show</span>
+          <select [value]="stateFilter()" (change)="stateFilter.set($any($event.target).value)">
+            <option value="all">All items</option><option value="low">Low &amp; out</option><option value="out">Out of stock</option>
+          </select></label>
+      </div>
+      @if (!stock()!.length) {
+        <wl-empty-state icon="inventory_2" title="No inventory items yet"
+                        message="Add raw materials like paneer, flour or milk, then record their opening stock." />
+      } @else {
+        <div class="scroll">
+          <table class="table stock" data-testid="stock-table">
+            <thead>
+              <tr><th>Item</th><th class="num">In stock</th><th class="num">Reorder at</th><th class="num">Avg cost</th>
+                <th class="num">Value</th><th><span class="sr-only">Actions</span></th></tr>
+            </thead>
+            <tbody>
+              @for (r of shown(); track r.item_id) {
+                <tr [attr.data-state]="r.state" data-testid="stock-row">
+                  <td>
+                    <b>{{ r.name }}</b>
+                    @if (r.state !== 'ok') {
+                      <span class="chip" [attr.data-state]="r.state">{{ r.state === 'out' ? 'Out of stock' : 'Low' }}</span>
+                    }
+                    <br /><small class="muted">{{ r.category_name ?? 'Uncategorised' }}{{ r.sku ? ' · ' + r.sku : '' }}{{ r.storage_location ? ' · ' + r.storage_location : '' }}</small>
+                  </td>
+                  <td class="num" data-testid="stock-on-hand">{{ qty(r.on_hand) }} {{ r.unit }}</td>
+                  <td class="num">{{ +r.reorder_level ? qty(r.reorder_level) + ' ' + r.unit : '—' }}</td>
+                  <td class="num">{{ price(r.avg_cost) }}</td>
+                  <td class="num">{{ price(r.value) }}</td>
+                  <td class="actions">
+                    @if (canAdjust()) {
+                      <button mat-stroked-button (click)="move(r)" data-testid="stock-change">Change</button>
+                    }
+                    <button mat-icon-button [matMenuTriggerFor]="m" aria-label="More for {{ r.name }}"><mat-icon>more_vert</mat-icon></button>
+                    <mat-menu #m="matMenu">
+                      <button mat-menu-item (click)="history(r)"><mat-icon>history</mat-icon>History</button>
+                      @if (canAdjust()) {
+                        <button mat-menu-item (click)="move(r, 'wastage')"><mat-icon>delete_sweep</mat-icon>Record wastage</button>
+                        <button mat-menu-item (click)="move(r, 'adjustment')"><mat-icon>fact_check</mat-icon>Count correction</button>
+                        @if (itemOf(r.item_id); as it) {
+                          <button mat-menu-item (click)="editItem(it)"><mat-icon>edit</mat-icon>Edit item</button>
+                        }
+                      }
+                    </mat-menu>
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="6" class="muted">Nothing matches.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </mat-tab>
+
+    <!-- ---------------- Alerts ---------------- -->
+    <mat-tab [label]="'Alerts' + (alertCount() ? ' (' + alertCount() + ')' : '')">
+      @if (alerts(); as a) {
+        @if (!a.low.length && !a.out.length && !a.expiring.length) {
+          <wl-empty-state icon="task_alt" title="All good" message="Nothing is low, out of stock or expiring this week." />
+        }
+        @for (g of bySupplier(); track g.name) {
+          <section class="panel alert-group" data-testid="alert-group">
+            <header>
+              <h2>{{ g.name }}</h2>
+              @if (canPurchase()) {
+                <button mat-flat-button (click)="orderFor(g.rows)" data-testid="order-suggested"><mat-icon>shopping_cart</mat-icon>Create purchase order</button>
+              }
+            </header>
+            <table class="table">
+              <thead><tr><th>Item</th><th class="num">In stock</th><th class="num">Reorder at</th><th class="num">Suggested order</th></tr></thead>
+              <tbody>
+                @for (r of g.rows; track r.item_id) {
+                  <tr [attr.data-state]="r.state">
+                    <td>{{ r.name }} <span class="chip" [attr.data-state]="r.state">{{ r.state === 'out' ? 'Out' : 'Low' }}</span></td>
+                    <td class="num">{{ qty(r.on_hand) }} {{ r.unit }}</td>
+                    <td class="num">{{ qty(r.reorder_level) }} {{ r.unit }}</td>
+                    <td class="num"><b>{{ qty(r.suggested_quantity) }} {{ r.unit }}</b></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </section>
+        }
+        @if (a.expiring.length) {
+          <section class="panel">
+            <h2>Expiring soon</h2>
+            <table class="table" data-testid="expiring">
+              <thead><tr><th>Item</th><th class="num">Batch</th><th>Expires</th><th class="num">In stock now</th></tr></thead>
+              <tbody>
+                @for (e of a.expiring; track $index) {
+                  <tr [attr.data-state]="e.days_left < 0 ? 'out' : 'low'">
+                    <td>{{ e.name }}</td><td class="num">{{ qty(e.quantity) }} {{ e.unit }}</td>
+                    <td>{{ e.expiry_date | date: 'd MMM' }} · {{ e.days_left < 0 ? 'expired' : e.days_left === 0 ? 'today' : 'in ' + e.days_left + ' days' }}</td>
+                    <td class="num">{{ qty(e.on_hand) }} {{ e.unit }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            <p class="hint">Record what you throw away as wastage so the stock stays right.</p>
+          </section>
+        }
+      } @else {
+        <wl-loading-state />
+      }
+    </mat-tab>
+
+    <!-- ---------------- Transfers ---------------- -->
+    @if (branches().length > 1) {
+      <mat-tab label="Transfers">
+        <div class="toolbar">
+          <p class="muted grow">Stock leaves when sent and arrives only when the other branch presses <b>Receive</b>.</p>
+          @if (canTransfer()) {
+            <button mat-flat-button (click)="newTransfer()" data-testid="new-transfer"><mat-icon>local_shipping</mat-icon>Send stock</button>
+          }
+        </div>
+        @if (transfers(); as list) {
+          @if (!list.length) { <p class="muted">No transfers yet.</p> }
+          <ul class="rows">
+            @for (t of list; track t.id) {
+              <li class="row" data-testid="transfer-row">
+                <span class="row__lead">{{ t.number }}</span>
+                <div class="row__main">
+                  <div><b>{{ t.from_branch_name }} → {{ t.to_branch_name }}</b>
+                    <span class="badge" [attr.data-status]="t.status === 'in_transit' ? 'notified' : t.status === 'received' ? 'seated' : 'cancelled'">
+                      {{ transferLabel[t.status] }}</span></div>
+                  <span class="muted">{{ t.created_at | date: 'd MMM, HH:mm' }} ·
+                    @for (l of t.items; track l.item_id) { {{ qty(l.quantity) }} {{ l.unit }} {{ l.name }}{{ $last ? '' : ', ' }} }</span>
+                  @if (t.notes) { <span class="muted">{{ t.notes }}</span> }
+                </div>
+                <div class="row__actions">
+                  @if (t.status === 'in_transit' && canTransfer()) {
+                    @if (t.to_branch_id === branchId()) {
+                      <button mat-flat-button (click)="finishTransfer(t, 'receive')" data-testid="receive-transfer">Receive</button>
+                    } @else {
+                      <button mat-button (click)="finishTransfer(t, 'cancel')">Cancel</button>
+                    }
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      </mat-tab>
+    }
+
+    <!-- ---------------- Items ---------------- -->
+    <mat-tab label="Items">
+      <table class="table" data-testid="items-table">
+        <thead><tr><th>Item</th><th>Unit</th><th>Category</th><th>Supplier</th><th class="num">Price</th><th></th></tr></thead>
+        <tbody>
+          @for (i of items(); track i.id) {
+            <tr [class.inactive]="!i.is_active">
+              <td><b>{{ i.name }}</b>{{ i.sku ? ' · ' + i.sku : '' }}@if (!i.is_active) { <span class="chip">Inactive</span> }
+                @if (i.tracks_expiry) { <span class="chip">Expiry</span> }</td>
+              <td>{{ i.unit }}</td><td>{{ i.category_name ?? '—' }}</td><td>{{ i.supplier_name ?? '—' }}</td>
+              <td class="num">{{ price(i.purchase_price) }} / {{ i.unit }}</td>
+              <td class="actions">
+                @if (canAdjust()) { <button mat-icon-button (click)="editItem(i)" [attr.aria-label]="'Edit ' + i.name"><mat-icon>edit</mat-icon></button> }
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="6" class="muted">No items yet.</td></tr>
+          }
+        </tbody>
+      </table>
+    </mat-tab>
+
+    <!-- ---------------- Reports ---------------- -->
+    <mat-tab label="Reports">
+      <form class="toolbar" (ngSubmit)="runReport()">
+        <label class="field"><span>Report</span>
+          <select name="kind" [(ngModel)]="reportKind" data-testid="report-kind">
+            @for (r of reports; track r.kind) { <option [value]="r.kind">{{ r.label }}</option> }
+          </select></label>
+        @if (isDated(reportKind)) {
+          <label class="field"><span>From</span><input name="from" type="date" [(ngModel)]="reportFrom" /></label>
+          <label class="field"><span>To</span><input name="to" type="date" [(ngModel)]="reportTo" /></label>
+        }
+        <button mat-flat-button type="submit" data-testid="run-report">Show</button>
+        @if (report()) {
+          <button mat-stroked-button type="button" (click)="exportCsv()" data-testid="export-csv"><mat-icon>download</mat-icon>CSV</button>
+        }
+      </form>
+      @if (report(); as r) {
+        <h2 class="report-title">{{ r.title }}</h2>
+        @if (!r.rows.length) { <p class="muted">No rows for this report.</p> }
+        @else {
+          <div class="scroll">
+            <table class="table" data-testid="report-table">
+              <thead><tr>@for (c of r.columns; track c) { <th>{{ c }}</th> }</tr></thead>
+              <tbody>
+                @for (row of r.rows; track $index) {
+                  <tr>@for (v of row; track $index) { <td>{{ v ?? '—' }}</td> }</tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @if (totalsList(r).length) {
+          <p class="report-totals">@for (t of totalsList(r); track t[0]) { <span>{{ t[0] }}: <b>{{ price(t[1]) }}</b></span> }</p>
+        }
+      } @else {
+        <p class="muted">Choose a report and press Show. Every report can be downloaded as CSV for Excel.</p>
+      }
+    </mat-tab>
+  </mat-tab-group>
+}

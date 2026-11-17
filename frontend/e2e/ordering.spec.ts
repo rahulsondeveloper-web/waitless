@@ -14,7 +14,10 @@ async function ownerToken(request: APIRequestContext): Promise<string> {
 }
 
 /** Seat guests at any free table through the API → { code, pin, label }. */
-async function seatGuests(request: APIRequestContext, guest: string): Promise<{ code: string; pin: string; label: string }> {
+async function seatGuests(
+  request: APIRequestContext,
+  guest: string,
+): Promise<{ code: string; pin: string; label: string; release: () => Promise<void> }> {
   const token = await ownerToken(request);
   const headers = { Authorization: `Bearer ${token}` };
   const me = await (await request.get('/api/v1/restaurant/me', { headers })).json();
@@ -28,7 +31,12 @@ async function seatGuests(request: APIRequestContext, guest: string): Promise<{ 
     });
     if (r.status() === 201) {
       const s = await r.json();
-      return { code: s.session.public_code, pin: s.pin, label: t.label };
+      const release = async () => {
+        // Guests left: free the table so later tests (and the other device project) find one.
+        await request.post(`/api/v1/restaurant/table-sessions/${s.session.id}/close`, { headers });
+        await request.patch(`/api/v1/restaurant/tables/${t.id}/status`, { headers, data: { status: 'available' } });
+      };
+      return { code: s.session.public_code, pin: s.pin, label: t.label, release };
     }
   }
   throw new Error('no free table');
@@ -91,6 +99,7 @@ test('guest enters the order ID + PIN, orders, and follows it live to Served', a
   await expect(order.getByTestId('serving-timer')).toHaveText(/Served in \d+ min/);
   await expect(page.getByTestId('table-total')).not.toHaveText('₹0');
   await kitchen.context().close();
+  await seated.release();
 });
 
 test('waiter places an order for a seated table from the Orders page', async ({ page, browser }) => {
@@ -112,6 +121,7 @@ test('waiter places an order for a seated table from the Orders page', async ({ 
   await expect(row).toContainText('Sent to kitchen');
   await expect(row).toContainText(seated.code);
   await staff.context().close();
+  await seated.release();
 });
 
 test('owner sees the serving-time discount policy and what guests get', async ({ browser }) => {

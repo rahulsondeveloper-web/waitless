@@ -177,7 +177,7 @@ export const routes: Routes = [
     children: adminChildren(
       RESTAURANT_ADMIN_NAV,
       {
-        profile: 3, branding: 3, gallery: 3, inventory: 9, suppliers: 9, purchases: 9,
+        profile: 3, branding: 3, gallery: 3,
         billing: 10, payments: 10, reports: 11, settings: 10,
       },
       {
@@ -234,6 +234,21 @@ export const routes: Routes = [
           path: 'kitchen',
           title: 'Kitchen · WaitLess',
           loadComponent: () => import('./features/restaurant-admin/kitchen/kitchen.page').then((m) => m.KitchenPage),
+        },
+        inventory: {
+          path: 'inventory',
+          title: 'Inventory · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/inventory/inventory.page').then((m) => m.InventoryPage),
+        },
+        suppliers: {
+          path: 'suppliers',
+          title: 'Suppliers · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/suppliers/suppliers.page').then((m) => m.SuppliersPage),
+        },
+        purchases: {
+          path: 'purchases',
+          title: 'Purchases · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/purchases/purchases.page').then((m) => m.PurchasesPage),
         },
         discounts: {
           path: 'discounts',
