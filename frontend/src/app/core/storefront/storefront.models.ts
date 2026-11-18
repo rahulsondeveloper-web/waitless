@@ -196,13 +196,16 @@ export const SOCIAL_LABELS: Partial<Record<string, string>> = {
 
 /**
  * The category card photo: the owner's own, or the template's default for that kind of category
- * (Starters, Main course, Soups, Salads, Desserts, Beverages — the Remelle template's menu section).
+ * (Starters, Main course, Soups, Salads, Desserts, Beverages — the Remelle template's menu section;
+ * Pizzas and the bar have their own photos too).
  */
 export function categoryImage(name: string, imageUrl: string | null | undefined): string {
   if (imageUrl) return imageUrl;
   const n = name.toLowerCase();
   const pick = (k: string) => `menu-categories/${k}.jpg`;
-  if (/(drink|beverage|juice|coffee|tea|shake|mocktail|cocktail|bar|wine|beer|lassi|smoothie)/.test(n)) return pick('beverages');
+  if (/(non[- ]?alcoholic|mocktail|drink|beverage|juice|coffee|tea|shake|lassi|smoothie|soda|water)/.test(n)) return pick('beverages');
+  if (/(alcohol|cocktail|\bbar\b|wine|beer|whisk|vodka|\brum\b|\bgin\b|spirit|liquor)/.test(n)) return pick('bar');
+  if (/(pizza)/.test(n)) return pick('pizza');
   if (/(dessert|sweet|cake|ice ?cream|bakery|pastr|mithai|kulfi)/.test(n)) return pick('desserts');
   if (/(soup|shorba)/.test(n)) return pick('soups');
   if (/(salad|green|bowl)/.test(n)) return pick('salads');
