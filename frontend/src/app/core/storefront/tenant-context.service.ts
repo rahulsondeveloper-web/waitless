@@ -1,8 +1,10 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Observable, Subscription, catchError, map, of, shareReplay, tap, throwError } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
 import { ApiError } from '../http/api-error';
+import { HttpCacheService } from '../http/http-cache.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { ThemeService } from '../theme/theme.service';
 import { StorefrontApi } from './storefront.api';
 import { Gallery, MenuQuery, PublicItemsPage, PublicMenu, Storefront } from './storefront.models';
@@ -22,6 +24,10 @@ export class TenantContextService {
   private readonly api = inject(StorefrontApi);
   private readonly theme = inject(ThemeService);
   private readonly auth = inject(AuthService);
+  private readonly cache = inject(HttpCacheService);
+  private readonly realtime = inject(RealtimeService);
+  private readonly _version = signal(0);
+  private changeTimer: ReturnType<typeof setTimeout> | undefined;
 
   private readonly _slug = signal<string | null>(null);
   private readonly _restaurant = signal<Storefront | null>(null);
@@ -38,10 +44,47 @@ export class TenantContextService {
   /** True when an owner is looking at their own unpublished storefront. */
   readonly preview = this._preview.asReadonly();
   readonly error = this._error.asReadonly();
+  /** Bumps when this restaurant's public data changed (server push) — pages reload what they show. */
+  readonly version = this._version.asReadonly();
   readonly primaryBranch = computed(() => {
     const r = this._restaurant();
     return r?.branches.find((b) => b.is_primary) ?? r?.branches[0] ?? null;
   });
+
+  constructor() {
+    this.realtime.on<{ slug?: string }>('storefront.changed', (e) => {
+      if (!e?.slug || e.slug !== this._slug()) return;
+      // An owner saving several dishes in a row: one refresh for the burst, not one per save.
+      clearTimeout(this.changeTimer);
+      this.changeTimer = setTimeout(() => this.changed(), 800);
+    });
+    effect(() => {
+      if (this.realtime.reconnects() === 0) return;
+      untracked(() => {
+        this.cache.markAllStale(); // a push may have been missed while offline
+        if (this._slug()) this.changed();
+      });
+    });
+  }
+
+  /** The restaurant edited something: forget kept copies, refresh the profile/theme, tell pages. */
+  private changed(): void {
+    const slug = this._slug();
+    if (!slug) return;
+    this.cache.invalidate(slug);
+    this.menu$ = undefined;
+    this.gallery$ = undefined;
+    const src = this._preview() ? this.api.previewStorefront() : this.api.storefront(slug);
+    src.subscribe({
+      next: (r) => {
+        if (this._slug() !== slug) return;
+        this._restaurant.set(r);
+        this.theme.applyBranding(r.branding);
+      },
+      error: () => undefined, // keep showing what we have; the next change or reload tries again
+    });
+    this._version.update((v) => v + 1);
+  }
 
   enter(slug: string): void {
     const clean = slug.toLowerCase();
@@ -49,6 +92,7 @@ export class TenantContextService {
     this.clear();
     this._slug.set(clean);
     this._status.set('loading');
+    void this.realtime.subscribeStorefront(clean); // "something changed" pings → cached copies refresh
 
     this.loadSub = this.api
       .storefront(clean)
@@ -138,6 +182,9 @@ export class TenantContextService {
   }
 
   private clear(): void {
+    const prev = this._slug();
+    if (prev) this.realtime.unsubscribeStorefront(prev);
+    clearTimeout(this.changeTimer);
     this.loadSub?.unsubscribe();
     this.loadSub = undefined;
     this.menu$ = undefined;

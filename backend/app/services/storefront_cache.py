@@ -14,6 +14,11 @@ def cache_key(slug: str, part: str = "") -> str:
     return f"storefront:{slug.lower()}{part}"
 
 
+def storefront_room(slug: str) -> str:
+    """Socket.IO room of everyone viewing a restaurant's public pages (no sign-in needed)."""
+    return f"storefront:{slug.lower()}"
+
+
 async def invalidate_storefront(slug: str) -> None:
     client = get_redis()
     if client is not None:
@@ -21,6 +26,10 @@ async def invalidate_storefront(slug: str) -> None:
             await client.delete(*(cache_key(slug, p) for p in PARTS))
         except Exception:
             pass
+    # Open storefront pages drop their browser cache and fetch again (HttpCacheService in the frontend).
+    from app.websocket.bus import emit
+
+    await emit("storefront.changed", {"slug": slug.lower()}, storefront_room(slug))
 
 
 async def cache_get(key: str) -> str | None:

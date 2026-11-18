@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, effect, untracked } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
 import { ApiError } from '../../../core/http/api-error';
@@ -131,6 +131,17 @@ export class StorefrontGalleryPage implements OnInit {
   protected readonly images = computed<LightboxImage[]>(
     () => this.gallery()?.items.map((i) => ({ url: i.url, caption: i.caption, width: i.width, height: i.height })) ?? [],
   );
+
+  constructor() {
+    // The restaurant changed its photos (server push): reload without the spinner.
+    let seen = this.ctx.version();
+    effect(() => {
+      const v = this.ctx.version();
+      if (v === seen) return;
+      seen = v;
+      untracked(() => this.load());
+    });
+  }
 
   ngOnInit(): void {
     this.load();

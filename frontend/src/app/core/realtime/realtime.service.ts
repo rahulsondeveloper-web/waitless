@@ -22,11 +22,14 @@ export class RealtimeService implements OnDestroy {
   private readonly handlers = new Map<string, Set<(...args: any[]) => void>>();
   private readonly _status = signal<RealtimeStatus>('idle');
   private readonly _offsetMs = signal(0);
+  private readonly _reconnects = signal(0);
 
   readonly status = this._status.asReadonly();
   readonly connected = computed(() => this._status() === 'connected');
   /** serverNow = Date.now() + clockOffsetMs() */
   readonly clockOffsetMs = this._offsetMs.asReadonly();
+  /** Bumps on every reconnect: pushes may have been missed while offline. */
+  readonly reconnects = this._reconnects.asReadonly();
 
   /** Anonymous connection (public pages). Upgraded automatically when a room needs a signed-in user. */
   connect(): void {
@@ -59,6 +62,15 @@ export class RealtimeService implements OnDestroy {
 
   unsubscribeQueue(tenantId: string, branchId: string): void {
     this.leave(`queue:${branchId}`, { kind: 'branch_queue', tenant_id: tenantId, branch_id: branchId });
+  }
+
+  /** Public "this restaurant's pages changed" pings (menu, profile, gallery…) — no data at all. */
+  subscribeStorefront(slug: string): Promise<boolean> {
+    return this.join(`storefront:${slug}`, { kind: 'storefront', slug }, false);
+  }
+
+  unsubscribeStorefront(slug: string): void {
+    this.leave(`storefront:${slug}`, { kind: 'storefront', slug });
   }
 
   /** Guests at a table: live order updates, authorised by the table token (no account needed). */
@@ -124,8 +136,13 @@ export class RealtimeService implements OnDestroy {
       transports: ['websocket', 'polling'],
     });
     for (const [event, set] of this.handlers) for (const h of set) this.socket.on(event, h);
+    // Only a reconnect of the *same* socket can have missed pushes (replacing an anonymous socket by a
+    // signed-in one happens in milliseconds and is not counted).
+    let connectedBefore = false;
     this.socket.on('connect', () => {
       this._status.set('connected');
+      if (connectedBefore) this._reconnects.update((n) => n + 1);
+      connectedBefore = true;
       this.syncClock();
       for (const payload of this.rooms.values()) void this.emitSubscribe(payload);
     });

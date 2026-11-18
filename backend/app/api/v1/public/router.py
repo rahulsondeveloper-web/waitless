@@ -1,9 +1,10 @@
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Path, Query, status
+from fastapi import APIRouter, Path, Query, Request, Response, status
 
 from app.api.deps import ClientDep, SessionDep
+from app.api.http_cache import etagged
 from app.core import rate_limit
 from app.core.config import get_settings
 from app.schemas.discovery import ContactRequest, ContactResponse, DiscoveryFilters, DiscoveryPage
@@ -92,13 +93,15 @@ MenuSearch = Annotated[str, Query(max_length=60)]
 async def storefront_menu(
     slug: Annotated[str, Path(max_length=60)],
     session: SessionDep,
+    request: Request,
     limit: MenuLimit = None,
     veg: VegOnly = False,
     q: MenuSearch = "",
-) -> PublicMenu:
+) -> Response:
     """Without `limit` every dish is returned. With it, each category carries its first `limit` dishes and
-    `item_count`; the storefront loads the rest in batches while the guest scrolls."""
-    return profile_service.page_menu(await profile_service.public_menu(session, slug), limit=limit, veg=veg, q=q)
+    `item_count`; the storefront loads the rest in batches while the guest scrolls. ETag / 304 supported."""
+    menu = await profile_service.public_menu(session, slug)
+    return etagged(request, profile_service.page_menu(menu, limit=limit, veg=veg, q=q))
 
 
 @router.get(
@@ -110,13 +113,14 @@ async def storefront_menu_items(
     slug: Annotated[str, Path(max_length=60)],
     category_id: uuid.UUID,
     session: SessionDep,
+    request: Request,
     offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
     veg: VegOnly = False,
     q: MenuSearch = "",
-) -> PublicItemsPage:
+) -> Response:
     menu = await profile_service.public_menu(session, slug)
-    return profile_service.page_items(menu, category_id, offset=offset, limit=limit, veg=veg, q=q)
+    return etagged(request, profile_service.page_items(menu, category_id, offset=offset, limit=limit, veg=veg, q=q))
 
 
 @router.get(
@@ -124,18 +128,22 @@ async def storefront_menu_items(
     response_model=StorefrontOut,
     summary="Public storefront: profile, branding, branches with hours, social links (published restaurants only)",
 )
-async def storefront(slug: Annotated[str, Path(max_length=60)], session: SessionDep) -> StorefrontOut:
-    return await profile_service.public_storefront(session, slug)
+async def storefront(slug: Annotated[str, Path(max_length=60)], session: SessionDep, request: Request) -> Response:
+    return etagged(request, await profile_service.public_storefront(session, slug))
 
 
 @router.get("/restaurants/{slug}/branding", response_model=BrandingOut, summary="Logo and theme tokens")
-async def storefront_branding(slug: Annotated[str, Path(max_length=60)], session: SessionDep) -> BrandingOut:
-    return await profile_service.public_branding(session, slug)
+async def storefront_branding(
+    slug: Annotated[str, Path(max_length=60)], session: SessionDep, request: Request
+) -> Response:
+    return etagged(request, await profile_service.public_branding(session, slug))
 
 
 @router.get("/restaurants/{slug}/gallery", response_model=GalleryOut, summary="Gallery photos (up to 5)")
-async def storefront_gallery(slug: Annotated[str, Path(max_length=60)], session: SessionDep) -> GalleryOut:
-    return await profile_service.public_gallery(session, slug)
+async def storefront_gallery(
+    slug: Annotated[str, Path(max_length=60)], session: SessionDep, request: Request
+) -> Response:
+    return etagged(request, await profile_service.public_gallery(session, slug))
 
 
 @router.get("/slug-availability", response_model=SlugAvailability, summary="Check a restaurant web address")

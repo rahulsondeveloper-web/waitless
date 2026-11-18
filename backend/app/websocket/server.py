@@ -6,6 +6,7 @@ Authentication (PRD §24 "authorize every connection and subscription"):
 """
 
 import logging
+import re
 import uuid
 from datetime import UTC, datetime
 
@@ -19,6 +20,7 @@ from app.models import Branch
 from app.services.access import load_tenant_context
 from app.services.notify import user_room
 from app.services.orders import table_session_room
+from app.services.storefront_cache import storefront_room
 from app.websocket.bus import NAMESPACE, branch_queue_room, branch_staff_room, set_server
 
 log = logging.getLogger(__name__)
@@ -32,6 +34,14 @@ def _client_manager() -> socketio.AsyncManager | None:
     if settings.redis_enabled:
         return socketio.AsyncRedisManager(settings.redis_url)
     return None  # in-memory, single process
+
+
+_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,59}$")
+
+
+def _slug(value: object) -> str | None:
+    s = str(value or "").strip().lower()
+    return s if _SLUG.match(s) else None
 
 
 async def authorize_branch_room(user_id: uuid.UUID, tenant_id: uuid.UUID, branch_id: uuid.UUID) -> bool:
@@ -79,10 +89,19 @@ def create_socket_server() -> socketio.AsyncServer:
 
     @sio.on("subscribe", namespace=NAMESPACE)
     async def subscribe(sid: str, data: dict | None = None) -> dict:
-        """Rooms: branch_staff (staff of a branch), user (my own notifications), branch_queue (public)."""
+        """Rooms: branch_staff (staff of a branch), user (my own notifications), branch_queue and
+        storefront (public)."""
         identity = await sio.get_session(sid, namespace=NAMESPACE)
         data = data or {}
         kind = data.get("kind")
+        if kind == "storefront":
+            # Public: only ever says "this restaurant's public pages changed" (no data at all).
+            slug = _slug(data.get("slug"))
+            if slug is None:
+                return {"ok": False, "error": "INVALID_SLUG"}
+            room = storefront_room(slug)
+            await sio.enter_room(sid, room, namespace=NAMESPACE)
+            return {"ok": True, "room": room}
         if kind == "branch_queue":
             # Public: only says "the queue changed" (no personal data); clients then refetch their token.
             try:
@@ -126,7 +145,12 @@ def create_socket_server() -> socketio.AsyncServer:
         identity = await sio.get_session(sid, namespace=NAMESPACE)
         data = data or {}
         try:
-            if data.get("kind") == "branch_queue":
+            if data.get("kind") == "storefront":
+                slug = _slug(data.get("slug"))
+                if slug is None:
+                    return {"ok": False}
+                room = storefront_room(slug)
+            elif data.get("kind") == "branch_queue":
                 room = branch_queue_room(uuid.UUID(str(data.get("tenant_id"))), uuid.UUID(str(data.get("branch_id"))))
             elif data.get("kind") == "table_session":
                 claims = decode_table_token(str(data.get("token") or ""))

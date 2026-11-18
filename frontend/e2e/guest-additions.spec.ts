@@ -202,3 +202,54 @@ test('a long category shows 10 dishes first and loads the rest in batches while 
     for (const id of ids) await page.request.post(`/api/v1/restaurant/menu/items/${id}/archive`, { headers });
   }
 });
+
+test('storefront data is cached in the browser and refreshed only when the restaurant changes it', async ({ page }, info) => {
+  test.setTimeout(90_000);
+  const { headers } = await api(page.request);
+  const menuCalls: number[] = [];
+  page.on('response', (r) => {
+    if (/\/api\/v1\/public\/restaurants\/[^/]+\/menu\?/.test(r.url())) menuCalls.push(r.status());
+  });
+  // Other tests edit this restaurant at the same time; each edit is pushed and correctly refetched.
+  let pushes = 0;
+  page.on('websocket', (ws) => ws.on('framereceived', (f) => String(f.payload).includes('storefront.changed') && pushes++));
+
+  await page.goto(`/r/${SLUG}/menu`);
+  await expect(page.getByTestId('menu-spread').first()).toBeVisible();
+  expect(menuCalls[0]).toBe(200);
+  await page.waitForTimeout(500);
+
+  // Moving around the site and back: no new menu request (beyond refetches caused by pushes meanwhile).
+  const callsBefore = menuCalls.length;
+  const pushesBefore = pushes;
+  await page.getByRole('link', { name: 'Enter your order ID' }).click(); // in-app navigation, no reload
+  await expect(page).toHaveURL(/\/session$/);
+  await page.goBack();
+  await expect(page.getByTestId('menu-spread').first()).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(menuCalls.length - callsBefore).toBeLessThanOrEqual(pushes - pushesBefore);
+
+  // The owner adds a dish: the open page updates by itself (server push → fetch again).
+  const menu = await (await page.request.get('/api/v1/restaurant/menu', { headers })).json();
+  const starters = menu.categories.find((c: { name: string }) => c.name === 'Starters');
+  const name = `Pushed Dish ${info.project.name} ${Date.now() % 100000}`;
+  const created = await page.request.post('/api/v1/restaurant/menu/items', {
+    headers,
+    data: { category_id: starters.id, name, base_price: '99' },
+  });
+  try {
+    await expect(page.getByRole('heading', { name })).toBeVisible({ timeout: 15_000 });
+    expect(menuCalls.at(-1)).toBe(200);
+
+    // A reload checks the kept copy with its ETag (unchanged → empty 304; another test may have changed
+    // the menu meanwhile → 200). Either way the browser asked "has it changed?", not "send everything".
+    menuCalls.length = 0;
+    const asked = page.waitForRequest((r) => /\/public\/restaurants\/[^/]+\/menu\?/.test(r.url()));
+    await page.reload();
+    expect((await asked).headers()['if-none-match']).toMatch(/^W\/"/);
+    await expect(page.getByRole('heading', { name })).toBeVisible();
+    expect([200, 304]).toContain(menuCalls[0]);
+  } finally {
+    await page.request.post(`/api/v1/restaurant/menu/items/${(await created.json()).id}/archive`, { headers });
+  }
+});

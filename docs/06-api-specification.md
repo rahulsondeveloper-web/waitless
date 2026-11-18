@@ -44,6 +44,8 @@ Auth column legend: **P** public · **C** customer · **S:perm** staff with perm
 | GET | `/public/restaurants/{slug}/gallery` | Up to 5 images |
 | GET | `/public/restaurants/{slug}/menu` | `?limit=&veg=&q=` — without `limit` every dish; with it the first `limit` (1–100) per category plus `item_count`, and `marks` (legend marks used on the whole menu). `veg`/`q` filter on the server; categories without a match are left out |
 | GET | `/public/restaurants/{slug}/menu/categories/{id}/items` | `?offset=&limit=10&veg=&q=` — the next batch `{category_id, offset, total, items}` (storefront loads it when the 8th of 10 dishes scrolls into view). Owner preview: `/restaurant/storefront/menu[/categories/{id}/items]` with the same parameters |
+
+Storefront reads (`/public/restaurants/{slug}`, `/branding`, `/gallery`, `/menu`, `/menu/categories/{id}/items`) return an `ETag` and `Cache-Control: no-cache, private`; send `If-None-Match` to get an empty **304** when nothing changed. Changes are pushed on Socket.IO: `subscribe {kind: "storefront", slug}` (public) → `storefront.changed {slug}`.
 | GET | `/public/restaurants/{slug}/booking-options` | Per branch: queue/reservations on, free/paid, fee, party range, grace, cancel window *(Phase 6)* |
 | GET | `/public/restaurants/{slug}/availability` | `?branch_id=&date=&party=` → time slots (available or full) in the branch time zone *(Phase 6)* |
 | GET | `/public/restaurants/{slug}/wait-time` | `?branch_id=&party=` → waiting parties, estimated minutes, free tables *(Phase 6)* |

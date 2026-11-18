@@ -388,3 +388,56 @@ async def test_public_menu_in_batches_with_filters(client: httpx.AsyncClient) ->
 
     preview = (await client.get("/api/v1/restaurant/storefront/menu", params={"limit": 10}, headers=h)).json()
     assert _cat(preview, "Main Course")["item_count"] == 25
+
+
+async def test_storefront_reads_are_etagged_and_changes_are_pushed(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Browsers keep storefront data: unchanged → empty 304; an owner edit changes the ETag and is pushed."""
+    from app.websocket import bus
+
+    pushed: list[tuple[str, dict, str]] = []
+
+    async def fake_emit(event: str, data: dict, room: str) -> None:
+        pushed.append((event, data, room))
+
+    monkeypatch.setattr(bus, "emit", fake_emit)
+    await create_super_admin()
+    admin = bearer(await login(client, "admin@waitless.test"))
+    tenant, h = await _owner(client, restaurant_name="Etag House")
+    await _publish(client, tenant, h, admin, lat="18.52", lng="73.85", city="Pune")
+    slug = (await client.get("/api/v1/restaurant/profile", headers=h)).json()["slug"]
+    urls = [
+        f"/api/v1/public/restaurants/{slug}",
+        f"/api/v1/public/restaurants/{slug}/branding",
+        f"/api/v1/public/restaurants/{slug}/gallery",
+        f"/api/v1/public/restaurants/{slug}/menu?limit=10",
+    ]
+    tags = {}
+    for url in urls:
+        r = await client.get(url)
+        assert r.status_code == 200 and r.headers["etag"].startswith('W/"'), url
+        assert r.headers["cache-control"] == "no-cache, private"
+        tags[url] = r.headers["etag"]
+        again = await client.get(url, headers={"If-None-Match": tags[url]})
+        assert again.status_code == 304 and again.content == b"" and again.headers["etag"] == tags[url]
+        strong = await client.get(url, headers={"If-None-Match": tags[url].removeprefix("W/")})
+        assert strong.status_code == 304  # weak comparison
+    menu_url = urls[3]
+    cat = _cat((await client.get(menu_url)).json(), "Starters")
+    items_url = f"/api/v1/public/restaurants/{slug}/menu/categories/{cat['id']}/items"
+    items_tag = (await client.get(items_url)).headers["etag"]
+    assert (await client.get(items_url, headers={"If-None-Match": items_tag})).status_code == 304
+
+    pushed.clear()
+    r = await client.post(
+        "/api/v1/restaurant/menu/items",
+        json={"category_id": cat["id"], "name": "Fresh Dish", "base_price": "150"},
+        headers=h,
+    )
+    assert r.status_code == 201
+    assert ("storefront.changed", {"slug": slug}, f"storefront:{slug}") in pushed
+    changed = await client.get(menu_url, headers={"If-None-Match": tags[menu_url]})
+    assert changed.status_code == 200 and changed.headers["etag"] != tags[menu_url]
+    assert "Fresh Dish" in changed.text
+    assert (await client.get(items_url, headers={"If-None-Match": items_tag})).status_code == 200

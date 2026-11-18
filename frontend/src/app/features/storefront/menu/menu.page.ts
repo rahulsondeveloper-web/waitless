@@ -1,5 +1,15 @@
 import { NgTemplateOutlet, ViewportScroller } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -158,6 +168,18 @@ export class StorefrontMenuPage implements OnInit {
     };
   });
 
+  constructor() {
+    // The restaurant edited its menu (server push): fetch again, keeping as many dishes as are shown,
+    // so the guest's scroll position and the loaded batches stay.
+    let seen = this.ctx.version();
+    effect(() => {
+      const v = this.ctx.version();
+      if (v === seen) return;
+      seen = v;
+      untracked(() => this.load(true));
+    });
+  }
+
   ngOnInit(): void {
     this.load();
     this.destroyRef.onDestroy(() => clearTimeout(this.searchTimer));
@@ -196,18 +218,20 @@ export class StorefrontMenuPage implements OnInit {
     setTimeout(() => this.toast.set(null), 2500);
   }
 
-  private menuQuery(): MenuQuery {
-    return { limit: MENU_BATCH, veg: this.vegOnly(), q: this.query() };
+  private menuQuery(limit = MENU_BATCH): MenuQuery {
+    return { limit, veg: this.vegOnly(), q: this.query() };
   }
 
-  /** First batch of every category (with the current filters). */
-  protected load(): void {
+  /** First batch of every category (with the current filters); `keep` = as many dishes as now shown. */
+  protected load(keep = false): void {
+    const shown = keep ? Math.max(0, ...(this.menu()?.categories ?? []).map((c) => c.items.length)) : 0;
+    const limit = Math.min(100, Math.max(MENU_BATCH, Math.ceil(shown / MENU_BATCH) * MENU_BATCH));
     const gen = ++this.generation;
     this.error.set(null);
     this.refreshing.set(!!this.menu());
     this.loadingMore.set(new Set());
     this.failedMore.set(new Set());
-    this.ctx.menuPage(this.menuQuery()).subscribe({
+    this.ctx.menuPage(this.menuQuery(limit)).subscribe({
       next: (m) => {
         if (gen !== this.generation) return;
         this.refreshing.set(false);

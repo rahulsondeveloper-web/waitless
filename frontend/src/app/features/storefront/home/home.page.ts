@@ -19,7 +19,11 @@ export class StorefrontHomePage {
   protected readonly ctx = inject(TenantContextService);
   protected readonly r = this.ctx.restaurant;
   protected readonly branch = this.ctx.primaryBranch;
-  protected readonly gallery = toSignal(this.ctx.gallery().pipe(catchError(() => of(null))), { initialValue: null });
+  /** Reloads when the restaurant changes its photos (ctx.version bumps on the server push). */
+  protected readonly gallery = toSignal(
+    toObservable(this.ctx.version).pipe(switchMap(() => this.ctx.gallery().pipe(catchError(() => of(null))))),
+    { initialValue: null },
+  );
   protected readonly photos = computed(() => this.gallery()?.items.slice(0, 3) ?? []);
   private readonly bookings = inject(BookingsService);
   /** Live-ish wait for the main branch (PRD §12 "estimated wait time"); hidden when unavailable. */
