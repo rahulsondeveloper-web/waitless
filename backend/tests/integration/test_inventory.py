@@ -5,8 +5,9 @@ retrying accept does not double-deduct.
 """
 
 import uuid
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -229,7 +230,8 @@ async def test_purchase_receive_pay_and_supplier_history(client: httpx.AsyncClie
 
     no_expiry = await client.post(f"{B}/purchases/{p['id']}/receive", json={}, headers=h)
     assert no_expiry.status_code == 422 and no_expiry.json()["error"]["code"] == "EXPIRY_REQUIRED"
-    soon = (date.today() + timedelta(days=3)).isoformat()
+    branch_today = datetime.now(ZoneInfo("Asia/Kolkata")).date()  # the branch's date, as the service uses
+    soon = (branch_today + timedelta(days=3)).isoformat()
     got = await client.post(
         f"{B}/purchases/{p['id']}/receive",
         json={

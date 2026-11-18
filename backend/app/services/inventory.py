@@ -946,8 +946,15 @@ async def alerts(session: AsyncSession, ctx: TenantContext, branch_id: uuid.UUID
 async def expiring(
     session: AsyncSession, branch_id: uuid.UUID, days: int, stock_rows: dict[uuid.UUID, StockRow]
 ) -> list[ExpiryRow]:
-    """Batches received with an expiry date up to `days` ahead (already expired included) while stock remains."""
-    today = _now().date()
+    """Batches received with an expiry date up to `days` ahead (already expired included) while stock remains.
+    "Today" is the branch's own date (an Indian branch just after midnight is already a day ahead of UTC)."""
+    from zoneinfo import ZoneInfo
+
+    tz = (await session.execute(select(Branch.timezone).where(Branch.id == branch_id))).scalar_one_or_none()
+    try:
+        today = _now().astimezone(ZoneInfo(tz or "Asia/Kolkata")).date()
+    except (KeyError, ValueError):
+        today = _now().date()
     rows = (
         await session.execute(
             select(InventoryMovement)
