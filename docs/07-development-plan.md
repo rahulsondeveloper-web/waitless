@@ -53,7 +53,7 @@ Note: menu **management** (categories/items CRUD) moves up into Phase 4 in a min
 
 ### Phase 6 — Queue & reservations
 - Digital queue (customer + staff), QR code per branch, live positions, wait-time estimate.
-- Reservation policies, free & paid bookings, mock + Razorpay gateway, webhook verification, arrival confirmation, expiry job with grace period, refund/forfeit rules.
+- Reservation policies, free & paid bookings, mock + Cashfree gateway (originally Razorpay), webhook verification, arrival confirmation, expiry job with grace period, refund/forfeit rules.
 - **Acceptance (tests 8, 10, 17):** free booking confirmed; paid booking confirmed only after verified webhook; duplicate webhook ignored; checked-in reservation is never expired.
 
 ### Phase 7 — Menu & ordering
@@ -108,6 +108,6 @@ Two terminals for backend (API + worker), one for frontend. A `scripts/dev.ps1` 
 ## 6. Open items for later (not blocking Phase 1)
 
 - Pricing for plans (amounts in INR).
-- Real provider accounts: Razorpay, SMS, WhatsApp, email, Google Maps key.
+- Real provider accounts: Cashfree, SMS, WhatsApp, email, Google Maps key.
 - Whether Starter should include ordering (see note in [doc 04 §4](04-roles-permissions.md#4-plan-feature-gates-configurable-prd-17)).
 - Final WaitLess logo.

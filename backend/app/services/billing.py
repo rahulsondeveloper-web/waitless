@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import use_system, use_tenant
 from app.core.errors import AppError, ConflictError, ForbiddenError, NotFoundError
-from app.integrations.payments.gateway import PaymentEvent, get_gateway
+from app.integrations.payments.gateway import Customer, PaymentEvent, get_gateway
 from app.models import Branch, Tenant, User
 from app.models.billing import Bill, BillItem, BillPayment, BillRefund, Invoice
 from app.models.booking import Reservation, ReservationPayment
@@ -882,7 +882,8 @@ async def refund(
     b = (await session.execute(select(Bill).where(Bill.id == p.bill_id).with_for_update())).scalar_one()
     provider_ref = None
     if p.method == "gateway" and p.provider and p.provider_payment_id:
-        provider_ref = await get_gateway(p.provider).refund(p.provider_payment_id, data.amount)
+        gateway = get_gateway(p.provider)
+        provider_ref = await gateway.refund(p.provider_order_id or "", p.provider_payment_id, data.amount)
     session.add(
         BillRefund(
             tenant_id=p.tenant_id,
@@ -1186,7 +1187,13 @@ async def pay_online(session: AsyncSession, token: str | None, bill_id: uuid.UUI
         raise ConflictError("Nothing is due on this bill.", code="NOTHING_DUE")
     currency = str((tenant.settings or {}).get("currency", "INR"))
     gateway = get_gateway()
-    order = await gateway.create_order(due, currency, f"bill-{b.id}", {"bill_id": str(b.id), "tenant": tenant.slug})
+    order = await gateway.create_order(
+        due,
+        currency,
+        f"bill-{b.id}",
+        {"bill_id": str(b.id), "tenant": tenant.slug},
+        customer=Customer(id=f"table-{b.table_session_id}"),
+    )
     p = BillPayment(
         tenant_id=b.tenant_id,
         branch_id=b.branch_id,
@@ -1235,7 +1242,7 @@ async def process_payment_event(session: AsyncSession, provider: str, event: Pay
     due = b.grand_total - b.paid_total
     if b.status != "open" or p.amount > due:
         # Paid at the counter meanwhile: give the online payment back automatically.
-        ref = await get_gateway(provider).refund(event.payment_id or "", p.amount)
+        ref = await get_gateway(provider).refund(event.order_id, event.payment_id, p.amount)
         p.refunded_amount = p.amount
         session.add(
             BillRefund(

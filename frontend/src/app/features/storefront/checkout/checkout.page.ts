@@ -14,7 +14,7 @@ import { BillSummaryComponent } from './bill-summary.component';
 
 /**
  * Checkout for the table's bill: every charge, then
- *  1. UPI ID, UPI QR or card through Razorpay — confirmed automatically by the signed webhook;
+ *  1. UPI ID, UPI QR or card through Cashfree — confirmed automatically by the signed webhook;
  *  2. the restaurant's own UPI ID (QR + "Open UPI app") — staff confirm when they see the money.
  * After payment the invoice can be downloaded (also later with the order ID + PIN).
  */
@@ -87,7 +87,7 @@ import { BillSummaryComponent } from './bill-summary.component';
                   <button type="button" class="wl-btn wl-btn--primary" (click)="payOnline()" [disabled]="busy()" data-testid="checkout-pay-online">
                     Pay {{ price(b.due) }}</button>
                 }
-                <p class="bk-muted">Secure payment by Razorpay. Your bill updates as soon as the payment is confirmed.</p>
+                <p class="bk-muted">Secure payment by Cashfree Payments. Your bill updates as soon as the payment is confirmed.</p>
               </article>
             }
             @if (data()?.upi_id) {

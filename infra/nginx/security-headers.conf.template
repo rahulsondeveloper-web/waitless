@@ -1,9 +1,9 @@
 # Included in every location that sets its own headers (Nginx does not inherit add_header into those).
-# OWASP A05. The CSP allows only: our own origin, Google Fonts, the Razorpay checkout, OpenStreetMap tiles
+# OWASP A05. The CSP allows only: our own origin, Google Fonts, the Cashfree checkout, OpenStreetMap tiles
 # and the S3/CloudFront media host.
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 add_header X-Content-Type-Options nosniff always;
 add_header Referrer-Policy strict-origin-when-cross-origin always;
 add_header X-Frame-Options DENY always;
 add_header Permissions-Policy "camera=(), microphone=(), geolocation=(self), payment=(self)" always;
-add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://checkout.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; connect-src 'self' wss://${DOMAIN} https://lumberjack.razorpay.com; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org ${MEDIA_HOST}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://sdk.cashfree.com; frame-src https://sdk.cashfree.com https://*.cashfree.com; connect-src 'self' wss://${DOMAIN} https://sdk.cashfree.com https://api.cashfree.com https://*.cashfree.com; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org ${MEDIA_HOST}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self' https://*.cashfree.com; frame-ancestors 'none'" always;

@@ -25,7 +25,7 @@ flowchart LR
   PG[("PostgreSQL 18<br/>source of truth")]
   RD[("Redis / Memurai<br/>cache, pub/sub, locks, rate limits")]
   FS[("File storage<br/>local ./uploads now, S3 later")]
-  EXT["External services<br/>Razorpay, SMS, WhatsApp,<br/>Email, OpenStreetMap"]
+  EXT["External services<br/>Cashfree, SMS, WhatsApp,<br/>Email, OpenStreetMap"]
 
   C1 & C2 & C3 --> NG
   NG --> R

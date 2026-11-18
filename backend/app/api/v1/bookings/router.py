@@ -144,12 +144,16 @@ async def payment_webhook(
     provider: str,
     request: Request,
     session: SessionDep,
-    x_razorpay_signature: Annotated[str | None, Header()] = None,
+    x_webhook_signature: Annotated[str | None, Header()] = None,
+    x_webhook_timestamp: Annotated[str | None, Header()] = None,
     x_mock_signature: Annotated[str | None, Header()] = None,
 ) -> WebhookAck:
     gateway = get_gateway(provider)
     body = await request.body()
-    event = gateway.parse_webhook(body, x_razorpay_signature if provider == "razorpay" else x_mock_signature)
+    if provider == "cashfree":
+        event = gateway.parse_webhook(body, x_webhook_signature, x_webhook_timestamp)
+    else:
+        event = gateway.parse_webhook(body, x_mock_signature)
     return WebhookAck(result=await res_svc.process_payment_event(session, gateway.name, event))
 
 

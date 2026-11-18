@@ -187,9 +187,9 @@ export class StorefrontReservationsPage implements OnInit {
       void this.router.navigateByUrl(c.checkout.url);
       return;
     }
-    // Razorpay window; the signature-verified webhook confirms the booking (never the browser).
+    // Cashfree checkout popup; the signature-verified webhook confirms the booking (never the browser).
     void this.checkout
-      .open(c.checkout, { name: this.ctx.restaurant()?.name ?? 'WaitLess', description: 'Table booking fee', prefill: { contact: this.auth.user()?.phone ?? undefined } })
+      .open(c.checkout, { name: this.ctx.restaurant()?.name ?? 'WaitLess', description: 'Table booking fee' })
       .then((r) => {
         if (r === 'unavailable') this.error.set('The payment window could not open. Please try again in a moment.');
         else if (r === 'submitted') this.error.set('Payment received — your booking is confirmed in a few seconds (see My bookings).');

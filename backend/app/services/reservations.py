@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.db import use_system, use_tenant
 from app.core.errors import AppError, ConflictError, ForbiddenError, NotFoundError
-from app.integrations.payments.gateway import PaymentEvent, get_gateway
+from app.integrations.payments.gateway import Customer, PaymentEvent, get_gateway
 from app.models import Branch, Tenant, User
 from app.models.booking import (
     RESERVATION_ACTIVE,
@@ -396,7 +396,16 @@ async def _create(
     if data.type == "paid":
         gateway = get_gateway()
         order = await gateway.create_order(
-            r.booking_fee, "INR", receipt=r.code, notes={"kind": "reservation", "reservation_id": str(r.id)}
+            r.booking_fee,
+            "INR",
+            receipt=r.code,
+            notes={"kind": "reservation", "reservation_id": str(r.id)},
+            customer=Customer(
+                id=str(customer.id) if customer else f"res-{r.id}",
+                phone=(customer.phone if customer else None) or phone,
+                name=(customer.full_name if customer else None) or guest_name or None,
+                email=customer.email if customer else None,
+            ),
         )
         session.add(
             ReservationPayment(
@@ -510,7 +519,7 @@ async def _refund(session: AsyncSession, r: Reservation, *, full: bool) -> Decim
     amount = pay.amount - pay.refunded_amount
     if amount <= 0:
         return Decimal("0")
-    await get_gateway(pay.provider).refund(pay.provider_payment_id or "", amount)
+    await get_gateway(pay.provider).refund(pay.provider_order_id, pay.provider_payment_id, amount)
     pay.refunded_amount += amount
     pay.status = "refunded"
     return amount
@@ -578,7 +587,11 @@ async def retry_payment(session: AsyncSession, user: User, reservation_id: uuid.
     if r.status != "pending_payment":
         raise ConflictError("This booking does not need a payment.", code="NOT_PAYABLE")
     order = await get_gateway().create_order(
-        r.booking_fee, "INR", receipt=r.code, notes={"kind": "reservation", "reservation_id": str(r.id)}
+        r.booking_fee,
+        "INR",
+        receipt=r.code,
+        notes={"kind": "reservation", "reservation_id": str(r.id)},
+        customer=Customer(id=str(user.id), phone=user.phone, name=user.full_name or None, email=user.email),
     )
     session.add(
         ReservationPayment(

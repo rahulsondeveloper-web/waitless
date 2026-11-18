@@ -12,14 +12,14 @@ dependency audits, and fixes for everything found. Status as of 17 Nov 2026.
 | Open high/critical findings | none |
 | Dependency audit | `pip-audit -r requirements.txt`: no known vulnerabilities · `npm audit --omit=dev`: 0 |
 | Tenant-isolation suite | `tests/integration/test_isolation_sweep.py` (catalogue, database and API level) + `test_tenant_isolation.py` (Phase 2), green |
-| Recommended before launch | external penetration test; Razorpay, MSG91/Twilio and AWS keys stored only in the server's env file |
+| Recommended before launch | external penetration test; Cashfree, MSG91/Twilio and AWS keys stored only in the server's env file |
 
 ## OWASP Top 10 (2021)
 
 | # | Risk | How WaitLess handles it | Evidence |
 |---|---|---|---|
 | A01 | Broken access control | Every staff route checks a permission **and** the branch (`require_permission`, `can_act_in_branch`). Tenant data is isolated by PostgreSQL Row-Level Security: the app connects as a non-owner role without `BYPASSRLS`; every table with a `tenant_id` has RLS **enabled and forced** (now also SaaS invoices, payments, support tickets, audit log). Guests use short-lived, PIN-bound table tokens. Super Admin routes require `is_super_admin`. | `test_isolation_sweep.py` (3 levels), `test_tenant_isolation.py`, `test_operations.py`, permission tests in every phase |
-| A02 | Cryptographic failures | Passwords: Argon2. OTPs and table PINs stored as HMAC hashes, compared in constant time. JWT HS256 with a ≥32-char secret (enforced in production). TLS 1.2/1.3 only, HSTS one year. Refresh token in an `HttpOnly; Secure; SameSite=Strict` cookie. Card data never touches WaitLess (Razorpay checkout). | `core/security.py`, `config._production_safety`, `nginx/default.conf.template` |
+| A02 | Cryptographic failures | Passwords: Argon2. OTPs and table PINs stored as HMAC hashes, compared in constant time. JWT HS256 with a ≥32-char secret (enforced in production). TLS 1.2/1.3 only, HSTS one year. Refresh token in an `HttpOnly; Secure; SameSite=Strict` cookie. Card data never touches WaitLess (Cashfree checkout). | `core/security.py`, `config._production_safety`, `nginx/default.conf.template` |
 | A03 | Injection | SQLAlchemy with bound parameters everywhere; the only literal SQL fragment (report time zones) is validated against a strict character set. Pydantic validates every request body; templates use Angular's auto-escaping (no `innerHTML`). | `services/analytics._zone_literal` |
 | A04 | Insecure design | Money only from the server: orders priced server-side, bills recomputed, payments confirmed **only** by signature-verified webhooks, idempotency keys on every paying action, unique keys against double billing/deduction, immutable ledgers (stock movements, invoices, audit log). Limits on discounts/refunds for non-owners. | Phases 7–10 acceptance tests |
 | A05 | Security misconfiguration | Production refuses to start with development defaults (JWT secret, DB password, mock payments, localhost CORS, console SMS, missing S3/Maps keys). API docs off in production. Narrow CORS (methods and headers listed). Security headers on every API response; CSP, HSTS, frame-ancestors none on the SPA. Images contain no `.env`, tests or uploads. `/api/v1/metrics` needs a token and is blocked at Nginx. | `test_integrations.py::test_production_refuses_development_defaults`, `::test_security_headers_and_metrics` |
@@ -27,7 +27,7 @@ dependency audits, and fixes for everything found. Status as of 17 Nov 2026.
 | A07 | Identification & authentication | Per-account and per-IP limits on password sign-in; OTP: 3 sends / 10 min per phone, 5 attempts per code, 5-minute expiry; table PIN: 5 tries / 15 min per code and 30 per IP; Nginx adds 10 requests/min on `/api/v1/auth/`. Refresh tokens rotate and are revoked on reuse/logout. | `test_auth*.py`, `test_orders.py::test_pin_attempts_are_limited` |
 | A08 | Software & data integrity | Webhooks: HMAC over the raw body, replay-safe (idempotent on provider order id). Database triggers make invoices, the stock ledger, order timers and the audit log append-only. | `test_billing.py`, `test_inventory.py`, `test_sla.py`, `test_database.py` |
 | A09 | Logging & monitoring | JSON logs with request IDs; every sensitive change audited (who, what, before/after, IP) and searchable in Super Admin → Audit log. Phone numbers masked in logs; OTP codes never logged in production. Prometheus metrics + alert rules; Loki for logs. | `infra/monitoring/` |
-| A10 | SSRF | The server only calls fixed provider hosts (Razorpay, Nominatim/Google, MSG91/Twilio/Meta, S3); no user-supplied URLs are fetched. Uploads are decoded and re-encoded by Pillow (size and type limits), stored under random names. | `integrations/*`, `services/media.py` |
+| A10 | SSRF | The server only calls fixed provider hosts (Cashfree, Nominatim/Google, MSG91/Twilio/Meta, S3); no user-supplied URLs are fetched. Uploads are decoded and re-encoded by Pillow (size and type limits), stored under random names. | `integrations/*`, `services/media.py` |
 
 ## Fixed in Phase 12
 

@@ -2,29 +2,36 @@ import { CheckoutService } from './checkout.service';
 
 describe('CheckoutService', () => {
   const svc = new CheckoutService();
+  const w = window as unknown as { Cashfree?: unknown };
+
+  afterEach(() => delete w.Cashfree);
 
   it('leaves the development mock checkout to the page', async () => {
     expect(svc.isMock({ url: '/pay/mock/x' })).toBe(true);
     expect(await svc.open({ url: '/pay/mock/x' })).toBe('mock');
   });
 
-  it('opens the Razorpay window with the order and reports the outcome', async () => {
-    let options: Record<string, unknown> = {};
-    (window as unknown as { Razorpay: unknown }).Razorpay = class {
-      constructor(o: Record<string, unknown>) {
-        options = o;
-      }
-      on(): void {}
-      open(): void {
-        (options['handler'] as () => void)();
-      }
+  it('opens the Cashfree checkout with the payment session in a popup', async () => {
+    let mode = '';
+    let opts: Record<string, unknown> = {};
+    w.Cashfree = (o: { mode: string }) => {
+      mode = o.mode;
+      return {
+        checkout: (x: Record<string, unknown>) => {
+          opts = x;
+          return Promise.resolve({ paymentDetails: { paymentMessage: 'ok' } });
+        },
+      };
     };
-    const r = await svc.open({ key_id: 'rzp_test_1', order_id: 'order_9', amount: 31500, currency: 'INR' }, { name: 'Urban Bites' });
+    const r = await svc.open({ provider: 'cashfree', payment_session_id: 'session_abc', order_id: 'wl_1', mode: 'production' });
     expect(r).toBe('submitted');
-    expect(options['key']).toBe('rzp_test_1');
-    expect(options['order_id']).toBe('order_9');
-    expect(options['name']).toBe('Urban Bites');
-    delete (window as unknown as { Razorpay?: unknown }).Razorpay;
+    expect(mode).toBe('production');
+    expect(opts).toEqual({ paymentSessionId: 'session_abc', redirectTarget: '_modal' });
+  });
+
+  it('reports a closed or failed window as dismissed (the webhook decides)', async () => {
+    w.Cashfree = () => ({ checkout: () => Promise.resolve({ error: { message: 'closed' } }) });
+    expect(await svc.open({ payment_session_id: 's', mode: 'sandbox' })).toBe('dismissed');
   });
 
   it('says so when there is nothing it can open', async () => {

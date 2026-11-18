@@ -39,7 +39,7 @@ docker compose -f infra/docker-compose.yml --env-file infra/env/production.env e
 |---|---|
 | `DOMAIN`, `ACME_EMAIL`, `PUBLIC_BASE_URL`, `CORS_ORIGINS` | your domain |
 | `DB_MIGRATION_PASSWORD`, `DB_PASSWORD`, `JWT_SECRET`, `METRICS_TOKEN` | generate: `python3 -c "import secrets; print(secrets.token_urlsafe(48))"` |
-| `RAZORPAY_KEY_ID/SECRET/WEBHOOK_SECRET` | Razorpay Dashboard → API keys; Webhooks → URL `https://DOMAIN/api/v1/webhooks/payments/razorpay`, events `payment.captured`, `payment.failed` |
+| `CASHFREE_APP_ID` / `CASHFREE_SECRET_KEY` / `CASHFREE_ENV=production` | Cashfree Dashboard → Developers → API Keys (production keys after KYC). Webhooks → URL `https://DOMAIN/api/v1/webhooks/payments/cashfree`, version 2023-08-01, events *Payment success / failed / user dropped* (orders also carry this `notify_url`). Whitelist the domain in Cashfree → Developers → Whitelisting. |
 | `S3_*`, `AWS_*`, `MEDIA_HOST` | AWS: bucket + IAM user/role with `s3:PutObject`, `s3:DeleteObject` on `arn:aws:s3:::BUCKET/media/*`; CloudFront distribution URL |
 | `MAPS_PROVIDER=google`, `GOOGLE_MAPS_API_KEY` | Google Cloud → Geocoding API key restricted to the server's IP |
 | `SMS_PROVIDER=msg91`, `MSG91_*` | MSG91 + a DLT-approved OTP template (India); or `twilio` |
@@ -106,7 +106,7 @@ ssh -L 3000:127.0.0.1:3000 you@server     # then open http://localhost:3000
 |---|---|---|
 | Site down | `docker compose … ps`; `logs web api` | restart the failing service; check disk (`df -h`) |
 | API restarts in a loop with "Unsafe production settings" | the log line lists what is missing | fix `production.env`, `up -d` |
-| Payments stay "pending" | Razorpay dashboard → webhooks → delivery log; `logs api \| grep webhook` | webhook URL/secret; payments are confirmed only by the webhook |
+| Payments stay "pending" | Cashfree dashboard → Developers → Webhooks → delivery log; `logs api \| grep webhook` | webhook URL/secret; payments are confirmed only by the webhook |
 | Guests don't get sign-in codes | `logs api \| grep OTP` | provider balance / DLT template; codes are never shown in production |
 | Timers or renewals not moving | `GET /api/v1/health` → worker heartbeat | `restart worker` |
 | Certificate expired | `logs certbot` | port 80 reachable? `docker compose … restart certbot web` |

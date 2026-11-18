@@ -259,7 +259,7 @@ Still planned: "view as" restaurant, alcohol-licence review.
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/webhooks/payments/{provider}` | `razorpay` (header `X-Razorpay-Signature`) or `mock` (`X-Mock-Signature`, non-production). HMAC of the raw body verified (400 `INVALID_SIGNATURE`); idempotent per order. Phase 6 routes booking fees; bills and SaaS invoices follow |
+| POST | `/webhooks/payments/{provider}` | `cashfree` (headers `x-webhook-signature` + `x-webhook-timestamp`: base64 HMAC-SHA256 of timestamp + raw body with the secret key) or `mock` (`X-Mock-Signature`, non-production). Signature verified (400 `INVALID_SIGNATURE`); idempotent per order. Phase 6 routes booking fees; bills and SaaS invoices follow |
 | POST | `/webhooks/notifications/{provider}` | Delivery receipts |
 
 ## 8. Socket.IO

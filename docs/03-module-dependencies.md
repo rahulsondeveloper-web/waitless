@@ -94,7 +94,7 @@ backend/
     services/<module>/      # business logic + event handlers
     websocket/              # socket auth, rooms, emitters
     tasks/                  # scheduled jobs
-    integrations/           # razorpay, sms, whatsapp, email, osm
+    integrations/           # cashfree, sms, whatsapp, email, osm
     seeds/                  # permissions, system roles, default plans, default menu taxonomy
   alembic/
   tests/  unit/ integration/ api/

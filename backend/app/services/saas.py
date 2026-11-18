@@ -135,7 +135,7 @@ def integrations() -> list[dict[str, str]]:
     from app.core.config import get_settings
 
     s = get_settings()
-    rz = bool(getattr(s, "razorpay_key_id", None))
+    rz = bool(s.cashfree_app_id and s.cashfree_secret_key)
     return [
         {
             "name": "Payments",
@@ -838,7 +838,7 @@ async def process_payment_event(session: AsyncSession, provider: str, event: Pay
         await _mark_paid(session, inv)
         result = "paid"
     else:
-        await get_gateway(provider).refund(event.payment_id or "", p.amount)
+        await get_gateway(provider).refund(event.order_id, event.payment_id, p.amount)
         result = "refunded_overpayment"
     write_audit(
         session,

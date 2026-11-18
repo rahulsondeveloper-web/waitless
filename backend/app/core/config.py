@@ -62,12 +62,15 @@ class Settings(BaseSettings):
     # SaaS
     trial_plan_code: str = "professional"
 
-    # Booking payments (decision D17). "mock" works offline; "razorpay" needs the three keys below.
-    payment_provider: Literal["mock", "razorpay"] = "mock"
+    # Online payments (decision D17). "mock" works offline; "cashfree" needs the App ID and Secret Key below
+    # (the secret key also verifies Cashfree's webhook signatures).
+    payment_provider: Literal["mock", "cashfree"] = "mock"
     mock_webhook_secret: str = "dev-mock-webhook-secret"
-    razorpay_key_id: str = ""
-    razorpay_key_secret: str = ""
-    razorpay_webhook_secret: str = ""
+    cashfree_app_id: str = ""
+    cashfree_secret_key: str = ""
+    cashfree_env: Literal["sandbox", "production"] = "sandbox"
+    # Cashfree requires a customer phone on every order; used when the payer gave none (e.g. a walk-in table guest)
+    cashfree_fallback_phone: str = "9999999999"
     payment_hold_minutes: int = 15  # unpaid paid-bookings release their table after this
 
     # Restaurant storefront (PRD §5.3: change only together with the DB check constraint)
@@ -132,11 +135,11 @@ class Settings(BaseSettings):
         if not self.db_password:
             problems.append("DB_PASSWORD is required")
         if self.payment_provider == "mock":
-            problems.append("PAYMENT_PROVIDER=mock is not allowed (use razorpay)")
-        if self.payment_provider == "razorpay" and not (
-            self.razorpay_key_id and self.razorpay_key_secret and self.razorpay_webhook_secret
-        ):
-            problems.append("RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are required")
+            problems.append("PAYMENT_PROVIDER=mock is not allowed (use cashfree)")
+        if self.payment_provider == "cashfree" and not (self.cashfree_app_id and self.cashfree_secret_key):
+            problems.append("CASHFREE_APP_ID and CASHFREE_SECRET_KEY are required")
+        if self.payment_provider == "cashfree" and self.cashfree_env != "production":
+            problems.append("CASHFREE_ENV must be production")
         if any(o.startswith("http://localhost") or o == "*" for o in self.cors_origins):
             problems.append("CORS_ORIGINS must list the real https origins")
         if self.debug:

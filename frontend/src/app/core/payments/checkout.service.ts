@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
 
 /**
- * Opens the payment provider's checkout (Phase 12). The server decides the provider:
+ * Opens the payment provider's checkout. The server decides the provider:
  * - mock (development): `checkout.url` → the caller shows its own test checkout;
- * - Razorpay: `checkout.key_id` + `order_id` → the official Razorpay window (checkout.js, loaded on demand).
+ * - Cashfree: `checkout.payment_session_id` → Cashfree's checkout (JS SDK v3, loaded on demand) in a
+ *   popup over the page: UPI ID, UPI QR, cards, net banking and wallets.
  *
  * The browser's "success" is never trusted: the server marks things paid only from the signature-verified
  * webhook (decision D57), so callers just refresh after the window closes.
@@ -11,38 +12,44 @@ import { Injectable } from '@angular/core';
 
 export interface CheckoutData {
   url?: string;
-  key_id?: string;
+  provider?: string;
+  payment_session_id?: string;
   order_id?: string;
-  amount?: number;
-  currency?: string;
+  mode?: 'sandbox' | 'production';
   [k: string]: unknown;
 }
 
 export interface CheckoutOptions {
   name?: string;
   description?: string;
-  prefill?: { name?: string; contact?: string; email?: string };
-  color?: string;
 }
 
-/** 'submitted' = the guest finished in the window (the webhook confirms), 'dismissed' = closed it. */
+/** 'submitted' = the guest finished in the window (the webhook confirms), 'dismissed' = closed it or it failed. */
 export type CheckoutResult = 'mock' | 'submitted' | 'dismissed' | 'unavailable';
 
-interface RazorpayCtor {
-  new (options: Record<string, unknown>): { open(): void; on(event: string, cb: (r: unknown) => void): void };
+interface CashfreeResult {
+  error?: { message?: string };
+  paymentDetails?: unknown;
+  redirect?: boolean;
 }
 
-const SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
-let loading: Promise<RazorpayCtor | null> | null = null;
+interface CashfreeInstance {
+  checkout(opts: { paymentSessionId: string; redirectTarget: '_modal' | '_self' | '_blank' }): Promise<CashfreeResult>;
+}
 
-function loadRazorpay(): Promise<RazorpayCtor | null> {
-  const w = window as unknown as { Razorpay?: RazorpayCtor };
-  if (w.Razorpay) return Promise.resolve(w.Razorpay);
+type CashfreeFactory = (opts: { mode: 'sandbox' | 'production' }) => CashfreeInstance;
+
+const SCRIPT = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+let loading: Promise<CashfreeFactory | null> | null = null;
+
+function loadCashfree(): Promise<CashfreeFactory | null> {
+  const w = window as unknown as { Cashfree?: CashfreeFactory };
+  if (w.Cashfree) return Promise.resolve(w.Cashfree);
   loading ??= new Promise((resolve) => {
     const s = document.createElement('script');
     s.src = SCRIPT;
     s.async = true;
-    s.onload = () => resolve((window as unknown as { Razorpay?: RazorpayCtor }).Razorpay ?? null);
+    s.onload = () => resolve((window as unknown as { Cashfree?: CashfreeFactory }).Cashfree ?? null);
     s.onerror = () => {
       loading = null;
       resolve(null);
@@ -59,26 +66,21 @@ export class CheckoutService {
     return !!c.url;
   }
 
-  async open(c: CheckoutData, opts: CheckoutOptions = {}): Promise<CheckoutResult> {
+  // `opts` is kept for callers; Cashfree shows the merchant name from its dashboard.
+  async open(c: CheckoutData, _opts: CheckoutOptions = {}): Promise<CheckoutResult> {
     if (c.url) return 'mock';
-    if (!c.key_id || !c.order_id) return 'unavailable';
-    const Razorpay = await loadRazorpay();
-    if (!Razorpay) return 'unavailable';
-    return new Promise<CheckoutResult>((resolve) => {
-      const rzp = new Razorpay({
-        key: c.key_id,
-        order_id: c.order_id,
-        amount: c.amount,
-        currency: c.currency ?? 'INR',
-        name: opts.name ?? 'WaitLess',
-        description: opts.description,
-        prefill: opts.prefill,
-        theme: { color: opts.color ?? '#0a7c86' },
-        handler: () => resolve('submitted'),
-        modal: { ondismiss: () => resolve('dismissed'), confirm_close: true },
+    if (!c.payment_session_id) return 'unavailable';
+    const Cashfree = await loadCashfree();
+    if (!Cashfree) return 'unavailable';
+    try {
+      const result = await Cashfree({ mode: c.mode === 'production' ? 'production' : 'sandbox' }).checkout({
+        paymentSessionId: c.payment_session_id,
+        redirectTarget: '_modal',
       });
-      rzp.on('payment.failed', () => undefined); // the window lets the guest retry; the webhook decides
-      rzp.open();
-    });
+      if (result.error) return 'dismissed'; // closed, or the payment failed — the webhook decides either way
+      return 'submitted';
+    } catch {
+      return 'unavailable';
+    }
   }
 }
