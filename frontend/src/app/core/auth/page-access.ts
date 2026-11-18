@@ -28,6 +28,7 @@ export const PAGE_ACCESS: Record<string, { label: string; perms: string[] }> = {
   payments: { label: 'Payments', perms: ['payments.collect', 'payments.refund'] },
   discounts: { label: 'Discount Settings', perms: ['discounts.policy.manage'] },
   reports: { label: 'Reports', perms: ['reports.view', 'reports.sales.view'] },
+  reviews: { label: 'Reviews', perms: ['restaurant.profile.view', 'restaurant.profile.manage'] },
 };
 
 /** First path segment under /restaurant-admin, e.g. "tables/qr" → "tables". */

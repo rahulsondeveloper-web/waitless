@@ -22,7 +22,7 @@ export class SecondTicker {
   }
 }
 
-type Tone = 'ok' | 'soon' | 'late' | 'done' | 'off';
+type Tone = 'ok' | 'soon' | 'late' | 'done' | 'off' | 'wait';
 
 /**
  * Serving timer (PRD §14): "12:40 left to serve" → "Running late · 2% off" → "Served in 18 min".
@@ -34,11 +34,14 @@ type Tone = 'ok' | 'soon' | 'late' | 'done' | 'off';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (state(); as s) {
-      <span class="timer" [attr.data-tone]="s.tone" [class.compact]="compact()" data-testid="serving-timer"
+      <span class="timer" [attr.data-tone]="s.tone" [class.compact]="compact()" [class.large]="large()" data-testid="serving-timer"
             [attr.aria-label]="s.label + (s.extra ? ', ' + s.extra : '')">
         <span class="dot" aria-hidden="true"></span>
         <span class="main">{{ s.label }}</span>
         @if (s.extra) { <span class="extra" data-testid="timer-discount">· {{ s.extra }}</span> }
+        @if (large() && s.used !== null) {
+          <span class="bar" aria-hidden="true"><span [style.width.%]="s.used"></span></span>
+        }
       </span>
     }
   `,
@@ -60,6 +63,17 @@ type Tone = 'ok' | 'soon' | 'late' | 'done' | 'off';
       justify-self: start;
     }
     .compact { padding: 0.15rem 0.5rem; font-size: 0.78rem; }
+    /* Kitchen screen: readable from across the kitchen */
+    .large { display: grid; grid-template-columns: auto 1fr; justify-self: stretch; border-radius: 10px;
+      padding: 0.45rem 0.7rem; font-size: 1.25rem; font-weight: 800; letter-spacing: 0.01em; }
+    .large .dot { width: 0.75rem; height: 0.75rem; }
+    .large .extra { grid-column: 1 / -1; font-size: 0.85rem; }
+    .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--tone) 22%, transparent); overflow: hidden; }
+    .bar span { display: block; height: 100%; background: var(--tone); transition: width 1s linear; }
+    .large[data-tone='late'] { color: #fff; background: #d0452b; border-color: #d0452b; }
+    .large[data-tone='late'] .bar { background: rgba(255, 255, 255, 0.35); }
+    .large[data-tone='late'] .bar span { background: #fff; }
+    .large[data-tone='wait'] { --tone: #6b5bd2; }
     .dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor; }
     .extra { font-weight: 700; }
     [data-tone='soon'] { --tone: #b7791f; }
@@ -76,6 +90,8 @@ export class ServingTimerComponent {
   readonly order = input.required<Order>();
   readonly offsetMs = input(0);
   readonly compact = input(false);
+  /** Big block with a progress bar (kitchen screen); new orders show how long they have waited. */
+  readonly large = input(false);
   readonly currency = input('INR');
 
   private readonly ticker = inject(SecondTicker);
@@ -84,10 +100,20 @@ export class ServingTimerComponent {
     this.ticker.use(inject(DestroyRef));
   }
 
-  protected readonly state = computed<{ tone: Tone; label: string; extra: string } | null>(() => {
+  protected readonly state = computed<{ tone: Tone; label: string; extra: string; used: number | null } | null>(() => {
+    const s = this.compute();
+    return s && { used: null, ...s };
+  });
+
+  private compute(): { tone: Tone; label: string; extra: string; used?: number | null } | null {
     const o = this.order();
     const sla = o.sla;
     if (o.status === 'cancelled') return null;
+    const notArrived = o.order_type === 'paid_preorder' && !o.table_session_id;
+    if (!sla && this.large() && o.status === 'placed' && !notArrived) {
+      const waited = this.ticker.now() + this.offsetMs() - Date.parse(o.placed_at);
+      return { tone: 'wait', label: `Waiting ${clock(Math.max(0, waited))}`, extra: 'Accept to start the 15-min timer' };
+    }
     if (!sla) {
       if (o.order_type === 'paid_preorder' && !o.table_session_id) {
         return { tone: 'off', label: 'Timer starts when you arrive', extra: '' };
@@ -104,16 +130,17 @@ export class ServingTimerComponent {
       return { tone: 'done', label: `Served in ${took} min`, extra: off };
     }
     if (sla.status !== 'running') return null;
+    const used = Math.min(100, Math.max(0, ((now - start) / Math.max(1, deadline - start)) * 100));
     if (now <= deadline) {
       const left = deadline - now;
-      return { tone: left <= 3 * 60_000 ? 'soon' : 'ok', label: `${clock(left)} left to serve`, extra: '' };
+      return { tone: left <= 3 * 60_000 ? 'soon' : 'ok', label: `${clock(left)} left to serve`, extra: '', used };
     }
     const late = `Running late · ${clock(now - deadline)}`;
-    return { tone: 'late', label: late, extra: sla.eligible ? off : '' };
-  });
+    return { tone: 'late', label: late, extra: sla.eligible ? off : '', used: 100 };
+  }
 
   private amount(o: Order, pct: number): string {
-    if (this.compact()) return '';
+    if (this.compact() || this.large()) return '';
     const sla = o.sla!;
     const base = sla.base === 'order_total' ? +o.total : +o.subtotal;
     return ` (${formatPrice(Math.round(base * pct) / 100, this.currency())})`;

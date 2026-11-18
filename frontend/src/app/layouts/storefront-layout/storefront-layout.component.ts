@@ -8,6 +8,7 @@ import { CartService } from '../../core/ordering/cart.service';
 import { SOCIAL_LABELS } from '../../core/storefront/storefront.models';
 import { TenantContextService } from '../../core/storefront/tenant-context.service';
 import { ErrorStateComponent, LoadingStateComponent } from '../../shared/ui/state/state.components';
+import { CallWaiterComponent } from '../../features/storefront/call-waiter/call-waiter.component';
 import { UserMenuComponent } from '../../shared/ui/user-menu/user-menu.component';
 
 /**
@@ -17,7 +18,15 @@ import { UserMenuComponent } from '../../shared/ui/user-menu/user-menu.component
  */
 @Component({
   selector: 'wl-storefront-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent, LoadingStateComponent, ErrorStateComponent],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    UserMenuComponent,
+    LoadingStateComponent,
+    ErrorStateComponent,
+    CallWaiterComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './storefront-layout.component.html',
   styleUrl: './storefront-layout.component.scss',

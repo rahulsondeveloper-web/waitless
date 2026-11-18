@@ -36,6 +36,7 @@
         }
         <a routerLink="menu" class="wl-btn wl-btn--light">View menu</a>
         <a routerLink="session" class="wl-btn wl-btn--light" data-testid="have-order-id">Have an order ID?</a>
+        <wl-wifi-button />
         @if (r.gallery_count) {
           <a routerLink="gallery" class="wl-btn wl-btn--light">View gallery</a>
         }
@@ -90,5 +91,28 @@
       <p class="about__text">{{ r.about_us }}</p>
       <a routerLink="about" class="link">Read more</a>
     </section>
+  }
+
+  @if (reviews(); as rv) {
+    @if (rv.count) {
+      <section class="wl-container reviews" aria-labelledby="h-reviews" data-testid="home-reviews">
+        <div class="reviews__head">
+          <h2 id="h-reviews">What guests say</h2>
+          <p class="reviews__avg" [attr.aria-label]="rv.average + ' out of 5 from ' + rv.count + ' reviews'">
+            <span class="stars" aria-hidden="true">{{ stars(rv.average ?? 0) }}</span>
+            <b data-testid="review-average">{{ rv.average }}</b> · {{ rv.count }} {{ rv.count === 1 ? 'review' : 'reviews' }}
+          </p>
+        </div>
+        <ul class="reviews__list">
+          @for (rev of rv.reviews.slice(0, 6); track rev.id) {
+            <li class="review" data-testid="home-review">
+              <span class="stars" [attr.aria-label]="rev.rating + ' of 5 stars'">{{ stars(rev.rating) }}</span>
+              @if (rev.comment) { <p>“{{ rev.comment }}”</p> }
+              <small>{{ rev.guest_name }} · {{ date(rev.created_at) }}</small>
+            </li>
+          }
+        </ul>
+      </section>
+    }
   }
 }

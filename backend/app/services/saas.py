@@ -428,6 +428,12 @@ async def subscription_row(session: AsyncSession, sub: Subscription) -> dict[str
             )
         )
     ).one()
+    return _row(sub, plan, tenant, int(due[0]), Decimal(due[1]))
+
+
+def _row(
+    sub: Subscription, plan: Plan | None, tenant: Tenant | None, due_count: int, due_sum: Decimal
+) -> dict[str, Any]:
     return {
         "id": sub.id,
         "tenant_id": sub.tenant_id,
@@ -446,8 +452,8 @@ async def subscription_row(session: AsyncSession, sub: Subscription) -> dict[str
         "auto_renew": sub.auto_renew,
         "cancelled_at": sub.cancelled_at,
         "price": str(_price(plan, sub.billing_cycle)) if plan else "0.00",
-        "invoices_due": int(due[0]),
-        "amount_due": str(_money(Decimal(due[1]))),
+        "invoices_due": due_count,
+        "amount_due": str(_money(due_sum)),
     }
 
 
@@ -474,7 +480,28 @@ async def list_subscriptions(session: AsyncSession, status: str | None, q: str |
         stmt = stmt.where(Subscription.status == status)
     if q:
         stmt = stmt.where(or_(Tenant.name.ilike(f"%{q}%"), Tenant.slug.ilike(f"%{q}%")))
-    return [await subscription_row(session, s) for s in (await session.execute(stmt.limit(500))).scalars()]
+    subs = list((await session.execute(stmt.limit(500))).scalars())
+    if not subs:
+        return []
+    # Three batched queries instead of four per restaurant (the list grows with every restaurant).
+    tids = {x.tenant_id for x in subs}
+    plans = {
+        p.id: p for p in (await session.execute(select(Plan).where(Plan.id.in_({x.plan_id for x in subs})))).scalars()
+    }
+    tenants = {t.id: t for t in (await session.execute(select(Tenant).where(Tenant.id.in_(tids)))).scalars()}
+    dues = {
+        tid: (int(n), Decimal(total))
+        for tid, n, total in (
+            await session.execute(
+                select(SaasInvoice.tenant_id, func.count(), func.coalesce(func.sum(SaasInvoice.total), 0))
+                .where(SaasInvoice.tenant_id.in_(tids), SaasInvoice.status == "due")
+                .group_by(SaasInvoice.tenant_id)
+            )
+        ).tuples()
+    }
+    return [
+        _row(x, plans.get(x.plan_id), tenants.get(x.tenant_id), *dues.get(x.tenant_id, (0, Decimal(0)))) for x in subs
+    ]
 
 
 async def _sub(session: AsyncSession, sub_id: uuid.UUID) -> Subscription:

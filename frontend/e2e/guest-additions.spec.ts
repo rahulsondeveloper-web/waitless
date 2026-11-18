@@ -135,6 +135,7 @@ test("Finish shows the bill in a popup; the guest pays the restaurant's UPI ID a
     await page.getByTestId('finish').click();
     await page.getByTestId('finish-confirm').click();
     await page.getByTestId('popup-pay-now').click();
+    await page.getByTestId('method-upi').check(); // Payment Method: UPI / Mobile Banking
 
     const upi = page.getByTestId('pay-upi-direct');
     await expect(upi.getByTestId('upi-id')).toHaveText('urbanbites@okaxis');

@@ -1,0 +1,239 @@
+// "Order at your table" cards from the Remelle template (design/default-theme/index.html#order):
+// Checkout card, Payment Method options, Order Tracking steps. Template colours → theme tokens.
+
+.oc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.6rem;
+  align-items: start;
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+.oc-stack {
+  display: grid;
+  gap: 1.6rem;
+  align-content: start;
+}
+.oc-card {
+  background: var(--wl-surface);
+  border: 1px solid var(--wl-line);
+  border-radius: var(--wl-radius-lg);
+  padding: clamp(1.2rem, 3vw, 2rem);
+  box-shadow: var(--wl-shadow-sm);
+}
+.oc-title {
+  font-family: var(--wl-font-serif);
+  font-size: 1.7rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+.oc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+.oc-no {
+  font-family: var(--wl-font-serif);
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--wl-primary);
+}
+.oc-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin: 1.1rem 0 0.5rem;
+  .oc-muted {
+    font-weight: 400;
+  }
+}
+.oc-muted {
+  color: var(--wl-muted);
+}
+.oc-input {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--wl-line);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--wl-text);
+  resize: vertical;
+  &:focus {
+    outline: 2px solid var(--wl-primary-soft);
+    border-color: var(--wl-primary);
+  }
+}
+.oc-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.oc-pill {
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--wl-line);
+  background: var(--wl-surface-alt);
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--wl-text-soft);
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
+  &.is-active {
+    background: var(--wl-primary);
+    border-color: var(--wl-primary);
+    color: #fff;
+  }
+  &:disabled {
+    cursor: default;
+  }
+}
+.oc-summary {
+  margin: 0 0 1.4rem;
+  font-size: 0.92rem;
+  div {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.3rem 0;
+  }
+  dt span {
+    color: var(--wl-muted);
+    margin-left: 0.4rem;
+  }
+  dt small {
+    display: block;
+    color: var(--wl-muted);
+    font-size: 0.78rem;
+  }
+  dd {
+    margin: 0;
+    white-space: nowrap;
+  }
+  .saved dd {
+    color: #2e7d4f;
+  }
+}
+.oc-summary__sep {
+  margin-top: 0.5rem;
+  padding-top: 0.8rem !important;
+  border-top: 1px solid var(--wl-line);
+}
+.oc-summary__total {
+  font-weight: 700;
+  font-size: 1.15rem;
+  dd {
+    font-family: var(--wl-font-serif);
+    font-size: 1.4rem;
+  }
+}
+.oc-pay {
+  display: grid;
+  gap: 0.6rem;
+}
+.oc-pay__opt {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--wl-line);
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+  input {
+    accent-color: var(--wl-primary);
+  }
+  &:has(input:checked) {
+    border-color: var(--wl-primary);
+    background: var(--wl-primary-soft);
+  }
+  .material-symbols-outlined {
+    font-size: 1.4rem;
+    color: var(--wl-primary);
+  }
+  b {
+    display: block;
+    font-weight: 600;
+    font-size: 0.92rem;
+  }
+  small {
+    color: var(--wl-muted);
+  }
+}
+.oc-secure {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--wl-muted);
+  .material-symbols-outlined {
+    font-size: 1rem;
+  }
+}
+.oc-btn-block {
+  width: 100%;
+  justify-content: center;
+}
+.oc-track {
+  position: relative;
+  display: grid;
+  gap: 1.4rem;
+  margin: 0;
+  padding: 0 0 0 2.4rem;
+  list-style: none;
+  &::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: var(--wl-line);
+  }
+  li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 1rem;
+    &::before {
+      content: '';
+      position: absolute;
+      left: -2.4rem;
+      top: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--wl-muted);
+      background: var(--wl-surface);
+      box-sizing: border-box;
+    }
+    &.is-done::before {
+      border-color: var(--wl-secondary);
+      background: var(--wl-secondary)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'%3E%3Cpath d='M13.5 4.5 6.5 11.5 3 8l1-1 2.5 2.5 6-6z'/%3E%3C/svg%3E")
+        center / 14px no-repeat;
+    }
+  }
+  b {
+    font-weight: 600;
+  }
+  span {
+    grid-column: 1;
+    font-size: 0.85rem;
+    color: var(--wl-muted);
+  }
+  time {
+    grid-row: 1;
+    grid-column: 2;
+    font-size: 0.85rem;
+    color: var(--wl-muted);
+  }
+}

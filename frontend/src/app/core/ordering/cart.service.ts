@@ -172,5 +172,8 @@ export interface EndedVisit {
   code: string;
   restaurantName: string;
   /** invoice download links (they carry the old table link, which still works for reading) */
-  receipts: { number: string; url: string }[];
+  receipts: { number: string; url: string; namesUrl: string }[];
+  /** the old table link, memory only: lets the guest leave a review on the thank-you screen */
+  token: string;
+  guestName: string;
 }

@@ -11,6 +11,7 @@ import { map } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { canOpenPage } from '../../core/auth/page-access';
+import { ServiceAlertsComponent } from '../../features/restaurant-admin/service-alerts/service-alerts.component';
 import { UserMenuComponent } from '../../shared/ui/user-menu/user-menu.component';
 
 export interface AdminNavItem {
@@ -36,6 +37,7 @@ export interface AdminNavItem {
     MatIconModule,
     MatButtonModule,
     UserMenuComponent,
+    ServiceAlertsComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-layout.component.html',
@@ -45,6 +47,8 @@ export class AdminLayoutComponent {
   private readonly data = toSignal(inject(ActivatedRoute).data, { initialValue: {} as Record<string, unknown> });
   protected readonly area = computed(() => (this.data()['area'] as string) ?? 'Admin');
   private readonly auth = inject(AuthService);
+  /** Restaurant admin (not Super Admin): waiter calls are shown here. */
+  protected readonly pageAccess = computed(() => !!this.data()['pageAccess']);
   protected readonly nav = computed(() => {
     const all = (this.data()['nav'] as AdminNavItem[]) ?? [];
     if (!this.data()['pageAccess']) return all;

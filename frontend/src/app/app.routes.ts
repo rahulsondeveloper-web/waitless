@@ -36,6 +36,7 @@ const RESTAURANT_ADMIN_NAV: AdminNavItem[] = [
   { label: 'Payments', icon: 'payments', path: 'payments' },
   { label: 'Discount Settings', icon: 'timer', path: 'discounts' },
   { label: 'Reports', icon: 'monitoring', path: 'reports' },
+  { label: 'Reviews', icon: 'reviews', path: 'reviews' },
   { label: 'Settings', icon: 'settings', path: 'settings' },
 ];
 
@@ -279,6 +280,11 @@ export const routes: Routes = [
           path: 'purchases',
           title: 'Purchases · WaitLess',
           loadComponent: () => import('./features/restaurant-admin/purchases/purchases.page').then((m) => m.PurchasesPage),
+        },
+        reviews: {
+          path: 'reviews',
+          title: 'Reviews · WaitLess',
+          loadComponent: () => import('./features/restaurant-admin/reviews/reviews.page').then((m) => m.ReviewsPage),
         },
         reports: {
           path: 'reports',

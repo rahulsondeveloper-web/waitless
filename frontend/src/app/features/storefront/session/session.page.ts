@@ -14,6 +14,7 @@ import { formatPrice } from '../../../core/storefront/storefront.models';
 import { TenantContextService } from '../../../core/storefront/tenant-context.service';
 import { ServingTimerComponent } from '../../../shared/ui/serving-timer/serving-timer.component';
 import { BillSummaryComponent } from '../checkout/bill-summary.component';
+import { ReviewFormComponent } from '../review/review-form.component';
 import { CheckoutService } from '../../../core/payments/checkout.service';
 
 const STEPS = ['placed', 'accepted', 'preparing', 'ready', 'served'] as const;
@@ -24,7 +25,7 @@ const STEPS = ['placed', 'accepted', 'preparing', 'ready', 'served'] as const;
  */
 @Component({
   selector: 'wl-storefront-session',
-  imports: [FormsModule, RouterLink, ServingTimerComponent, BillSummaryComponent],
+  imports: [FormsModule, RouterLink, ServingTimerComponent, BillSummaryComponent, ReviewFormComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './session.page.html',
   styleUrls: ['../booking-shared.scss', './session.page.scss'],
@@ -192,8 +193,21 @@ export class StorefrontSessionPage implements OnInit {
     });
   }
 
-  protected receiptUrl(invoiceId: string): string {
-    return this.billing.guestReceiptUrl(this.cart.tableToken() ?? '', invoiceId);
+  protected receiptUrl(invoiceId: string, names = false): string {
+    return this.billing.guestReceiptUrl(this.cart.tableToken() ?? '', invoiceId, names);
+  }
+
+  /** The template's "Order Tracking" steps for one order, with the time each happened. */
+  protected track(o: Order): { title: string; text: string; done: boolean; at: string }[] {
+    const t = (iso: string | null) =>
+      iso ? new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+    const i = this.stepIndex(o);
+    return [
+      { title: 'Order Placed', text: 'Your order has been received.', done: i >= 0, at: t(o.placed_at) },
+      { title: 'Preparing', text: 'Our chefs are preparing your order.', done: i >= 2, at: t(o.preparing_at ?? o.accepted_at) },
+      { title: 'Ready to Serve', text: 'Your order is ready!', done: i >= 3, at: t(o.ready_at) },
+      { title: 'Enjoy Your Meal', text: 'Thank you for dining with us!', done: i >= 4, at: t(o.served_at) },
+    ];
   }
 
   protected n(v: string): number {
@@ -217,11 +231,16 @@ export class StorefrontSessionPage implements OnInit {
     const receipts = bs.bills.flatMap((b) =>
       b.invoices
         .filter((i) => i.kind === 'invoice')
-        .map((i) => ({ number: i.number, url: this.billing.guestReceiptUrl(token, i.id) })),
+        .map((i) => ({
+          number: i.number,
+          url: this.billing.guestReceiptUrl(token, i.id),
+          namesUrl: this.billing.guestReceiptUrl(token, i.id, true),
+        })),
     );
+    const guestName = this.cart.guestName();
     this.popup.set(null);
     this.leave();
-    this.cart.endVisit({ code: bs.session_code, restaurantName: bs.restaurant_name, receipts });
+    this.cart.endVisit({ code: bs.session_code, restaurantName: bs.restaurant_name, receipts, token, guestName });
   }
 
   protected cancel(o: Order): void {

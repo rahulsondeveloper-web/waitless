@@ -45,9 +45,10 @@
         </header>
         <wl-serving-timer [order]="o" [offsetMs]="offset()" [currency]="ctx.restaurant()?.currency ?? 'INR'" />
         @if (o.status !== 'cancelled') {
-          <ol class="steps" aria-label="Progress">
-            @for (s of steps; track s; let i = $index) {
-              <li [class.done]="i <= stepIndex(o)">{{ statusLabel[s] }}</li>
+          <ol class="oc-track track" aria-label="Order tracking" data-testid="order-track">
+            @for (t of track(o); track t.title) {
+              <li [class.is-done]="t.done"><b>{{ t.title }}</b><span>{{ t.text }}</span>
+                @if (t.at) { <time>{{ t.at }}</time> }</li>
             }
           </ol>
         }
@@ -128,7 +129,8 @@
             </div>
             @if (b.status === 'paid') {
               <p class="paid-note">Thank you! @for (inv of b.invoices; track inv.id) {
-                @if (inv.kind === 'invoice') { <a [href]="receiptUrl(inv.id)" target="_blank" rel="noopener" data-testid="receipt">Receipt {{ inv.number }}</a> } }</p>
+                @if (inv.kind === 'invoice') { <a [href]="receiptUrl(inv.id)" target="_blank" rel="noopener" data-testid="receipt">Receipt {{ inv.number }}</a>
+                  · <a [href]="receiptUrl(inv.id, true)" target="_blank" rel="noopener" data-testid="receipt-names">with names</a> } }</p>
             } @else if (n(b.due) > 0) {
               @if (paying()?.billId === b.id && paying()!.mock) {
                 <div class="mock" role="group" aria-label="Test payment">
@@ -198,9 +200,12 @@
             @for (r of ended.receipts; track r.number) {
               <a class="wl-btn wl-btn--primary" [href]="r.url" target="_blank" rel="noopener" data-testid="ended-receipt">
                 Download invoice {{ r.number }}</a>
+              <a class="wl-btn wl-btn--ghost" [href]="r.namesUrl" target="_blank" rel="noopener" data-testid="ended-receipt-names">
+                Download invoice with names</a>
             }
           </div>
         }
+        <wl-review-form [token]="ended.token" [guestName]="ended.guestName" />
         <p class="bk-muted">Need the invoice later? Enter order ID <b>{{ ended.code }}</b> and your PIN below.</p>
         <div class="bk-actions"><a routerLink="../menu" class="wl-btn wl-btn--ghost wl-btn--sm">Back to the menu</a></div>
       </article>

@@ -268,15 +268,24 @@ export class BillingService {
   finish(token: string): Observable<SessionBills> {
     return this.api.post('table-session/finish', {}, { 'X-Table-Token': token });
   }
-  payOnline(token: string, billId: string): Observable<OnlinePayment> {
-    return this.api.post(`table-session/bills/${billId}/pay`, {}, { 'X-Table-Token': token });
+  /** `amount` = this person's equal share; empty = everything that is due. */
+  payOnline(token: string, billId: string, amount?: string | null): Observable<OnlinePayment> {
+    return this.api.post(`table-session/bills/${billId}/pay`, amount ? { amount } : {}, { 'X-Table-Token': token });
+  }
+  /** One bill per person, by the names the dishes were ordered under. */
+  splitByPerson(token: string, billId: string): Observable<SessionBills> {
+    return this.api.post(`table-session/bills/${billId}/split-by-person`, {}, { 'X-Table-Token': token });
   }
   mockPay(token: string, orderId: string, success: boolean): Observable<{ result: string }> {
     return this.api.post(`public/payments/mock-bill/${encodeURIComponent(orderId)}`, { success }, { 'X-Table-Token': token });
   }
   /** "I paid the restaurant's UPI ID" — waits for staff to confirm. */
-  upiClaim(token: string, billId: string, reference: string): Observable<SessionBills> {
-    return this.api.post(`table-session/bills/${billId}/upi-claim`, { reference }, { 'X-Table-Token': token });
+  upiClaim(token: string, billId: string, reference: string, amount?: string | null): Observable<SessionBills> {
+    return this.api.post(
+      `table-session/bills/${billId}/upi-claim`,
+      amount ? { reference, amount } : { reference },
+      { 'X-Table-Token': token },
+    );
   }
   confirmUpi(paymentId: string): Observable<Bill> {
     return this.api.post(`restaurant/payments/${paymentId}/confirm`, {});
@@ -288,11 +297,12 @@ export class BillingService {
   myInvoices(): Observable<MyInvoice[]> {
     return this.api.get('me/invoices');
   }
-  myInvoicePdf(id: string): Observable<Blob> {
-    return this.api.getBlob(`me/invoices/${id}/pdf`);
+  /** `names` = the copy with who ordered which dish and each person's total. */
+  myInvoicePdf(id: string, names = false): Observable<Blob> {
+    return this.api.getBlob(`me/invoices/${id}/pdf`, names ? { names: true } : undefined);
   }
-  guestReceiptUrl(token: string, invoiceId: string): string {
-    return `/api/v1/table-session/invoices/${invoiceId}/pdf?t=${encodeURIComponent(token)}`;
+  guestReceiptUrl(token: string, invoiceId: string, names = false): string {
+    return `/api/v1/table-session/invoices/${invoiceId}/pdf?t=${encodeURIComponent(token)}${names ? '&names=true' : ''}`;
   }
 }
 

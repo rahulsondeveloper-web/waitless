@@ -46,7 +46,17 @@ export class StorefrontCartPage implements OnInit {
     this.paidBookings().find((r) => r.id === this.cart.preorderFor()) ?? null,
   );
 
+  /** "Table T3" for the Checkout card's table line. */
+  protected readonly tableLabel = signal<string | null>(null);
+
   ngOnInit(): void {
+    const token = this.cart.tableToken();
+    if (token) {
+      this.api.tableView(token).subscribe({
+        next: (v) => this.tableLabel.set(v.table_labels.length ? `Table ${v.table_labels.join(', ')}` : v.branch_name),
+        error: () => undefined,
+      });
+    }
     const slug = this.ctx.slug();
     if (!this.auth.isAuthenticated() || !slug) return;
     this.bookings.myBookings().subscribe({

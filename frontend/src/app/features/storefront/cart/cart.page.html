@@ -21,8 +21,57 @@
       <div class="bk-actions"><a routerLink="../menu" class="wl-btn wl-btn--primary">Browse the menu</a></div>
     </article>
   } @else {
-    <article class="bk-card">
-      @if (name()) { <p class="who" data-testid="cart-who"><span class="material-symbols-outlined" aria-hidden="true">person</span> {{ name() }}'s order</p> }
+    <!-- The template's "Checkout" card (design/default-theme/index.html#order) -->
+    <article class="oc-card checkout" data-testid="cart-checkout">
+      <div class="oc-row">
+        <h2 class="oc-title">Checkout</h2>
+        @if (name()) { <span class="oc-no who" data-testid="cart-who">{{ name() }}'s order</span> }
+      </div>
+
+      <p class="oc-label">Delivery Type</p>
+      <div class="oc-pills" role="radiogroup" aria-label="Delivery type">
+        <button type="button" class="oc-pill is-active" role="radio" aria-checked="true" disabled>
+          {{ target() === 'preorder' ? 'Pre-order' : 'Dine In' }}</button>
+      </div>
+
+      @switch (target()) {
+        @case ('table') {
+          <p class="oc-label">Table Selection</p>
+          <p class="where"><span class="material-symbols-outlined" aria-hidden="true">table_restaurant</span>
+            {{ tableLabel() ?? 'Your table' }} — this order goes straight to the kitchen.</p>
+          <label class="oc-label" for="guestName">Your Name <span class="oc-muted">(shown with your dishes)</span></label>
+          <input id="guestName" class="oc-input" type="text" maxlength="60" autocomplete="given-name" [ngModel]="name()"
+                 (ngModelChange)="setName($event)" name="guestName" placeholder="e.g. Riya" data-testid="guest-name" />
+        }
+        @case ('preorder') {
+          <p class="oc-label">Booking</p>
+          <p class="where"><span class="material-symbols-outlined" aria-hidden="true">event_available</span>
+            Pre-order for your paid booking
+            @if (preorderBooking(); as r) { <b>{{ r.code }}</b> on {{ when(r.starts_at) }} }.
+            The kitchen starts when you arrive.</p>
+        }
+        @default {
+          <p class="oc-label">Table Selection</p>
+          <ul class="choices">
+            <li>At the restaurant? <a routerLink="../session">Enter your order ID and PIN</a> from your waiter, or scan the QR code on your table.</li>
+            @if (!auth.isAuthenticated()) {
+              <li>Booked a paid table? <button type="button" class="bk-link" (click)="signIn()">Sign in</button> to pre-order.</li>
+            } @else if (paidBookings().length) {
+              @for (r of paidBookings(); track r.id) {
+                <li><button type="button" class="bk-link" (click)="chooseBooking(r.id)">Pre-order for {{ r.code }} · {{ when(r.starts_at) }}</button></li>
+              }
+            } @else {
+              <li>Pre-ordering comes with a <a routerLink="../reservations">paid table booking</a>.</li>
+            }
+          </ul>
+        }
+      }
+
+      <label class="oc-label" for="notes">Special Instructions <span class="oc-muted">(Optional)</span></label>
+      <textarea id="notes" class="oc-input" rows="3" maxlength="300" [(ngModel)]="notes" name="notes"
+                placeholder="Any special requests?"></textarea>
+
+      <p class="oc-label">Order Summary</p>
       <ul class="lines">
         @for (l of cart.lines(); track l.key) {
           <li data-testid="cart-line">
@@ -41,60 +90,19 @@
           </li>
         }
       </ul>
-      <div class="totals">
-        <div><span>Food</span><span>{{ price(cart.subtotal()) }}</span></div>
-        <div><span>Taxes</span><span>{{ price(cart.tax()) }}</span></div>
-        <div class="grand"><span>Total</span><span>{{ price(cart.total()) }}</span></div>
-        <p class="bk-muted">Prices are confirmed by the restaurant when you place the order.</p>
-      </div>
-      <label class="bk-field">
-        <span>Note for the kitchen (optional)</span>
-        <input type="text" maxlength="300" [(ngModel)]="notes" name="notes" />
-      </label>
-    </article>
-
-    <article class="bk-card">
-      @switch (target()) {
-        @case ('table') {
-          <p><span class="material-symbols-outlined icon" aria-hidden="true">table_restaurant</span>
-            This order goes straight to the kitchen for your table.</p>
-          <label class="bk-field">
-            <span>Your name (shown with your dishes)</span>
-            <input type="text" maxlength="60" autocomplete="given-name" [ngModel]="name()" (ngModelChange)="setName($event)"
-                   name="guestName" placeholder="e.g. Riya" data-testid="guest-name" />
-          </label>
-        }
-        @case ('preorder') {
-          <p><span class="material-symbols-outlined icon" aria-hidden="true">event_available</span>
-            Pre-order for your paid booking
-            @if (preorderBooking(); as r) { <b>{{ r.code }}</b> on {{ when(r.starts_at) }} }.
-            The kitchen starts when you arrive.</p>
-        }
-        @default {
-          <p><b>Where should we send this order?</b></p>
-          <ul class="choices">
-            <li>At the restaurant? <a routerLink="../session">Enter your order ID and PIN</a> from your waiter.</li>
-            @if (!auth.isAuthenticated()) {
-              <li>Booked a paid table? <button type="button" class="bk-link" (click)="signIn()">Sign in</button> to pre-order.</li>
-            } @else if (paidBookings().length) {
-              @for (r of paidBookings(); track r.id) {
-                <li><button type="button" class="bk-link" (click)="chooseBooking(r.id)">Pre-order for {{ r.code }} · {{ when(r.starts_at) }}</button></li>
-              }
-            } @else {
-              <li>Pre-ordering comes with a <a routerLink="../reservations">paid table booking</a>.</li>
-            }
-          </ul>
-        }
-      }
+      <dl class="oc-summary">
+        <div class="oc-summary__sep"><dt>Subtotal</dt><dd>{{ price(cart.subtotal()) }}</dd></div>
+        <div><dt>Taxes</dt><dd>{{ price(cart.tax()) }}</dd></div>
+        <div class="oc-summary__total"><dt>Total</dt><dd>{{ price(cart.total()) }}</dd></div>
+      </dl>
+      <p class="bk-muted small">Prices are confirmed by the restaurant when you place the order. You pay at the end of your meal.</p>
 
       @if (error(); as e) { <p class="bk-error" role="alert">{{ e }}</p> }
 
       @if (target() !== 'none') {
-        <div class="bk-actions">
-          <button type="button" class="wl-btn wl-btn--primary" [disabled]="busy()" (click)="place()" data-testid="place-order">
-            {{ target() === 'table' ? 'Send to kitchen' : 'Place pre-order' }} · {{ price(cart.total()) }}
-          </button>
-        </div>
+        <button type="button" class="wl-btn wl-btn--primary oc-btn-block" [disabled]="busy()" (click)="place()" data-testid="place-order">
+          {{ target() === 'table' ? 'Send to kitchen' : 'Place pre-order' }} · {{ price(cart.total()) }}
+        </button>
       }
     </article>
   }

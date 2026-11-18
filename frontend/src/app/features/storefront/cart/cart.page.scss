@@ -92,3 +92,24 @@
   font-weight: 600;
   margin: 0 0 0.6rem;
 }
+
+.checkout {
+  max-width: 640px;
+  margin-inline: auto;
+}
+.where {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  .material-symbols-outlined {
+    color: var(--wl-primary);
+  }
+}
+.who {
+  font-size: 1rem;
+}
+.small {
+  font-size: 0.8rem;
+  margin: 0 0 1rem;
+}

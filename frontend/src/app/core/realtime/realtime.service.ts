@@ -17,6 +17,8 @@ export class RealtimeService implements OnDestroy {
   private socket?: Socket;
   private authed = false;
   private readonly rooms = new Map<string, Record<string, string>>(); // key → subscribe payload
+  /** How many parts of the app want each room (the admin layout and a page may share one). */
+  private readonly refs = new Map<string, number>();
   // Listeners survive socket replacement (e.g. upgrading an anonymous connection to a signed-in one).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly handlers = new Map<string, Set<(...args: any[]) => void>>();
@@ -89,11 +91,20 @@ export class RealtimeService implements OnDestroy {
       this.open(withAuth);
     }
     const ok = await this.emitSubscribe(payload);
-    if (ok) this.rooms.set(key, payload);
+    if (ok) {
+      this.rooms.set(key, payload);
+      this.refs.set(key, (this.refs.get(key) ?? 0) + 1);
+    }
     return ok;
   }
 
   private leave(key: string, payload: Record<string, string>): void {
+    const left = (this.refs.get(key) ?? 1) - 1;
+    if (left > 0) {
+      this.refs.set(key, left); // someone else still listens to this room
+      return;
+    }
+    this.refs.delete(key);
     this.rooms.delete(key);
     this.socket?.emit('unsubscribe', payload);
   }
@@ -118,7 +129,10 @@ export class RealtimeService implements OnDestroy {
     this.socket?.disconnect();
     this.socket = undefined;
     this.authed = false;
-    if (clearRooms) this.rooms.clear();
+    if (clearRooms) {
+      this.rooms.clear();
+      this.refs.clear();
+    }
     this._status.set('idle');
   }
 

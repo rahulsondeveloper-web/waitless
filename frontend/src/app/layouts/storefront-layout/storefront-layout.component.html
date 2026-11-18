@@ -66,6 +66,7 @@
   @switch (ctx.status()) {
     @case ('ready') {
       <router-outlet />
+      @if (cart.tableToken() && !ctx.preview()) { <wl-call-waiter /> }
     }
     @case ('not_found') {
       <section class="wl-container sf-missing">

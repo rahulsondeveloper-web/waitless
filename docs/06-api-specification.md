@@ -201,6 +201,16 @@ Implemented in Phase 10 (plan feature `billing_pos`):
 
 Guests (header `X-Table-Token`): `GET /table-session/bills`, `POST /table-session/finish`, `POST /table-session/bills/{id}/pay` (gateway order), `POST /table-session/bills/{id}/upi-claim {reference}` (paid the restaurant's own UPI ID; 422 `UPI_NOT_SET`), `GET /table-session/invoices/{id}/pdf?t=` (receipt). The order ID + PIN still open a closed visit (read-only, 90 days) so the invoice can be downloaded later. Table QR: `GET /public/restaurants/{slug}/tables/{qr}`, `POST …/start {guest_name, party_size}` (self-seating → token, order ID, PIN), `POST …/join {pin}`. Signed-in customers: `GET /me/invoices`, `GET /me/invoices/{id}/pdf`. `POST /table-session/orders` takes `guest_name` (shown with the dishes, never on the invoice). Development: `POST /public/payments/mock-bill/{order_id}`. Gateway webhooks for bills arrive on the same `/webhooks/payments/{provider}`. Realtime: `bills.changed {branch_id[, session_id]}` to the branch staff room and the table.
 
+### Guest service (post-launch)
+
+Guests (header `X-Table-Token`): `GET · POST /table-session/calls {kind: water|tissue|bill|help, guest_name}` (429 `CALL_COOLDOWN` within 2 min), `GET /table-session/wifi`, `GET · POST /table-session/review {rating 1–5, comment}` (409 `NOT_PAID` / `ALREADY_REVIEWED`), `POST /table-session/bills/{id}/split-by-person` (422 `ONE_PERSON`, 409 `BILL_LOCKED`), `POST /table-session/bills/{id}/pay {amount?}` and `/upi-claim {reference, amount?}` (equal shares), `GET /table-session/invoices/{id}/pdf?names=true`. Public: `GET /public/restaurants/{slug}/reviews`. Signed-in: `GET /me/invoices/{id}/pdf?names=true`.
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/service-calls?branch_id=` · POST `/service-calls/{id}/done` | `tables.operate` — Socket.IO `service.requested` / `service.done` in the branch staff room |
+| GET · PUT | `/guest-wifi {name, password}` | GET `restaurant.profile.view`; PUT `restaurant.profile.manage` |
+| GET | `/reviews` · PATCH `/reviews/{id} {hidden}` | `restaurant.profile.view` / `restaurant.profile.manage` |
+
 ### Inventory, suppliers, purchases
 
 Implemented in Phase 9 (plan feature `inventory`):

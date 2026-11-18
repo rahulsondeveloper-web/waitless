@@ -40,6 +40,7 @@
       @if (!isHandset()) {
         <a mat-button routerLink="/">WaitLess site</a>
       }
+      @if (pageAccess()) { <wl-service-alerts /> }
       <wl-user-menu [compact]="isHandset()" />
     </mat-toolbar>
     <main class="ad-main">

@@ -18,6 +18,7 @@ import { Branch, CUISINES, RESTAURANT_TYPES } from '../../../core/tenancy/tenanc
 import { TenancyService } from '../../../core/tenancy/tenancy.service';
 import { LatLng, MapPickerComponent } from '../../../shared/ui/map-picker/map-picker.component';
 import { ErrorStateComponent, LoadingStateComponent } from '../../../shared/ui/state/state.components';
+import { GuestWifiCardComponent } from './guest-wifi-card.component';
 
 type Section = 'details' | 'location' | 'hours' | 'social';
 const HTTPS = /^https:\/\/\S+$/i;
@@ -26,6 +27,7 @@ const HTTPS = /^https:\/\/\S+$/i;
 @Component({
   selector: 'wl-profile-page',
   imports: [
+    GuestWifiCardComponent,
     ReactiveFormsModule,
     MatFormFieldModule,
     MatInputModule,

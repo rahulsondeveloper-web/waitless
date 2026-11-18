@@ -18,7 +18,7 @@ import { ServingTimerComponent } from '../../shared/ui/serving-timer/serving-tim
     <section class="wl-container bk-page">
       <header class="bk-head">
         <h1>My orders</h1>
-        <p>Pre-orders and orders you placed while signed in, and your invoices.</p>
+        <p>Your orders and invoices from every restaurant — no order ID or PIN needed while you are signed in.</p>
       </header>
       @if (invoices()?.length) {
         <h2 class="sub">Invoices</h2>
@@ -29,8 +29,12 @@ import { ServingTimerComponent } from '../../shared/ui/serving-timer/serving-tim
                 <b>{{ i.restaurant_name }} · {{ i.kind === 'credit_note' ? 'Credit note' : 'Invoice' }} {{ i.number }}</b>
                 <p class="bk-muted">{{ when(i.issued_at) }} · {{ price(i.total) }}{{ i.items.length ? ' · ' + i.items.slice(0, 4).join(', ') + (i.items.length > 4 ? '…' : '') : '' }}</p>
               </div>
-              <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="download(i)" [disabled]="downloading() === i.id" data-testid="my-invoice-pdf">
-                Download</button>
+              <span class="inv-actions">
+                <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="download(i)" [disabled]="downloading() === i.id" data-testid="my-invoice-pdf">
+                  Download</button>
+                <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="download(i, true)" [disabled]="downloading() === i.id" data-testid="my-invoice-pdf-names">
+                  With names</button>
+              </span>
             </div>
           }
         </article>
@@ -102,6 +106,12 @@ import { ServingTimerComponent } from '../../shared/ui/serving-timer/serving-tim
     .inv p {
       margin: 0.15rem 0 0;
     }
+    .inv-actions {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      justify-content: flex-end;
+    }
     .lines {
       margin: 0;
       padding-left: 1.1rem;
@@ -130,9 +140,9 @@ export class MyOrdersPage implements OnInit {
     this.destroyRef.onDestroy(this.realtime.on('orders.changed', () => this.load()));
   }
 
-  protected download(i: MyInvoice): void {
+  protected download(i: MyInvoice, names = false): void {
     this.downloading.set(i.id);
-    this.billing.myInvoicePdf(i.id).subscribe({
+    this.billing.myInvoicePdf(i.id, names).subscribe({
       next: (b) => {
         this.downloading.set(null);
         openBlob(b);

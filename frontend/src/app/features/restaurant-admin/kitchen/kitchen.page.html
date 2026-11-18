@@ -35,7 +35,7 @@
               <span>{{ where(o) }}</span>
               <span class="mins" [attr.aria-label]="minutes(o) + ' minutes since ordered'">{{ minutes(o) }}′</span>
             </header>
-            <wl-serving-timer [order]="o" [compact]="true" />
+            <wl-serving-timer [order]="o" [large]="true" />
             <ul>
               @for (l of o.items; track l.id) {
                 <li>
