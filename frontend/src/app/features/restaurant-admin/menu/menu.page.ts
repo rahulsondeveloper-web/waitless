@@ -10,7 +10,7 @@ import { Observable, filter } from 'rxjs';
 
 import { AuthService } from '../../../core/auth/auth.service';
 import { ApiError } from '../../../core/http/api-error';
-import { AdminItem, AdminMenu, MenuService } from '../../../core/restaurant/menu.service';
+import { AdminItem, AdminMenu, MenuService, AdminCategory } from '../../../core/restaurant/menu.service';
 import { formatPrice } from '../../../core/storefront/storefront.models';
 import { TenancyService } from '../../../core/tenancy/tenancy.service';
 import { ConfirmData, ConfirmDialogComponent } from '../../../shared/ui/confirm-dialog/confirm-dialog.component';
@@ -20,6 +20,7 @@ import { CategoryDialogComponent, CategoryDialogData } from './category-dialog.c
 import { ItemDialogComponent, ItemDialogData } from './item-dialog.component';
 import { OptionsDialogComponent, OptionsDialogData } from './options-dialog.component';
 import { RecipeDialogComponent } from './recipe-dialog.component';
+import { categoryImage } from '../../../core/storefront/storefront.models';
 
 /** Menu management (PRD §7): categories, subcategories, dishes, photos, sold-out, archive. */
 @Component({
@@ -184,6 +185,25 @@ export class MenuAdminPage implements OnInit {
 
   protected archive(item: AdminItem, archived: boolean): void {
     this.run(item.id, this.svc.archive(item.id, archived), (i) => this.upsertItem(i as AdminItem));
+  }
+
+  protected catImage(c: AdminCategory): string {
+    return categoryImage(c.name, c.image_url);
+  }
+
+  protected uploadCategoryImage(c: AdminCategory, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    this.run('cat-' + c.id, this.svc.uploadCategoryImage(c.id, file), (m) => {
+      this.menu.set(m);
+      this.snack.open('Category photo saved.', undefined, { duration: 2000 });
+    });
+  }
+
+  protected resetCategoryImage(c: AdminCategory): void {
+    this.run('cat-' + c.id, this.svc.removeCategoryImage(c.id), (m) => this.menu.set(m));
   }
 
   protected uploadImage(item: AdminItem, event: Event): void {

@@ -70,14 +70,26 @@ test('guest presses Finish, pays online and gets the receipt; staff then closes 
   await page.getByRole('button', { name: 'Open my table' }).click();
   await expect(page.getByTestId('table-view')).toContainText(seated.session.public_code);
 
-  page.once('dialog', (d) => d.accept());
   await page.getByTestId('finish').click();
+  const popup = page.getByTestId('finish-popup');
+  await popup.getByTestId('finish-confirm').click();
+  // The popup shows the final bill with every charge, and Pay now.
+  await expect(popup.getByTestId('popup-bill')).toBeVisible();
+  await expect(popup.getByTestId('bill-lines').locator('li')).toHaveCount(1);
+  await expect(popup.getByTestId('summary-total')).toBeVisible();
+  await popup.getByTestId('popup-pay-now').click();
+
+  // Checkout: UPI ID / QR / card through the gateway (mock in development).
+  await expect(page).toHaveURL(new RegExp(`/r/${SLUG}/checkout/`));
+  await page.getByTestId('pay-gateway').getByTestId('checkout-pay-online').click();
+  await page.getByTestId('mock-pay').click();
+  await expect(page.getByTestId('checkout-paid')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('download-invoice')).toHaveAttribute('href', /\/invoices\/.+\/pdf\?t=/);
+
+  await page.goto(`/r/${SLUG}/session`);
   const bill = page.getByTestId('guest-bill');
-  await expect(bill).toContainText('To pay');
+  await expect(bill).toContainText('Paid');
   await expect(page.getByTestId('order-more')).toHaveCount(0); // no more orders after Finish
-  await bill.getByTestId('pay-online').click();
-  await bill.getByTestId('mock-pay').click();
-  await expect(bill).toContainText('Paid', { timeout: 15_000 });
   await expect(bill.getByTestId('receipt')).toHaveAttribute('href', /\/invoices\/.+\/pdf\?t=/);
 
   const staff = await ownerPage(browser, '/restaurant-admin/billing');

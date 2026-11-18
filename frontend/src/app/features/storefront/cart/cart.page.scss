@@ -84,3 +84,11 @@
   font-size: 3rem;
   color: var(--wl-secondary);
 }
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  margin: 0 0 0.6rem;
+}

@@ -9,6 +9,8 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { map } from 'rxjs';
 
+import { AuthService } from '../../core/auth/auth.service';
+import { canOpenPage } from '../../core/auth/page-access';
 import { UserMenuComponent } from '../../shared/ui/user-menu/user-menu.component';
 
 export interface AdminNavItem {
@@ -19,7 +21,8 @@ export interface AdminNavItem {
 
 /**
  * Shared shell for Restaurant Admin and Super Admin dashboards (Angular Material).
- * Route data: { area: string, nav: AdminNavItem[] }.
+ * Route data: { area: string, nav: AdminNavItem[], pageAccess?: true }.
+ * With pageAccess, the sidebar shows only the pages the staff member's role can open.
  */
 @Component({
   selector: 'wl-admin-layout',
@@ -41,7 +44,13 @@ export interface AdminNavItem {
 export class AdminLayoutComponent {
   private readonly data = toSignal(inject(ActivatedRoute).data, { initialValue: {} as Record<string, unknown> });
   protected readonly area = computed(() => (this.data()['area'] as string) ?? 'Admin');
-  protected readonly nav = computed(() => (this.data()['nav'] as AdminNavItem[]) ?? []);
+  private readonly auth = inject(AuthService);
+  protected readonly nav = computed(() => {
+    const all = (this.data()['nav'] as AdminNavItem[]) ?? [];
+    if (!this.data()['pageAccess']) return all;
+    this.auth.activeTenant(); // re-filter when the role or restaurant changes
+    return all.filter((n) => canOpenPage(n.path, (p) => this.auth.hasPermission(p)));
+  });
   protected readonly isHandset = toSignal(
     inject(BreakpointObserver)
       .observe('(max-width: 900px)')

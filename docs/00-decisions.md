@@ -134,3 +134,14 @@ Decisions taken during scoping (2026-11-16). "Owner" = confirmed by the product 
 | D102 | Checkout | The browser opens Razorpay's official checkout (checkout.js loaded on demand); success in the browser is never trusted — the signed webhook decides. The development mock checkout stays. | Phase 12 |
 | D103 | Deployment | One Compose project: Postgres (owner ≠ app role), Redis, one-shot `migrate`, API replicas (Nginx `ip_hash` for Socket.IO), one worker, Nginx with Let's Encrypt (self-signed until issued), nightly verified backups to S3, optional Prometheus/Loki/Grafana. | Phase 12 |
 | D34 | RLS app role timing | The non-owner database role and Row-Level Security policies are created in **Phase 2** together with the first tenant tables, instead of Phase 1 (there is nothing to protect before tenants exist). | Phase 1 |
+
+## Post-launch additions (2026-11-18)
+
+| # | Topic | Decision | Source |
+|---|---|---|---|
+| D104 | Guest names | Each order stores `ordered_by_name` (typed at the cart/join form, or the account name). Shown on the cart, table page, kitchen tickets, Orders and Billing screens — **never on the invoice** (excluded from the invoice snapshot and PDF). | Owner (1a) |
+| D105 | Checkout | Finish opens a popup with every charge and *Pay now* → `/r/{slug}/checkout/{bill}`. Main option: Razorpay (UPI ID, UPI QR, cards). Fallback when the restaurant sets its own UPI ID: a `upi://pay` QR + "Open UPI app"; the guest taps "I have paid" (pending payment, bill locked) and staff mark it *Received* / *Not received*. | Owner (2c) |
+| D106 | Invoice later | The order ID + PIN reopen a closed visit read-only for 90 days, so the guest can download the invoice any time; signed-in customers see all their invoices under My orders. | Owner |
+| D107 | Page access | Pages follow the role's permissions (a page opens with any of its permissions; Dashboard and Settings open to all). The sidebar hides other pages and a route guard redirects; the APIs already enforce the same permissions. Built-in roles are fixed; *Customise* copies one into an editable custom role with a "Pages" checklist. | Owner (3) |
+| D108 | Category photos | Categories show photo cards on the storefront (not dishes). Defaults are the template's images chosen by category name; owners can upload their own or go back to the default. | Owner (4) |
+| D109 | Table QR | Each table gets an unguessable token (rotatable). Scanning a free table lets the guest open it with a name (self-seating, on by default, switchable; rate-limited 5/15 min per table, 10/h per IP) and shows the order ID + PIN to share; a taken table is joined with its PIN. | Default |

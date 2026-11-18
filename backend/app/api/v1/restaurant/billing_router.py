@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Query, Response
 from pydantic import BaseModel, Field
 
-from app.api.deps import SessionDep, TenantCtx, require_feature, require_permission
+from app.api.deps import CurrentUser, SessionDep, TenantCtx, require_feature, require_permission
 from app.schemas.billing import (
     ActiveTable,
     BillingSettings,
@@ -20,6 +20,7 @@ from app.schemas.billing import (
     RefundIn,
     SessionBillsOut,
     SplitIn,
+    UpiClaimIn,
 )
 from app.services import billing as svc
 from app.services import invoice_pdf
@@ -223,3 +224,32 @@ async def mock_bill(order_id: str, body: MockPayIn, session: SessionDep, token: 
     if get_settings().is_production or get_settings().payment_provider != "mock":
         raise NotFoundError("Not found.")
     return Ack(result=await svc.mock_bill_payment(session, token, order_id, body.success))
+
+
+@router.post("/payments/{payment_id}/confirm", response_model=BillOut, summary="The guest's UPI payment arrived")
+async def confirm_upi(payment_id: uuid.UUID, session: SessionDep, ctx: Collect) -> BillOut:
+    return await svc.review_upi_claim(session, ctx, payment_id, accept=True)
+
+
+@router.post("/payments/{payment_id}/reject", response_model=BillOut, summary="The guest's UPI payment did not arrive")
+async def reject_upi(payment_id: uuid.UUID, session: SessionDep, ctx: Collect) -> BillOut:
+    return await svc.review_upi_claim(session, ctx, payment_id, accept=False)
+
+
+@guest_router.post(
+    "/table-session/bills/{bill_id}/upi-claim", response_model=SessionBillsOut, summary="I paid the restaurant's UPI ID"
+)
+async def upi_claim(
+    bill_id: uuid.UUID, body: UpiClaimIn, session: SessionDep, token: TableToken = None
+) -> SessionBillsOut:
+    return await svc.upi_claim(session, token, bill_id, body.reference)
+
+
+@guest_router.get("/me/invoices", summary="My invoices at every restaurant (signed in)")
+async def my_invoices(session: SessionDep, user: CurrentUser) -> list[dict]:
+    return await svc.my_invoices(session, user)
+
+
+@guest_router.get("/me/invoices/{invoice_id}/pdf", summary="Download one of my invoices")
+async def my_invoice_pdf(invoice_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Response:
+    return _pdf(await svc.my_invoice(session, user, invoice_id), receipt=False)

@@ -233,6 +233,7 @@ async def _create(
     customer_id: uuid.UUID | None = None,
     placed_by: uuid.UUID | None = None,
     idem: str | None = None,
+    ordered_by_name: str | None = None,
 ) -> tuple[Order, bool]:
     """Returns (order, created). A repeated idempotency key returns the original order."""
     if (existing := await _find_idempotent(session, idem)) is not None:
@@ -268,6 +269,7 @@ async def _create(
             total=_money(subtotal + tax),
             notes=data.notes.strip(),
             idempotency_key=idem,
+            ordered_by_name=(ordered_by_name or data.guest_name or "").strip()[:60] or None,
         )
         try:
             async with session.begin_nested():
@@ -391,6 +393,7 @@ async def orders_out(
                 sla=sla_view,
                 discount_total=discount,
                 payable_total=Decimal("0.00") if o.status == "cancelled" else payable,
+                ordered_by_name=o.ordered_by_name,
                 can_cancel=o.status in cancellable,
                 restaurant_name=tenant.name if tenant else None,
                 restaurant_slug=tenant.slug if tenant else None,
@@ -416,8 +419,31 @@ async def join_table(session: AsyncSession, tenant: Tenant, data: TableJoinIn, i
             select(TableSession).where(TableSession.public_code == data.code, TableSession.status != "closed")
         )
     ).scalar_one_or_none()
-    if s is None or not hmac.compare_digest(s.pin_hash, hash_otp(data.code, data.pin)):
-        raise UnauthorizedError("That code and PIN don't match an open table.", code="INVALID_TABLE_PIN")
+    pin_hash = hash_otp(data.code, data.pin)
+    if s is None or not hmac.compare_digest(s.pin_hash, pin_hash):
+        # After the visit: the same order ID + PIN still opens it (read-only) to see and download the invoice.
+        from datetime import timedelta
+
+        s = next(
+            (
+                c
+                for c in (
+                    await session.execute(
+                        select(TableSession)
+                        .where(
+                            TableSession.public_code == data.code,
+                            TableSession.status == "closed",
+                            TableSession.closed_at >= _now() - timedelta(days=90),
+                        )
+                        .order_by(TableSession.closed_at.desc())
+                    )
+                ).scalars()
+                if hmac.compare_digest(c.pin_hash, pin_hash)
+            ),
+            None,
+        )
+    if s is None:
+        raise UnauthorizedError("That code and PIN don't match a table.", code="INVALID_TABLE_PIN")
     token, exp = create_table_token(s.id, tenant.id, s.pin_hash)
     return TableJoinOut(token=token, expires_at=exp, session_id=s.id)
 
@@ -512,6 +538,7 @@ async def guest_order(
         table_session_id=s.id,
         customer_id=user.id if user else None,
         idem=_scoped_key(f"s{s.id}", idem),
+        ordered_by_name=data.guest_name.strip() or (user.full_name if user else None),
     )
     if created:
         await session.commit()
@@ -581,6 +608,7 @@ async def preorder(
         reservation_id=r.id,
         customer_id=user.id,
         idem=_scoped_key(f"u{user.id}", idem),
+        ordered_by_name=data.guest_name.strip() or user.full_name,
     )
     if created:
         await session.commit()

@@ -197,7 +197,10 @@ async def admin_menu(session: AsyncSession, ctx: TenantContext) -> AdminMenu:
     )
     items = (await session.execute(select(MenuItem).order_by(MenuItem.sort_order, MenuItem.name))).scalars().all()
     links = await _meal_links(session)
-    urls = await _media_urls(session, {i.image_media_id for i in items if i.image_media_id})
+    urls = await _media_urls(
+        session,
+        {i.image_media_id for i in items if i.image_media_id} | {c.image_media_id for c in cats if c.image_media_id},
+    )
     opts = await load_options(session)
 
     subs_by_cat: dict[uuid.UUID, list[SubcategoryOut]] = defaultdict(list)
@@ -221,6 +224,7 @@ async def admin_menu(session: AsyncSession, ctx: TenantContext) -> AdminMenu:
                 sort_order=c.sort_order,
                 subcategories=subs_by_cat.get(c.id, []),
                 item_count=count.get(c.id, 0),
+                image_url=urls.get(c.image_media_id) if c.image_media_id else None,
             )
             for c in cats
         ],
@@ -575,6 +579,40 @@ async def remove_item_image(session: AsyncSession, ctx: TenantContext, item_id: 
     return await _one_item(session, item)
 
 
+async def set_category_image(
+    session: AsyncSession, ctx: TenantContext, category_id: uuid.UUID, upload: UploadFile
+) -> None:
+    """The photo on the category card (storefront menu). Without one, the template's default image is shown."""
+    cat = await _get(session, MenuCategory, category_id, "Category")
+    media = await store_image(
+        session, tenant_id=ctx.tenant_id, kind="menu_item", upload=upload, actor_user_id=ctx.user_id
+    )
+    old = await session.get(MediaFile, cat.image_media_id) if cat.image_media_id else None
+    cat.image_media_id = media.id
+    await session.flush()
+    old_key = old.storage_key if old else None
+    if old:
+        await session.delete(old)
+    await session.commit()
+    if old_key:
+        await delete_files([old_key])
+    await _changed(ctx)
+
+
+async def remove_category_image(session: AsyncSession, ctx: TenantContext, category_id: uuid.UUID) -> None:
+    """Back to the template's default image."""
+    cat = await _get(session, MenuCategory, category_id, "Category")
+    old = await session.get(MediaFile, cat.image_media_id) if cat.image_media_id else None
+    if old:
+        key = old.storage_key
+        cat.image_media_id = None
+        await session.flush()
+        await session.delete(old)
+        await session.commit()
+        await delete_files([key])
+        await _changed(ctx)
+
+
 async def menu_ready(session: AsyncSession) -> bool:
     """Publish checklist: at least one live dish in an active category."""
     n = (
@@ -647,13 +685,19 @@ async def build_public_menu(session: AsyncSession, tenant: Tenant) -> PublicMenu
                 **opts.fields(i.id),
             )
         )
+    cat_urls = await _media_urls(session, {c.image_media_id for c in cats if c.image_media_id})
     categories = []
     for c in cats:
         meal_ids = [m for m in links.get(c.id, []) if m in active_meals]
         if by_cat.get(c.id) and meal_ids:
             categories.append(
                 PublicCategory(
-                    id=c.id, name=c.name, description=c.description, meal_type_ids=meal_ids, items=by_cat[c.id]
+                    id=c.id,
+                    name=c.name,
+                    description=c.description,
+                    meal_type_ids=meal_ids,
+                    items=by_cat[c.id],
+                    image_url=cat_urls.get(c.image_media_id) if c.image_media_id else None,
                 )
             )
     used_meals = {m for c in categories for m in c.meal_type_ids}

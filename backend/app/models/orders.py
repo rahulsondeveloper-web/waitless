@@ -57,6 +57,8 @@ class Order(UUIDPkMixin, TimestampMixin, Base):
     tax_total: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     notes: Mapped[str] = mapped_column(String(300), default="", server_default="")
+    # Who at the table ordered it ("Riya") — shown to the table, kitchen and staff, never on the invoice.
+    ordered_by_name: Mapped[str | None] = mapped_column(String(60))
     idempotency_key: Mapped[str | None] = mapped_column(String(80))
     placed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

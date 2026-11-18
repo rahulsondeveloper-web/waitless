@@ -221,6 +221,17 @@ export class BillingPage implements OnInit {
       .subscribe({ next: this.after(`${this.tableName(t)} merged into this bill.`), error: this.fail });
   }
 
+  protected confirmUpi(p: BillPayment): void {
+    this.busy.set(p.id);
+    this.api.confirmUpi(p.id).subscribe({ next: this.after(`UPI payment of ${this.price(p.amount)} confirmed.`), error: this.fail });
+  }
+
+  protected rejectUpi(p: BillPayment): void {
+    if (!confirm(`Mark the UPI payment of ${this.price(p.amount)} as not received? The guest can pay again.`)) return;
+    this.busy.set(p.id);
+    this.api.rejectUpi(p.id).subscribe({ next: this.after('Marked as not received.'), error: this.fail });
+  }
+
   protected settle(b: Bill): void {
     this.busy.set(b.id);
     this.api.settle(b.id).subscribe({ next: this.after(`${b.label} closed.`), error: this.fail });

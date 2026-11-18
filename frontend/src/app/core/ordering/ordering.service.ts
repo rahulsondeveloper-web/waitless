@@ -61,6 +61,7 @@ export interface Order {
   sla: Sla | null;
   discount_total: string;
   payable_total: string;
+  ordered_by_name: string | null;
   can_cancel: boolean;
   restaurant_name: string | null;
   restaurant_slug: string | null;
@@ -105,6 +106,26 @@ export function newIdempotencyKey(): string {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+export interface QrTable {
+  table_label: string;
+  capacity: number;
+  branch_id: string;
+  branch_name: string;
+  state: 'free' | 'occupied' | string;
+  session_open: boolean;
+  self_seating: boolean;
+  ordering_enabled: boolean;
+}
+
+export interface QrSeat {
+  token: string;
+  expires_at: string;
+  session_id: string;
+  code: string;
+  pin: string | null;
+  table_label: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class OrderingService {
   private readonly api = inject(ApiService);
@@ -113,11 +134,28 @@ export class OrderingService {
   joinTable(slug: string, code: string, pin: string): Observable<{ token: string; expires_at: string; session_id: string }> {
     return this.api.post(`public/restaurants/${encodeURIComponent(slug)}/table-sessions/join`, { code, pin });
   }
+  // ---------- the QR code on the table ----------
+  qrTable(slug: string, qr: string): Observable<QrTable> {
+    return this.api.get(`public/restaurants/${encodeURIComponent(slug)}/tables/${encodeURIComponent(qr)}`);
+  }
+  qrStart(slug: string, qr: string, guestName: string, partySize: number): Observable<QrSeat> {
+    return this.api.post(`public/restaurants/${encodeURIComponent(slug)}/tables/${encodeURIComponent(qr)}/start`, {
+      guest_name: guestName,
+      party_size: partySize,
+    });
+  }
+  qrJoin(slug: string, qr: string, pin: string): Observable<QrSeat> {
+    return this.api.post(`public/restaurants/${encodeURIComponent(slug)}/tables/${encodeURIComponent(qr)}/join`, { pin });
+  }
   tableView(token: string): Observable<TableView> {
     return this.api.getWithHeaders('table-session', { 'X-Table-Token': token });
   }
-  tableOrder(token: string, items: OrderLineIn[], notes: string, key: string): Observable<Order> {
-    return this.api.post('table-session/orders', { items, notes }, { 'X-Table-Token': token, 'Idempotency-Key': key });
+  tableOrder(token: string, items: OrderLineIn[], notes: string, key: string, guestName = ''): Observable<Order> {
+    return this.api.post(
+      'table-session/orders',
+      { items, notes, guest_name: guestName },
+      { 'X-Table-Token': token, 'Idempotency-Key': key },
+    );
   }
   tableCancel(token: string, orderId: string): Observable<Order> {
     return this.api.post(`table-session/orders/${orderId}/cancel`, {}, { 'X-Table-Token': token });

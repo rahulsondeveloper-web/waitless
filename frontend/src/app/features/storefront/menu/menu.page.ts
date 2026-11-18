@@ -6,7 +6,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiError } from '../../../core/http/api-error';
 import { CartLine, CartService } from '../../../core/ordering/cart.service';
 import { OrderingService, itemPrice, unavailableReason } from '../../../core/ordering/ordering.service';
-import { PublicCategory, PublicItem, PublicMenu, formatPrice } from '../../../core/storefront/storefront.models';
+import { PublicCategory, PublicItem, PublicMenu, formatPrice, categoryImage } from '../../../core/storefront/storefront.models';
 import { TenantContextService } from '../../../core/storefront/tenant-context.service';
 import { EmptyStateComponent, ErrorStateComponent, LoadingStateComponent } from '../../../shared/ui/state/state.components';
 import { DishPickerComponent } from './dish-picker.component';
@@ -105,6 +105,10 @@ export class StorefrontMenuPage implements OnInit {
 
   protected price(v: string | number): string {
     return formatPrice(v, this.menu()?.currency ?? 'INR');
+  }
+
+  protected catImage(c: { name: string; image_url?: string | null }): string {
+    return categoryImage(c.name, c.image_url);
   }
 
   protected jump(id: string): void {

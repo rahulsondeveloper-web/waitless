@@ -76,14 +76,27 @@ export class StorefrontCartPage implements OnInit {
     void this.router.navigate(['/login'], { queryParams: { returnUrl: `/r/${this.ctx.slug()}/cart` } });
   }
 
+  /** The name shown with these dishes: typed here, or the signed-in account name. */
+  protected name(): string {
+    return this.cart.guestName() || this.auth.user()?.full_name || '';
+  }
+
+  protected setName(v: string): void {
+    this.cart.setGuestName(v);
+  }
+
   protected place(): void {
+    if (this.target() === 'table' && !this.name().trim()) {
+      this.error.set('Tell us your name, so your dishes reach you.');
+      return;
+    }
     if (!this.cart.count()) return;
     this.attemptKey ??= newIdempotencyKey();
     const items = this.cart.toOrder();
     const token = this.cart.tableToken();
     const pre = this.cart.preorderFor();
     const req = token
-      ? this.api.tableOrder(token, items, this.notes.trim(), this.attemptKey)
+      ? this.api.tableOrder(token, items, this.notes.trim(), this.attemptKey, this.name())
       : pre
         ? this.api.preorder(pre, items, this.notes.trim(), this.attemptKey)
         : null;

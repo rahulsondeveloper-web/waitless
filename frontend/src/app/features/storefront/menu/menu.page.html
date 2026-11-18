@@ -41,9 +41,12 @@
         </label>
       </div>
       @if (categories().length > 1) {
-        <nav class="jump" aria-label="Categories">
+        <nav class="cat-cards" aria-label="Categories" data-testid="category-cards">
           @for (c of categories(); track c.id) {
-            <button type="button" (click)="jump(c.id)">{{ c.name }}</button>
+            <button type="button" class="cat-card" (click)="jump(c.id)">
+              <img [src]="catImage(c)" [alt]="''" loading="lazy" width="300" height="225" />
+              <span>{{ c.name }}</span>
+            </button>
           }
         </nav>
       }

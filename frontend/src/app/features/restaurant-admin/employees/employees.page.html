@@ -65,8 +65,12 @@
                 <b>{{ r.name }}</b> @if (!r.is_system) { <span class="custom">custom</span> }
                 <small>{{ r.description }}</small>
                 <small>{{ permCount(r) }} permissions · {{ r.member_count }} {{ r.member_count === 1 ? 'person' : 'people' }}</small>
+                <small class="pages" data-testid="role-pages-summary">Pages: {{ pagesOf(r) }}</small>
               </div>
-              @if (!r.is_system) {
+              @if (r.is_system) {
+                <button mat-button type="button" (click)="openRole(null, r)" [attr.aria-label]="'Customise a copy of ' + r.name">
+                  <mat-icon>content_copy</mat-icon> Customise</button>
+              } @else {
                 <div>
                   <button mat-icon-button type="button" (click)="openRole(r)" [attr.aria-label]="'Edit ' + r.name"><mat-icon>edit</mat-icon></button>
                   <button mat-icon-button type="button" (click)="deleteRole(r)" [attr.aria-label]="'Delete ' + r.name"><mat-icon>delete</mat-icon></button>

@@ -1,6 +1,7 @@
 import { Route, Routes } from '@angular/router';
 
 import { authGuard, guestGuard, staffGuard, superAdminGuard } from './core/auth/auth.guards';
+import { PAGE_ACCESS, pageAccessGuard } from './core/auth/page-access';
 import type { AdminNavItem } from './layouts/admin-layout/admin-layout.component';
 
 /** Route map follows docs/01 + PRD §19. Each area is lazy-loaded with its own layout. */
@@ -55,6 +56,10 @@ const SUPER_ADMIN_NAV: AdminNavItem[] = [
  */
 const adminChildren = (nav: AdminNavItem[], phases: Record<string, number>, built: Record<string, Route> = {}) =>
   nav.map((n) => built[n.path] ?? page(n.path === '.' ? '' : n.path, n.label, phases[n.path] ?? 0));
+
+/** Restaurant-admin pages are guarded by the role's permissions (core/auth/page-access.ts). */
+const guarded = (routes: Route[]): Route[] =>
+  routes.map((r) => (r.path && PAGE_ACCESS[r.path.split('/')[0]] ? { ...r, canActivate: [...(r.canActivate ?? []), pageAccessGuard] } : r));
 
 export const routes: Routes = [
   // WaitLess public website
@@ -177,6 +182,14 @@ export const routes: Routes = [
         path: 'session',
         loadComponent: () => import('./features/storefront/session/session.page').then((m) => m.StorefrontSessionPage),
       },
+      {
+        path: 'checkout/:billId',
+        loadComponent: () => import('./features/storefront/checkout/checkout.page').then((m) => m.StorefrontCheckoutPage),
+      },
+      {
+        path: 't/:qr',
+        loadComponent: () => import('./features/storefront/table-qr/table-qr.page').then((m) => m.StorefrontTableQrPage),
+      },
     ],
   },
 
@@ -185,8 +198,14 @@ export const routes: Routes = [
     path: 'restaurant-admin',
     canActivate: [staffGuard],
     loadComponent: () => import('./layouts/admin-layout/admin-layout.component').then((m) => m.AdminLayoutComponent),
-    data: { area: 'Restaurant Admin', nav: RESTAURANT_ADMIN_NAV },
-    children: adminChildren(
+    data: { area: 'Restaurant Admin', nav: RESTAURANT_ADMIN_NAV, pageAccess: true },
+    children: guarded([
+      {
+        path: 'tables/qr',
+        title: 'Table QR codes · WaitLess',
+        loadComponent: () => import('./features/restaurant-admin/tables/table-qr.page').then((m) => m.TableQrPage),
+      },
+      ...adminChildren(
       RESTAURANT_ADMIN_NAV,
       {
         profile: 3, branding: 3, gallery: 3,
@@ -299,6 +318,7 @@ export const routes: Routes = [
         },
       },
     ),
+    ]),
   },
 
   // WaitLess Super Admin dashboard

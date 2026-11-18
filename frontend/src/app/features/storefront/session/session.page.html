@@ -40,6 +40,7 @@
           <span class="bk-badge" [attr.data-status]="o.status === 'ready' ? 'notified' : o.status === 'served' ? 'seated' : o.status === 'cancelled' ? 'cancelled' : 'waiting'">
             {{ statusLabel[o.status] }}
           </span>
+          @if (o.ordered_by_name) { <span class="by" data-testid="ordered-by">{{ o.ordered_by_name }}</span> }
           <span class="bk-muted time">ordered {{ minutes(o) }} min ago</span>
         </header>
         <wl-serving-timer [order]="o" [offsetMs]="offset()" [currency]="ctx.restaurant()?.currency ?? 'INR'" />
@@ -130,10 +131,10 @@
                 </div>
               } @else {
                 <div class="bk-actions">
-                  @if (b.methods.includes('gateway')) {
-                    <button type="button" class="wl-btn wl-btn--primary" (click)="payOnline(b.id)" [disabled]="billBusy()" data-testid="pay-online">
-                      Pay {{ price(b.due) }} online</button>
+                  @if (b.methods.includes('gateway') || bs.upi_id) {
+                    <a class="wl-btn wl-btn--primary" [routerLink]="['../checkout', b.id]" data-testid="pay-now">Pay {{ price(b.due) }} now</a>
                   }
+                  <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="popup.set('bill')">See the full bill</button>
                   <span class="bk-muted">or pay your waiter by cash, card or UPI.</span>
                 </div>
               }
@@ -141,6 +142,39 @@
           </article>
         }
       }
+    }
+    @if (popup(); as mode) {
+      <div class="popup-backdrop" (click)="closePopup()" aria-hidden="true"></div>
+      <div class="popup" role="dialog" aria-modal="true" [attr.aria-label]="mode === 'confirm' ? 'Finish your meal' : 'Your bill'" data-testid="finish-popup">
+        @if (mode === 'confirm') {
+          <h2>Finish your meal?</h2>
+          <p>You won't be able to order more, and your final bill will be ready.</p>
+          <div class="bk-actions">
+            <button type="button" class="wl-btn wl-btn--primary" (click)="confirmFinish()" [disabled]="billBusy()" data-testid="finish-confirm">
+              Yes, get my bill</button>
+            <button type="button" class="wl-btn wl-btn--ghost" (click)="closePopup()">Not yet</button>
+          </div>
+        } @else {
+          <h2>Your bill</h2>
+          @for (b of payable(); track b.id) {
+            <div class="popup__bill" data-testid="popup-bill">
+              <wl-bill-summary [bill]="b" [currency]="ctx.restaurant()?.currency ?? 'INR'" />
+              @if (b.status === 'paid') {
+                <p class="paid-note">Paid — thank you!</p>
+              } @else if (n(b.due) > 0) {
+                <div class="bk-actions">
+                  <button type="button" class="wl-btn wl-btn--primary" (click)="payNow(b.id)" data-testid="popup-pay-now">
+                    Pay {{ price(b.due) }} now</button>
+                </div>
+              }
+            </div>
+          } @empty {
+            <p class="bk-muted">Your bill is being prepared. Please ask your waiter.</p>
+          }
+          <p class="bk-muted">Pay by UPI ID, UPI QR or card — or pay your waiter by cash.</p>
+          <div class="bk-actions"><button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="closePopup()">Close</button></div>
+        }
+      </div>
     }
   } @else if (loading()) {
     <div class="wl-state"><span class="wl-spinner" aria-label="Loading"></span></div>
@@ -152,6 +186,11 @@
           <span>Order ID</span>
           <input name="code" [(ngModel)]="code" autocomplete="off" autocapitalize="characters" placeholder="UB-4821"
                  required data-testid="join-code" />
+        </label>
+        <label class="bk-field">
+          <span>Your name</span>
+          <input name="guestName" [(ngModel)]="guestName" maxlength="60" autocomplete="given-name" placeholder="e.g. Riya"
+                 data-testid="join-name" />
         </label>
         <label class="bk-field">
           <span>PIN</span>

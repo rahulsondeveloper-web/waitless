@@ -155,6 +155,15 @@ export const STATUS_LABEL: Record<TableStatus, string> = {
   cleaning: 'Cleaning',
 };
 
+export interface TableQrSheet {
+  branch_id: string;
+  branch_name: string;
+  restaurant_name: string;
+  slug: string;
+  self_seating: boolean;
+  tables: { table_id: string; label: string; capacity: number; path: string }[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class OperationsService {
   private readonly api = inject(ApiService);
@@ -215,6 +224,16 @@ export class OperationsService {
   }
   deleteSection(id: string): Observable<void> {
     return this.api.delete(`restaurant/sections/${id}`);
+  }
+  // ---------- QR codes on the tables ----------
+  tableQr(branchId: string): Observable<TableQrSheet> {
+    return this.api.get('restaurant/table-qr', { branch_id: branchId });
+  }
+  rotateTableQr(tableId: string): Observable<TableQrSheet> {
+    return this.api.post(`restaurant/table-qr/${tableId}/rotate`, {});
+  }
+  setSelfSeating(enabled: boolean): Observable<{ enabled: boolean }> {
+    return this.api.put('restaurant/table-qr/self-seating', { enabled });
   }
   tables(branchId: string): Observable<Table[]> {
     return this.api.get('restaurant/tables', { branch_id: branchId });

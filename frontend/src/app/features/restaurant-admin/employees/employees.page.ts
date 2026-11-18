@@ -9,6 +9,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { Observable, filter, forkJoin } from 'rxjs';
 
 import { AuthService } from '../../../core/auth/auth.service';
+import { PAGE_ACCESS } from '../../../core/auth/page-access';
 import { ApiError } from '../../../core/http/api-error';
 import { OperationsService, Permission, Role, Staff } from '../../../core/restaurant/operations.service';
 import { Branch } from '../../../core/tenancy/tenancy.models';
@@ -108,10 +109,10 @@ export class EmployeesPage implements OnInit {
     );
   }
 
-  protected openRole(role: Role | null): void {
+  protected openRole(role: Role | null, copyOf: Role | null = null): void {
     this.dialog
       .open<RoleDialogComponent, RoleDialogData, Role>(RoleDialogComponent, {
-        data: { role, permissions: this.permissions() },
+        data: { role, permissions: this.permissions(), copyOf },
         width: '620px',
         maxWidth: '96vw',
       })
@@ -124,6 +125,12 @@ export class EmployeesPage implements OnInit {
     this.confirm({ title: `Delete role "${role.name}"?`, message: 'This cannot be undone.', confirm: 'Delete', danger: true }, () =>
       this.run(this.ops.deleteRole(role.id), () => this.refreshRoles()),
     );
+  }
+
+  /** "Tables, Orders, Kitchen" — the admin pages this role can open. */
+  protected pagesOf(r: Role): string {
+    const list = Object.values(PAGE_ACCESS).filter((pg) => pg.perms.some((p) => !!r.permissions[p]));
+    return list.length === Object.keys(PAGE_ACCESS).length ? 'All pages' : list.map((pg) => pg.label).join(', ') || 'Dashboard only';
   }
 
   protected permCount(r: Role): number {

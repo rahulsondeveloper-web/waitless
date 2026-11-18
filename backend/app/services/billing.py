@@ -392,6 +392,11 @@ async def bills_out(session: AsyncSession, bills: list[Bill]) -> list[BillOut]:
     ).scalars():
         lines[li.bill_id].append(li)
     oids = {li.order_id for ls in lines.values() for li in ls}
+    order_names = (
+        dict((await session.execute(select(Order.id, Order.ordered_by_name).where(Order.id.in_(oids)))).tuples().all())
+        if oids
+        else {}
+    )
     unserved: dict[uuid.UUID, int] = defaultdict(int)
     if oids:
         open_orders = {
@@ -449,7 +454,10 @@ async def bills_out(session: AsyncSession, bills: list[Bill]) -> list[BillOut]:
                 status=b.status,  # type: ignore[arg-type]
                 locked=b.locked,
                 merged_into_id=b.merged_into_id,
-                lines=[BillLineOut.model_validate(li) for li in lines[b.id]],
+                lines=[
+                    BillLineOut.model_validate(li).model_copy(update={"ordered_by_name": order_names.get(li.order_id)})
+                    for li in lines[b.id]
+                ],
                 subtotal=b.subtotal,
                 sla_discount=b.sla_discount,
                 sla_discount_after_tax=b.sla_discount_after_tax,
@@ -490,7 +498,12 @@ async def session_bills_out(session: AsyncSession, s: TableSession) -> SessionBi
     out = await bills_out(session, bills)
     labels = await _labels(session, {s.id})
     due = sum((b.due for b in out), ZERO)
+    tenant = await session.get(Tenant, s.tenant_id)
+    st = settings_of(tenant) if tenant else BillingSettings()
     return SessionBillsOut(
+        restaurant_name=tenant.name if tenant else "",
+        upi_id=st.upi_id,
+        upi_payee_name=st.upi_payee_name or (tenant.name if tenant else ""),
         session_id=s.id,
         session_code=s.public_code,
         session_status=s.status,
@@ -992,7 +1005,11 @@ async def _issue(
                 "currency": str((tenant.settings or {}).get("currency", "INR")),
                 "tax_split": st.tax_split,
             },
-            "bill": view.model_dump(mode="json", exclude={"methods", "other_method_label"}),
+            # The invoice never names who ate what (only the screens do).
+            "bill": view.model_dump(
+                mode="json",
+                exclude={"methods": True, "other_method_label": True, "lines": {"__all__": {"ordered_by_name"}}},
+            ),
             "original_number": original.number if original else None,
             "reason": reason or None,
             "total": str(total),
@@ -1279,3 +1296,161 @@ async def mock_bill_payment(session: AsyncSession, token: str | None, order_id: 
         raise NotFoundError("Payment not found.")
     raw, sig = MockGateway.build_event(order_id, p.amount, success)
     return await process_payment_event(session, "mock", MockGateway().parse_webhook(raw, sig)) or "unknown_order"
+
+
+# ---------- paying the restaurant's own UPI ID (guest claims, staff confirm) ----------
+
+
+async def upi_claim(session: AsyncSession, token: str | None, bill_id: uuid.UUID, reference: str) -> SessionBillsOut:
+    """The guest paid the restaurant's UPI ID from the checkout page. WaitLess cannot see that money, so the
+    payment waits as "pending" until staff confirm it on the Billing screen."""
+    b, s, tenant = await _guest_bill(session, token, bill_id)
+    st = settings_of(tenant)
+    if not st.upi_id:
+        raise AppError(
+            "This restaurant has no UPI ID set up — pay online or at the counter.", code="UPI_NOT_SET", status_code=422
+        )
+    if b.status != "open":
+        raise ConflictError(f"This bill is {b.status}.", code="BILL_CLOSED")
+    pending = (
+        await session.execute(
+            select(BillPayment).where(
+                BillPayment.bill_id == b.id, BillPayment.status == "pending", BillPayment.provider == "upi_direct"
+            )
+        )
+    ).scalar_one_or_none()
+    if pending is None:
+        if not b.locked:
+            await recompute(session, b, st)
+        due = b.grand_total - b.paid_total
+        if due <= 0:
+            raise ConflictError("Nothing is due on this bill.", code="NOTHING_DUE")
+        session.add(
+            BillPayment(
+                tenant_id=b.tenant_id,
+                branch_id=b.branch_id,
+                bill_id=b.id,
+                method="upi",
+                method_label="Paid to restaurant UPI",
+                amount=due,
+                status="pending",
+                provider="upi_direct",
+                reference=reference.strip()[:80],
+            )
+        )
+        b.locked = True  # the amount the guest paid must not change underneath them
+        write_audit(
+            session,
+            action="bill.upi_claimed",
+            entity="bill",
+            entity_id=b.id,
+            tenant_id=b.tenant_id,
+            diff={"amount": str(due), "reference": reference.strip()[:80]},
+        )
+        await session.commit()
+        await _changed(b.tenant_id, b.branch_id, {s.id})
+    return await session_bills_out(session, s)
+
+
+async def review_upi_claim(session: AsyncSession, ctx: TenantContext, payment_id: uuid.UUID, accept: bool) -> BillOut:
+    """Staff saw (or did not see) the money in the restaurant's UPI app."""
+    p = (
+        await session.execute(select(BillPayment).where(BillPayment.id == payment_id).with_for_update())
+    ).scalar_one_or_none()
+    if p is None or p.provider != "upi_direct":
+        raise NotFoundError("Payment not found.")
+    if not ctx.can_act_in_branch("payments.collect", p.branch_id):
+        raise ForbiddenError("You cannot confirm payments here.", code="PERMISSION_DENIED")
+    if p.status != "pending":
+        raise ConflictError("This payment was already reviewed.", code="ALREADY_REVIEWED")
+    b = (await session.execute(select(Bill).where(Bill.id == p.bill_id).with_for_update())).scalar_one()
+    if accept:
+        if b.status != "open" or p.amount > b.grand_total - b.paid_total:
+            raise ConflictError("The bill was paid another way meanwhile — reject this one.", code="OVERPAYMENT")
+        p.status, p.captured_at, p.received_by = "captured", _now(), ctx.user_id
+        b.paid_total = _money(b.paid_total + p.amount)
+        await _paid_check(session, b)
+    else:
+        p.status, p.received_by = "failed", ctx.user_id
+        others = (
+            await session.execute(
+                select(func.count())
+                .select_from(BillPayment)
+                .where(
+                    BillPayment.bill_id == b.id, BillPayment.id != p.id, BillPayment.status.in_(("captured", "pending"))
+                )
+            )
+        ).scalar_one()
+        if not others and b.status == "open":
+            b.locked = False  # nothing was paid: the bill can change again
+    write_audit(
+        session,
+        action="bill.upi_confirmed" if accept else "bill.upi_rejected",
+        entity="bill",
+        entity_id=b.id,
+        tenant_id=ctx.tenant_id,
+        actor_user_id=ctx.user_id,
+        diff={"amount": str(p.amount), "reference": p.reference},
+    )
+    await session.commit()
+    await _changed(ctx.tenant_id, b.branch_id, {b.table_session_id})
+    return (await bills_out(session, [b]))[0]
+
+
+# ---------- the customer's own invoices (signed in) ----------
+
+
+async def my_invoices(session: AsyncSession, user: User) -> list[dict[str, Any]]:
+    """Invoices of every visit where the signed-in customer ordered or had the booking, at all restaurants."""
+    await use_system(session)
+    bill_ids = select(BillItem.bill_id).join(Order, Order.id == BillItem.order_id).where(Order.customer_id == user.id)
+    booked = (
+        select(Bill.id)
+        .join(Reservation, Reservation.table_session_id == Bill.table_session_id)
+        .where(Reservation.customer_id == user.id)
+    )
+    rows = list(
+        (
+            await session.execute(
+                select(Invoice)
+                .where(Invoice.bill_id.in_(bill_ids.union(booked)))
+                .order_by(Invoice.issued_at.desc())
+                .limit(200)
+            )
+        ).scalars()
+    )
+    tenants = (
+        {
+            t.id: t
+            for t in (await session.execute(select(Tenant).where(Tenant.id.in_({r.tenant_id for r in rows})))).scalars()
+        }
+        if rows
+        else {}
+    )
+    out = []
+    for inv in rows:
+        snap = inv.snapshot or {}
+        bill = snap.get("bill") or {}
+        t = tenants.get(inv.tenant_id)
+        out.append(
+            {
+                "id": inv.id,
+                "number": inv.number,
+                "kind": inv.kind,
+                "total": str(inv.total),
+                "issued_at": inv.issued_at,
+                "restaurant_name": t.name if t else (snap.get("restaurant") or {}).get("name"),
+                "restaurant_slug": t.slug if t else None,
+                "items": [f"{ln['quantity']} × {ln['name']}" for ln in bill.get("lines", [])][:12],
+            }
+        )
+    return out
+
+
+async def my_invoice(session: AsyncSession, user: User, invoice_id: uuid.UUID) -> Invoice:
+    ids = {r["id"] for r in await my_invoices(session, user)}
+    if invoice_id not in ids:
+        raise NotFoundError("Invoice not found.")
+    inv = await session.get(Invoice, invoice_id)
+    assert inv is not None
+    return inv

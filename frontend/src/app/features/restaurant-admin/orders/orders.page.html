@@ -48,6 +48,7 @@
             <b>{{ where(o) }}</b>{{ o.guest_name ? ' · ' + o.guest_name : '' }}
             <span class="badge" [attr.data-status]="o.status === 'ready' ? 'notified' : o.status === 'served' ? 'seated' : o.status === 'cancelled' ? 'cancelled' : 'waiting'">{{ label[o.status] }}</span>
             <span class="badge">{{ o.source === 'staff' ? 'Waiter' : 'Guest' }}</span>
+            @if (o.ordered_by_name) { <span class="badge" data-testid="order-by">{{ o.ordered_by_name }}</span> }
           </div>
           <span class="muted">
             {{ time(o.placed_at) }}

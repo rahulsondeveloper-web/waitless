@@ -8,6 +8,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { Observable, filter, interval } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../../../core/auth/auth.service';
 import { ApiError } from '../../../core/http/api-error';
@@ -41,6 +42,7 @@ import {
 @Component({
   selector: 'wl-tables-page',
   imports: [
+    RouterLink,
     MatTabsModule,
     MatButtonModule,
     MatIconModule,

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { interval } from 'rxjs';
 
 import { BillingService, SessionBills } from '../../../core/billing/billing.service';
@@ -13,6 +13,7 @@ import { RealtimeService } from '../../../core/realtime/realtime.service';
 import { formatPrice } from '../../../core/storefront/storefront.models';
 import { TenantContextService } from '../../../core/storefront/tenant-context.service';
 import { ServingTimerComponent } from '../../../shared/ui/serving-timer/serving-timer.component';
+import { BillSummaryComponent } from '../checkout/bill-summary.component';
 import { CheckoutService } from '../../../core/payments/checkout.service';
 
 const STEPS = ['placed', 'accepted', 'preparing', 'ready', 'served'] as const;
@@ -23,7 +24,7 @@ const STEPS = ['placed', 'accepted', 'preparing', 'ready', 'served'] as const;
  */
 @Component({
   selector: 'wl-storefront-session',
-  imports: [FormsModule, RouterLink, ServingTimerComponent],
+  imports: [FormsModule, RouterLink, ServingTimerComponent, BillSummaryComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './session.page.html',
   styleUrls: ['../booking-shared.scss', './session.page.scss'],
@@ -36,6 +37,7 @@ export class StorefrontSessionPage implements OnInit {
   private readonly checkout = inject(CheckoutService);
   private readonly realtime = inject(RealtimeService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
 
   protected readonly statusLabel = ORDER_STATUS_LABEL;
   protected readonly steps = STEPS;
@@ -51,7 +53,11 @@ export class StorefrontSessionPage implements OnInit {
   protected readonly bills = signal<SessionBills | null>(null);
   protected readonly paying = signal<{ billId: string; orderId: string; amount: string; mock: boolean } | null>(null);
   protected readonly billBusy = signal(false);
+  /** The Finish popup: 'confirm' asks first, 'bill' shows the final bill with Pay now. */
+  protected readonly popup = signal<'confirm' | 'bill' | null>(null);
+  protected readonly payable = computed(() => (this.bills()?.bills ?? []).filter((b) => b.lines.length && b.status !== 'void'));
   protected code = '';
+  protected guestName = '';
   protected pin = '';
   private watching: string | null = null;
 
@@ -84,6 +90,7 @@ export class StorefrontSessionPage implements OnInit {
         this.busy.set(false);
         this.cart.setPreorder(null);
         this.cart.setTableToken(r.token);
+        if (this.guestName.trim()) this.cart.setGuestName(this.guestName);
         this.pin = '';
         this.load();
       },
@@ -105,17 +112,32 @@ export class StorefrontSessionPage implements OnInit {
   // ---------- the bill ----------
 
   protected finish(): void {
+    this.popup.set('confirm');
+  }
+
+  protected closePopup(): void {
+    this.popup.set(null);
+  }
+
+  protected payNow(billId: string): void {
+    this.popup.set(null);
+    void this.router.navigate(['/r', this.ctx.slug(), 'checkout', billId]);
+  }
+
+  protected confirmFinish(): void {
     const token = this.cart.tableToken();
-    if (!token || !confirm("Finish your meal? You won't be able to order more, and your final bill will be ready.")) return;
+    if (!token) return;
     this.billBusy.set(true);
     this.billing.finish(token).subscribe({
       next: (b) => {
         this.billBusy.set(false);
         this.bills.set(b);
+        this.popup.set('bill');
         this.load(false);
       },
       error: (e: ApiError) => {
         this.billBusy.set(false);
+        this.popup.set(null);
         this.error.set(e.message);
       },
     });

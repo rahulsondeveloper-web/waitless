@@ -171,3 +171,12 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
+
+.upi-claim {
+  color: #b26a00;
+  font-weight: 600;
+}
+.upi-actions {
+  display: inline-flex;
+  gap: 0.25rem;
+}

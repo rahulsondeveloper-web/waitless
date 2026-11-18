@@ -4,6 +4,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from pydantic import BaseModel
 
 from app.api.deps import SessionDep, TenantCtxAnyStatus, require_permission
 from app.schemas.staff import (
@@ -183,3 +184,31 @@ async def close(session_id: uuid.UUID, session: SessionDep, ctx: TablesOperate) 
 @router.post("/table-sessions/{session_id}/pin", response_model=SeatedOut, summary="Issue a new PIN for the guests")
 async def new_pin(session_id: uuid.UUID, session: SessionDep, ctx: TablesOperate) -> SeatedOut:
     return await tables_svc.new_pin(session, ctx, session_id)
+
+
+# ---------- table QR codes ----------
+
+
+class SelfSeatingIn(BaseModel):
+    enabled: bool
+
+
+@router.get("/table-qr", summary="QR code links for every table of a branch (for printing)")
+async def table_qr_codes(session: SessionDep, ctx: TablesConfigure, branch_id: uuid.UUID) -> dict:
+    from app.services import table_qr
+
+    return await table_qr.qr_codes(session, ctx, branch_id)
+
+
+@router.post("/table-qr/{table_id}/rotate", summary="New QR for one table (the old sticker stops working)")
+async def rotate_table_qr(table_id: uuid.UUID, session: SessionDep, ctx: TablesConfigure) -> dict:
+    from app.services import table_qr
+
+    return await table_qr.rotate(session, ctx, table_id)
+
+
+@router.put("/table-qr/self-seating", summary="Let guests start ordering at a free table by scanning its QR")
+async def table_qr_self_seating(body: SelfSeatingIn, session: SessionDep, ctx: TablesConfigure) -> dict:
+    from app.services import table_qr
+
+    return {"enabled": await table_qr.set_self_seating(session, ctx, body.enabled)}

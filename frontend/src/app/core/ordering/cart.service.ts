@@ -52,6 +52,7 @@ export class CartService {
   private readonly _lines = signal<CartLine[]>([]);
   private readonly _table = signal<string | null>(null);
   private readonly _preorder = signal<string | null>(null);
+  private readonly _name = signal('');
   private loadedFor: string | null = null;
 
   readonly lines = this._lines.asReadonly();
@@ -59,6 +60,8 @@ export class CartService {
   readonly tableToken = this._table.asReadonly();
   /** Reservation id when the guest pre-orders for a paid booking. */
   readonly preorderFor = this._preorder.asReadonly();
+  /** "Riya" — shown with this guest's dishes to the table, kitchen and staff (never on the invoice). */
+  readonly guestName = this._name.asReadonly();
   readonly count = computed(() => this._lines().reduce((n, l) => n + l.quantity, 0));
   readonly subtotal = computed(() => round(this._lines().reduce((s, l) => s + l.unit_price * l.quantity, 0)));
   readonly tax = computed(() =>
@@ -75,6 +78,7 @@ export class CartService {
       this._lines.set(slug ? read<CartLine[]>(this.key(slug, 'cart'), []) : []);
       this._table.set(slug ? read<string | null>(this.key(slug, 'table'), null) : null);
       this._preorder.set(slug ? read<string | null>(this.key(slug, 'preorder'), null) : null);
+      this._name.set(slug ? read<string>(this.key(slug, 'name'), '') : '');
     });
   }
 
@@ -100,6 +104,13 @@ export class CartService {
     this._table.set(token);
     const slug = this.ctx.slug();
     if (slug) write(this.key(slug, 'table'), token);
+  }
+
+  setGuestName(name: string): void {
+    const clean = name.trim().slice(0, 60);
+    this._name.set(clean);
+    const slug = this.ctx.slug();
+    if (slug) write(this.key(slug, 'name'), clean || null);
   }
 
   setPreorder(reservationId: string | null): void {

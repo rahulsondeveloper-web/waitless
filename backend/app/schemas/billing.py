@@ -25,6 +25,9 @@ class BillingSettings(ApiModel):
     invoice_footer: str = Field(default="Thank you for dining with us!", max_length=300)
     methods: list[Method] = Field(default_factory=lambda: ["cash", "upi", "card", "gateway"], min_length=1)
     other_method_label: str = Field(default="Other", max_length=40)
+    # The restaurant's own UPI ID: guests pay it directly from the checkout page (QR / UPI app); staff confirm.
+    upi_id: str = Field(default="", max_length=60, pattern=r"^$|^[A-Za-z0-9._-]{2,}@[A-Za-z][A-Za-z0-9.]{1,}$")
+    upi_payee_name: str = Field(default="", max_length=60)
 
 
 class BillLineOut(ApiModel):
@@ -41,6 +44,7 @@ class BillLineOut(ApiModel):
     sla_discount: Decimal
     manual_discount: Decimal
     taxable: Decimal
+    ordered_by_name: str | None = None  # screens only — never printed on the invoice
 
 
 class PaymentOut(ApiModel):
@@ -133,6 +137,9 @@ class SessionBillsOut(ApiModel):
     bills: list[BillOut]
     total_due: Decimal
     can_close: bool
+    restaurant_name: str = ""
+    upi_id: str = ""  # the restaurant's own UPI ID, when set
+    upi_payee_name: str = ""
 
 
 class ActiveTable(ApiModel):
@@ -186,6 +193,10 @@ class PaymentIn(ApiModel):
 class RefundIn(ApiModel):
     amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
     reason: str = Field(min_length=1, max_length=200)
+
+
+class UpiClaimIn(ApiModel):
+    reference: str = Field(default="", max_length=80)  # UPI transaction / UTR number, if the guest has it
 
 
 class OnlinePaymentOut(ApiModel):

@@ -248,6 +248,7 @@ class CategoryOut(ApiModel):
     sort_order: int
     subcategories: list[SubcategoryOut]
     item_count: int
+    image_url: str | None = None  # owner's photo; None = the template default for this kind of category
 
 
 class MealTypeOut(ApiModel):
@@ -295,6 +296,7 @@ class PublicCategory(ApiModel):
     description: str
     meal_type_ids: list[uuid.UUID]
     items: list[PublicItem]
+    image_url: str | None = None
 
 
 class PublicMealType(ApiModel):

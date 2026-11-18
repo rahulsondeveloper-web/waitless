@@ -28,6 +28,7 @@ export interface BillLine {
   sla_discount: string;
   manual_discount: string;
   taxable: string;
+  ordered_by_name: string | null; // screens only, never on the invoice
 }
 
 export interface BillPayment {
@@ -117,6 +118,9 @@ export interface SessionBills {
   bills: Bill[];
   total_due: string;
   can_close: boolean;
+  restaurant_name: string;
+  upi_id: string;
+  upi_payee_name: string;
 }
 
 export interface ActiveTable {
@@ -146,6 +150,8 @@ export interface BillingSettings {
   invoice_footer: string;
   methods: PayMethod[];
   other_method_label: string;
+  upi_id: string;
+  upi_payee_name: string;
 }
 
 export interface Invoice {
@@ -157,6 +163,23 @@ export interface Invoice {
   issued_at: string;
   original_invoice_id: string | null;
   snapshot: { bill: Bill; reason?: string | null; original_number?: string | null };
+}
+
+export interface MyInvoice {
+  id: string;
+  number: string;
+  kind: 'invoice' | 'credit_note';
+  total: string;
+  issued_at: string;
+  restaurant_name: string | null;
+  restaurant_slug: string | null;
+  items: string[];
+}
+
+/** upi://pay link for the restaurant's own UPI ID (opens any UPI app; also encoded in the QR). */
+export function upiLink(vpa: string, payee: string, amount: string | number, note: string): string {
+  const q = new URLSearchParams({ pa: vpa, pn: payee, am: (+amount).toFixed(2), cu: 'INR', tn: note.slice(0, 50) });
+  return `upi://pay?${q.toString()}`;
 }
 
 export interface OnlinePayment {
@@ -250,6 +273,23 @@ export class BillingService {
   }
   mockPay(token: string, orderId: string, success: boolean): Observable<{ result: string }> {
     return this.api.post(`public/payments/mock-bill/${encodeURIComponent(orderId)}`, { success }, { 'X-Table-Token': token });
+  }
+  /** "I paid the restaurant's UPI ID" — waits for staff to confirm. */
+  upiClaim(token: string, billId: string, reference: string): Observable<SessionBills> {
+    return this.api.post(`table-session/bills/${billId}/upi-claim`, { reference }, { 'X-Table-Token': token });
+  }
+  confirmUpi(paymentId: string): Observable<Bill> {
+    return this.api.post(`restaurant/payments/${paymentId}/confirm`, {});
+  }
+  rejectUpi(paymentId: string): Observable<Bill> {
+    return this.api.post(`restaurant/payments/${paymentId}/reject`, {});
+  }
+  // ---------- signed-in customer ----------
+  myInvoices(): Observable<MyInvoice[]> {
+    return this.api.get('me/invoices');
+  }
+  myInvoicePdf(id: string): Observable<Blob> {
+    return this.api.getBlob(`me/invoices/${id}/pdf`);
   }
   guestReceiptUrl(token: string, invoiceId: string): string {
     return `/api/v1/table-session/invoices/${invoiceId}/pdf?t=${encodeURIComponent(token)}`;

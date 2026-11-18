@@ -95,7 +95,7 @@
                                      (change)="toggle(l.order_item_id, $any($event.target).checked)" [attr.aria-label]="'Pick ' + l.name" /></td>
                         }
                         <td>{{ l.quantity }} × {{ l.name }}
-                          <small class="muted">#{{ l.order_number }} · GST {{ n(l.tax_pct) }}%@if (n(l.sla_pct) > 0) { · {{ n(l.sla_pct) }}% late discount }</small></td>
+                          <small class="muted">#{{ l.order_number }}{{ l.ordered_by_name ? ' · ' + l.ordered_by_name : '' }} · GST {{ n(l.tax_pct) }}%@if (n(l.sla_pct) > 0) { · {{ n(l.sla_pct) }}% late discount }</small></td>
                         <td class="num">{{ price(l.line_total) }}</td>
                       </tr>
                     }
@@ -134,11 +134,18 @@
                       <li [class.off]="p.status !== 'captured'">
                         <span>{{ p.method === 'other' ? p.method_label || 'Other' : methodLabel[p.method] }}
                           @if (p.reference) { <small class="muted">{{ p.reference }}</small> }
-                          @if (p.status === 'pending') { <small class="muted">waiting for the gateway</small> }
+                          @if (p.status === 'pending' && p.method === 'upi') { <small class="upi-claim" data-testid="upi-claim">guest says paid by UPI — check your UPI app</small> }
+                          @else if (p.status === 'pending') { <small class="muted">waiting for the gateway</small> }
                           @if (p.status === 'failed') { <small class="muted">failed</small> }
                           @if (n(p.change_due) > 0) { <small class="muted">change {{ price(p.change_due) }}</small> }</span>
                         <span class="muted small">{{ p.created_at | date: 'HH:mm' }}{{ p.received_by_name ? ' · ' + p.received_by_name : '' }}</span>
                         <b>{{ price(p.amount) }}</b>
+                        @if (canCollect() && p.status === 'pending' && p.method === 'upi') {
+                          <span class="upi-actions">
+                            <button mat-flat-button (click)="confirmUpi(p)" [disabled]="busy() === p.id" data-testid="upi-confirm">Received</button>
+                            <button mat-button (click)="rejectUpi(p)" [disabled]="busy() === p.id" data-testid="upi-reject">Not received</button>
+                          </span>
+                        }
                         @if (canRefund() && p.status === 'captured' && n(p.refunded_amount) < n(p.amount)) {
                           <button mat-button (click)="refund(p)" data-testid="refund">Refund</button>
                         } @else if (n(p.refunded_amount) > 0) { <small class="muted">refunded {{ price(p.refunded_amount) }}</small> }
@@ -214,6 +221,10 @@
                 <label class="check"><input type="checkbox" [checked]="st.methods.includes(m)" (change)="toggleMethod(m, $any($event.target).checked)" />
                   {{ m === 'gateway' ? 'Online (guests pay from their phone)' : methodLabel[m] }}</label>
               }
+              <label class="field"><span>Your UPI ID (guests can pay it directly; you confirm)</span>
+                <input name="upi" [ngModel]="st.upi_id" (ngModelChange)="patchSettings('upi_id', $event.trim())" maxlength="60" placeholder="e.g. spicegarden@okhdfcbank" data-testid="upi-id-setting" /></label>
+              <label class="field"><span>Name shown in the UPI app</span>
+                <input name="upin" [ngModel]="st.upi_payee_name" (ngModelChange)="patchSettings('upi_payee_name', $event)" maxlength="60" /></label>
               @if (st.methods.includes('other')) {
                 <label class="field"><span>Name for "Other"</span><input name="ol" [ngModel]="st.other_method_label" (ngModelChange)="patchSettings('other_method_label', $event)" maxlength="40" placeholder="e.g. Sodexo, Zomato Pay" /></label>
               }

@@ -22,6 +22,7 @@
     </article>
   } @else {
     <article class="bk-card">
+      @if (name()) { <p class="who" data-testid="cart-who"><span class="material-symbols-outlined" aria-hidden="true">person</span> {{ name() }}'s order</p> }
       <ul class="lines">
         @for (l of cart.lines(); track l.key) {
           <li data-testid="cart-line">
@@ -57,6 +58,11 @@
         @case ('table') {
           <p><span class="material-symbols-outlined icon" aria-hidden="true">table_restaurant</span>
             This order goes straight to the kitchen for your table.</p>
+          <label class="bk-field">
+            <span>Your name (shown with your dishes)</span>
+            <input type="text" maxlength="60" autocomplete="given-name" [ngModel]="name()" (ngModelChange)="setName($event)"
+                   name="guestName" placeholder="e.g. Riya" data-testid="guest-name" />
+          </label>
         }
         @case ('preorder') {
           <p><span class="material-symbols-outlined icon" aria-hidden="true">event_available</span>

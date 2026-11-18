@@ -106,6 +106,7 @@ export interface PublicCategory {
   description: string;
   meal_type_ids: string[];
   items: PublicItem[];
+  image_url?: string | null;
 }
 
 export interface PublicMenu {
@@ -192,3 +193,19 @@ export const SOCIAL_LABELS: Partial<Record<string, string>> = {
   tripadvisor: 'Tripadvisor',
   other: 'Website',
 };
+
+/**
+ * The category card photo: the owner's own, or the template's default for that kind of category
+ * (Starters, Main course, Soups, Salads, Desserts, Beverages — the Remelle template's menu section).
+ */
+export function categoryImage(name: string, imageUrl: string | null | undefined): string {
+  if (imageUrl) return imageUrl;
+  const n = name.toLowerCase();
+  const pick = (k: string) => `menu-categories/${k}.jpg`;
+  if (/(drink|beverage|juice|coffee|tea|shake|mocktail|cocktail|bar|wine|beer|lassi|smoothie)/.test(n)) return pick('beverages');
+  if (/(dessert|sweet|cake|ice ?cream|bakery|pastr|mithai|kulfi)/.test(n)) return pick('desserts');
+  if (/(soup|shorba)/.test(n)) return pick('soups');
+  if (/(salad|green|bowl)/.test(n)) return pick('salads');
+  if (/(starter|appeti|snack|small plate|chaat|tikka|tandoor|breakfast|toast)/.test(n)) return pick('starters');
+  return pick('main');
+}

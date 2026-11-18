@@ -51,9 +51,16 @@ class MenuCategory(UUIDPkMixin, TimestampMixin, Base):
     sort_order: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_alcoholic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Photo for the category card on the storefront menu; NULL = the template's default image for its kind.
+    image_media_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="CASCADE"),
+        ForeignKeyConstraint(
+            ["tenant_id", "image_media_id"],
+            ["media_files.tenant_id", "media_files.id"],
+            ondelete="SET NULL (image_media_id)",
+        ),
         UniqueConstraint("tenant_id", "id", name="uq_menu_categories_tenant_id_id"),
         UniqueConstraint("tenant_id", "name", name="uq_menu_categories_tenant_name"),
     )

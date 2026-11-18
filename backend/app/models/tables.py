@@ -56,6 +56,8 @@ class RestaurantTable(UUIDPkMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(12), default="available", server_default="available")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     sort_order: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+    # Printed on the table's QR code (/r/{slug}/t/{qr_token}); random, can be regenerated.
+    qr_token: Mapped[str | None] = mapped_column(String(24), unique=True)
 
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="CASCADE"),

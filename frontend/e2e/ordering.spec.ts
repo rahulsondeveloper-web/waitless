@@ -73,6 +73,7 @@ test('guest enters the order ID + PIN, orders, and follows it live to Served', a
   await page.goto(`/r/${SLUG}`);
   await page.getByTestId('have-order-id').click();
   await page.getByTestId('join-code').fill(seated.code);
+  await page.getByTestId('join-name').fill('Riya');
   await page.getByTestId('join-pin').fill(seated.pin);
   await page.getByRole('button', { name: 'Open my table' }).click();
   await expect(page.getByTestId('table-view')).toContainText(seated.code);
@@ -84,10 +85,13 @@ test('guest enters the order ID + PIN, orders, and follows it live to Served', a
   await expect(page.getByTestId('cart-count')).toHaveText('1');
   await page.getByTestId('cart-bar').click();
   await expect(page.getByTestId('cart-line')).toHaveCount(1);
+  await expect(page.getByTestId('guest-name')).toHaveValue('Riya'); // remembered from the join form
+  await expect(page.getByTestId('cart-who')).toContainText("Riya's order");
   await page.getByTestId('place-order').click();
 
   await expect(page).toHaveURL(new RegExp(`/r/${SLUG}/session$`));
   const order = page.getByTestId('table-order').first();
+  await expect(order.getByTestId('ordered-by')).toHaveText('Riya');
   await expect(order).toContainText('Sent to kitchen');
   await expect(page.getByTestId('serving-promise')).toContainText('Served within 15 min');
   await expect(order.getByTestId('serving-timer')).toHaveText(/Timer starts when the kitchen accepts/);

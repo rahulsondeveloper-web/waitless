@@ -190,8 +190,13 @@ Implemented in Phase 10 (plan feature `billing_pos`):
 | POST | `/payments/{id}/refunds` 🔁 `{amount, reason}` | `payments.refund` — 403 `REFUND_LIMIT`; issues a credit note |
 | GET | `/payments?branch_id=&date=` | `payments.collect` |
 | GET | `/invoices?branch_id=&date=` · `/invoices/{id}` · `/invoices/{id}/pdf?format=a4\|receipt` | `billing.operate` or `payments.collect` |
+| POST | `/payments/{id}/confirm` · `/payments/{id}/reject` | `payments.collect` — guest's "I paid your UPI ID" claim; 409 `ALREADY_REVIEWED` |
+| GET | `/table-qr?branch_id=` | `tables.configure` — one QR path per table (`/r/{slug}/t/{token}`), tokens made on first use |
+| POST | `/table-qr/{table_id}/rotate` | `tables.configure` — new token; the printed one stops working |
+| PUT | `/table-qr/self-seating` `{enabled}` | `tables.configure` — guests may open a free table by scanning |
+| POST · DELETE | `/menu/categories/{id}/image` | `menu.manage` — category card photo (default photo when none) |
 
-Guests (header `X-Table-Token`): `GET /table-session/bills`, `POST /table-session/finish`, `POST /table-session/bills/{id}/pay` (gateway order), `GET /table-session/invoices/{id}/pdf?t=` (receipt). Development: `POST /public/payments/mock-bill/{order_id}`. Gateway webhooks for bills arrive on the same `/webhooks/payments/{provider}`. Realtime: `bills.changed {branch_id[, session_id]}` to the branch staff room and the table.
+Guests (header `X-Table-Token`): `GET /table-session/bills`, `POST /table-session/finish`, `POST /table-session/bills/{id}/pay` (gateway order), `POST /table-session/bills/{id}/upi-claim {reference}` (paid the restaurant's own UPI ID; 422 `UPI_NOT_SET`), `GET /table-session/invoices/{id}/pdf?t=` (receipt). The order ID + PIN still open a closed visit (read-only, 90 days) so the invoice can be downloaded later. Table QR: `GET /public/restaurants/{slug}/tables/{qr}`, `POST …/start {guest_name, party_size}` (self-seating → token, order ID, PIN), `POST …/join {pin}`. Signed-in customers: `GET /me/invoices`, `GET /me/invoices/{id}/pdf`. `POST /table-session/orders` takes `guest_name` (shown with the dishes, never on the invoice). Development: `POST /public/payments/mock-bill/{order_id}`. Gateway webhooks for bills arrive on the same `/webhooks/payments/{provider}`. Realtime: `bills.changed {branch_id[, session_id]}` to the branch staff room and the table.
 
 ### Inventory, suppliers, purchases
 

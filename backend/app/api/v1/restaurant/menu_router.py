@@ -140,6 +140,20 @@ async def remove_item_image(item_id: uuid.UUID, session: SessionDep, ctx: MenuMa
     return await svc.remove_item_image(session, ctx, item_id)
 
 
+@router.post("/menu/categories/{category_id}/image", response_model=AdminMenu, summary="Upload the category photo")
+async def upload_category_image(
+    category_id: uuid.UUID, file: Annotated[UploadFile, File()], session: SessionDep, ctx: MenuManage
+) -> AdminMenu:
+    await svc.set_category_image(session, ctx, category_id, file)
+    return await svc.admin_menu(session, ctx)
+
+
+@router.delete("/menu/categories/{category_id}/image", response_model=AdminMenu, summary="Back to the default photo")
+async def remove_category_image(category_id: uuid.UUID, session: SessionDep, ctx: MenuManage) -> AdminMenu:
+    await svc.remove_category_image(session, ctx, category_id)
+    return await svc.admin_menu(session, ctx)
+
+
 # Owner preview of the storefront (works before publishing)
 @router.get("/storefront", response_model=StorefrontOut, summary="Preview your storefront data (even unpublished)")
 async def preview_storefront(session: SessionDep, ctx: ProfileView) -> StorefrontOut:

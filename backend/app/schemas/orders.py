@@ -30,6 +30,8 @@ class OrderLineIn(ApiModel):
 class OrderIn(ApiModel):
     items: list[OrderLineIn] = Field(min_length=1, max_length=50)
     notes: str = Field(default="", max_length=300)
+    # "Riya" — who at the table orders. Signed-in guests default to their account name.
+    guest_name: str = Field(default="", max_length=60)
 
 
 class StaffOrderIn(OrderIn):
@@ -106,6 +108,7 @@ class OrderOut(ApiModel):
     sla: SlaOut | None = None  # serving timer (Phase 8): starts on accept, or at arrival for paid pre-orders
     discount_total: Decimal = Decimal("0.00")
     payable_total: Decimal | None = None  # total after the serving-time discount
+    ordered_by_name: str | None = None
     can_cancel: bool = False  # for the viewer (guest: only while "placed")
     restaurant_name: str | None = None
     restaurant_slug: str | None = None

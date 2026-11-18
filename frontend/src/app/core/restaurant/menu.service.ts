@@ -67,6 +67,7 @@ export interface AdminCategory {
   sort_order: number;
   subcategories: { id: string; name: string; sort_order: number }[];
   item_count: number;
+  image_url: string | null;
 }
 
 export interface AdminMealType {
@@ -148,5 +149,14 @@ export class MenuService {
   }
   removeImage(id: string): Observable<AdminItem> {
     return this.api.delete(`restaurant/menu/items/${id}/image`);
+  }
+  /** Category card photo on the storefront; without one the template's default photo is shown. */
+  uploadCategoryImage(id: string, file: File): Observable<AdminMenu> {
+    const fd = new FormData();
+    fd.append('file', file, file.name);
+    return this.api.post(`restaurant/menu/categories/${id}/image`, fd);
+  }
+  removeCategoryImage(id: string): Observable<AdminMenu> {
+    return this.api.delete(`restaurant/menu/categories/${id}/image`);
   }
 }

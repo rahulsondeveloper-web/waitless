@@ -6,11 +6,14 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 
 import { ApiError } from '../../../core/http/api-error';
+import { PAGE_ACCESS } from '../../../core/auth/page-access';
 import { OperationsService, Permission, Role, Scope } from '../../../core/restaurant/operations.service';
 
 export interface RoleDialogData {
   role: Role | null;
   permissions: Permission[];
+  /** Start a new custom role from a built-in one (built-in roles themselves are fixed). */
+  copyOf?: Role | null;
 }
 
 /** Create or edit a custom role: pick permissions and whether each applies to all or only assigned branches. */
@@ -32,6 +35,17 @@ export interface RoleDialogData {
           <input matInput formControlName="description" maxlength="200" />
         </mat-form-field>
       </form>
+      <fieldset data-testid="role-pages">
+        <legend>Pages this role can open</legend>
+        <p class="hint">Tick a page to give its basic permission; untick to remove all of that page's permissions.
+          Dashboard and Settings are open to everyone.</p>
+        <div class="pages">
+          @for (pg of pages; track pg.key) {
+            <label><input type="checkbox" [checked]="opens(pg.perms)" (change)="togglePage(pg.perms, $any($event.target).checked)"
+                          [attr.data-testid]="'page-' + pg.key" /> {{ pg.label }}</label>
+          }
+        </div>
+      </fieldset>
       @for (group of groups(); track group.module) {
         <fieldset>
           <legend>{{ group.module }}</legend>
@@ -97,6 +111,22 @@ export interface RoleDialogData {
     .err {
       color: #a3321c;
     }
+    .hint {
+      margin: 0 0 0.4rem;
+      font-size: 0.8rem;
+      color: var(--wl-muted, #6b6b6b);
+    }
+    .pages {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.25rem 0.75rem;
+      font-size: 0.9rem;
+      label {
+        display: flex;
+        gap: 0.4rem;
+        align-items: center;
+      }
+    }
   `,
 })
 export class RoleDialogComponent {
@@ -105,9 +135,13 @@ export class RoleDialogComponent {
   private readonly ops = inject(OperationsService);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly chosen = signal<Record<string, Scope>>({ ...(this.data.role?.permissions ?? {}) });
+  protected readonly chosen = signal<Record<string, Scope>>(
+    Object.fromEntries(
+      Object.entries(this.data.role?.permissions ?? this.data.copyOf?.permissions ?? {}).filter(([k]) => k !== 'subscription.manage'),
+    ) as Record<string, Scope>,
+  );
   protected readonly form = inject(NonNullableFormBuilder).group({
-    name: [this.data.role?.name ?? '', [Validators.required, Validators.minLength(2)]],
+    name: [this.data.role?.name ?? (this.data.copyOf ? `${this.data.copyOf.name} (custom)` : ''), [Validators.required, Validators.minLength(2)]],
     description: [this.data.role?.description ?? ''],
   });
   /** Billing access is never delegated (backend rejects it too). */
@@ -118,6 +152,25 @@ export class RoleDialogComponent {
     }
     return [...by.entries()].map(([module, items]) => ({ module, items }));
   });
+
+  /** Page → permissions, limited to permissions this restaurant can grant. */
+  protected readonly pages = Object.entries(PAGE_ACCESS)
+    .map(([key, v]) => ({ key, label: v.label, perms: v.perms.filter((p) => this.data.permissions.some((x) => x.key === p)) }))
+    .filter((p) => p.perms.length);
+
+  protected opens(perms: string[]): boolean {
+    const c = this.chosen();
+    return perms.some((p) => !!c[p]);
+  }
+
+  protected togglePage(perms: string[], on: boolean): void {
+    this.chosen.update((c) => {
+      const next = { ...c };
+      if (on) next[perms[0]] = next[perms[0]] ?? 'own_branches';
+      else for (const p of perms) delete next[p];
+      return next;
+    });
+  }
 
   protected toggle(key: string, on: boolean): void {
     this.chosen.update((c) => {

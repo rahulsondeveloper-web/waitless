@@ -47,7 +47,7 @@
             </ul>
             @if (o.notes) { <p class="note">Note: {{ o.notes }}</p> }
             <footer>
-              <span class="muted">{{ o.source === 'staff' ? 'Waiter' : 'Guest' }}{{ o.guest_name ? ' · ' + o.guest_name : '' }}</span>
+              <span class="muted">{{ o.source === 'staff' ? 'Waiter' : 'Guest' }}{{ (o.ordered_by_name || o.guest_name) ? ' · ' + (o.ordered_by_name || o.guest_name) : '' }}</span>
               @if (allowed(lane)) {
                 <button mat-flat-button (click)="advance(o, lane)" [disabled]="busy() === o.id">{{ lane.action }}</button>
               }

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { BillingService, MyInvoice, openBlob } from '../../core/billing/billing.service';
 import { formatWhen } from '../../core/bookings/bookings.service';
 import { ApiError } from '../../core/http/api-error';
 import { ORDER_STATUS_LABEL, Order, OrderingService } from '../../core/ordering/ordering.service';
@@ -17,8 +18,24 @@ import { ServingTimerComponent } from '../../shared/ui/serving-timer/serving-tim
     <section class="wl-container bk-page">
       <header class="bk-head">
         <h1>My orders</h1>
-        <p>Pre-orders and orders you placed while signed in.</p>
+        <p>Pre-orders and orders you placed while signed in, and your invoices.</p>
       </header>
+      @if (invoices()?.length) {
+        <h2 class="sub">Invoices</h2>
+        <article class="bk-card inv-list" data-testid="my-invoices">
+          @for (i of invoices()!; track i.id) {
+            <div class="inv" data-testid="my-invoice">
+              <div>
+                <b>{{ i.restaurant_name }} · {{ i.kind === 'credit_note' ? 'Credit note' : 'Invoice' }} {{ i.number }}</b>
+                <p class="bk-muted">{{ when(i.issued_at) }} · {{ price(i.total) }}{{ i.items.length ? ' · ' + i.items.slice(0, 4).join(', ') + (i.items.length > 4 ? '…' : '') : '' }}</p>
+              </div>
+              <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="download(i)" [disabled]="downloading() === i.id" data-testid="my-invoice-pdf">
+                Download</button>
+            </div>
+          }
+        </article>
+        <h2 class="sub">Orders</h2>
+      }
       @if (error(); as e) { <p class="bk-error" role="alert">{{ e }}</p> }
       @if (!orders()) {
         <div class="wl-state"><span class="wl-spinner" aria-label="Loading"></span></div>
@@ -68,6 +85,23 @@ import { ServingTimerComponent } from '../../shared/ui/serving-timer/serving-tim
     .right {
       margin-left: auto;
     }
+    .sub {
+      font-size: 1.1rem;
+      margin: 0.5rem 0 0;
+    }
+    .inv-list {
+      display: grid;
+      gap: 0.7rem;
+    }
+    .inv {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .inv p {
+      margin: 0.15rem 0 0;
+    }
     .lines {
       margin: 0;
       padding-left: 1.1rem;
@@ -80,17 +114,34 @@ import { ServingTimerComponent } from '../../shared/ui/serving-timer/serving-tim
 })
 export class MyOrdersPage implements OnInit {
   private readonly api = inject(OrderingService);
+  private readonly billing = inject(BillingService);
   private readonly realtime = inject(RealtimeService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly label = ORDER_STATUS_LABEL;
   protected readonly when = formatWhen;
   protected readonly orders = signal<Order[] | null>(null);
   protected readonly error = signal<string | null>(null);
+  protected readonly invoices = signal<MyInvoice[] | null>(null);
+  protected readonly downloading = signal<string | null>(null);
 
   ngOnInit(): void {
     this.load();
     void this.realtime.subscribeUser();
     this.destroyRef.onDestroy(this.realtime.on('orders.changed', () => this.load()));
+  }
+
+  protected download(i: MyInvoice): void {
+    this.downloading.set(i.id);
+    this.billing.myInvoicePdf(i.id).subscribe({
+      next: (b) => {
+        this.downloading.set(null);
+        openBlob(b);
+      },
+      error: (e: ApiError) => {
+        this.downloading.set(null);
+        this.error.set(e.message);
+      },
+    });
   }
 
   protected price(v: string): string {
@@ -108,5 +159,6 @@ export class MyOrdersPage implements OnInit {
 
   private load(): void {
     this.api.myOrders().subscribe({ next: (o) => this.orders.set(o), error: (e: ApiError) => this.error.set(e.message) });
+    this.billing.myInvoices().subscribe({ next: (i) => this.invoices.set(i), error: () => this.invoices.set([]) });
   }
 }
