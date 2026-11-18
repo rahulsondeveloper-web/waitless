@@ -8,6 +8,8 @@ import {
   DiscoveryPage,
   DiscoveryQuery,
   Gallery,
+  MenuQuery,
+  PublicItemsPage,
   PublicMenu,
   Storefront,
 } from './storefront.models';
@@ -20,8 +22,14 @@ export class StorefrontApi {
   storefront(slug: string): Observable<Storefront> {
     return this.api.get(`public/restaurants/${encodeURIComponent(slug)}`);
   }
-  menu(slug: string): Observable<PublicMenu> {
-    return this.api.get(`public/restaurants/${encodeURIComponent(slug)}/menu`);
+  menu(slug: string, query: MenuQuery = {}): Observable<PublicMenu> {
+    return this.api.get(`public/restaurants/${encodeURIComponent(slug)}/menu`, menuParams(query));
+  }
+  menuItems(slug: string, categoryId: string, offset: number, query: MenuQuery = {}): Observable<PublicItemsPage> {
+    return this.api.get(
+      `public/restaurants/${encodeURIComponent(slug)}/menu/categories/${categoryId}/items`,
+      menuParams({ ...query, offset }),
+    );
   }
   gallery(slug: string): Observable<Gallery> {
     return this.api.get(`public/restaurants/${encodeURIComponent(slug)}/gallery`);
@@ -31,8 +39,11 @@ export class StorefrontApi {
   previewStorefront(): Observable<Storefront> {
     return this.api.get('restaurant/storefront');
   }
-  previewMenu(): Observable<PublicMenu> {
-    return this.api.get('restaurant/storefront/menu');
+  previewMenuItems(categoryId: string, offset: number, query: MenuQuery = {}): Observable<PublicItemsPage> {
+    return this.api.get(`restaurant/storefront/menu/categories/${categoryId}/items`, menuParams({ ...query, offset }));
+  }
+  previewMenu(query: MenuQuery = {}): Observable<PublicMenu> {
+    return this.api.get('restaurant/storefront/menu', menuParams(query));
   }
   previewGallery(): Observable<Gallery> {
     return this.api.get('restaurant/gallery');
@@ -47,4 +58,14 @@ export class StorefrontApi {
   contact(body: ContactRequest): Observable<{ received: boolean; message: string }> {
     return this.api.post('public/contact', body);
   }
+}
+
+/** Only the filters that are set (the full menu is returned when nothing is passed). */
+function menuParams(q: MenuQuery & { offset?: number }): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {};
+  if (q.limit) out['limit'] = q.limit;
+  if (q.offset) out['offset'] = q.offset;
+  if (q.veg) out['veg'] = true;
+  if (q.q?.trim()) out['q'] = q.q.trim();
+  return out;
 }

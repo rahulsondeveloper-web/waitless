@@ -1,17 +1,30 @@
 import { NgTemplateOutlet, ViewportScroller } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { ApiError } from '../../../core/http/api-error';
 import { CartLine, CartService } from '../../../core/ordering/cart.service';
 import { OrderingService, itemPrice, unavailableReason } from '../../../core/ordering/ordering.service';
-import { PublicCategory, PublicItem, PublicMenu, formatPrice, categoryImage } from '../../../core/storefront/storefront.models';
+import {
+  MenuQuery,
+  PublicCategory,
+  PublicItem,
+  PublicMenu,
+  categoryImage,
+  formatPrice,
+} from '../../../core/storefront/storefront.models';
 import { TenantContextService } from '../../../core/storefront/tenant-context.service';
+import { NearEndDirective } from '../../../shared/ui/near-end/near-end.directive';
 import { EmptyStateComponent, ErrorStateComponent, LoadingStateComponent } from '../../../shared/ui/state/state.components';
 import { DishPickerComponent } from './dish-picker.component';
 
 const FOOD_LABEL = { veg: 'Vegetarian', non_veg: 'Non-vegetarian', egg: 'Contains egg' } as const;
+
+/** Dishes per category in the first load and in every "load more" batch. */
+export const MENU_BATCH = 10;
+/** The next batch is fetched when this many dishes from the end of the loaded ones come into view (8th of 10). */
+export const LOAD_AHEAD = 3;
 
 /** Footer lines of each spread, as in the Remelle template. */
 const QUOTES = [
@@ -47,7 +60,15 @@ const hasTag = (i: PublicItem, tag: string) => i.tags.some((t) => t.trim().toLow
 /** Restaurant menu (PRD §6 Menu, §7.3) with ordering (PRD §13): pick options → cart. */
 @Component({
   selector: 'wl-storefront-menu',
-  imports: [NgTemplateOutlet, LoadingStateComponent, ErrorStateComponent, EmptyStateComponent, DishPickerComponent, RouterLink],
+  imports: [
+    NgTemplateOutlet,
+    NearEndDirective,
+    LoadingStateComponent,
+    ErrorStateComponent,
+    EmptyStateComponent,
+    DishPickerComponent,
+    RouterLink,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './menu.page.html',
   styleUrl: './menu.page.scss',
@@ -57,6 +78,7 @@ export class StorefrontMenuPage implements OnInit {
   private readonly scroller = inject(ViewportScroller);
   private readonly route = inject(ActivatedRoute);
   private readonly ordering = inject(OrderingService);
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly cart = inject(CartService);
   protected readonly picking = signal<PublicItem | null>(null);
   protected readonly toast = signal<string | null>(null);
@@ -73,23 +95,33 @@ export class StorefrontMenuPage implements OnInit {
   protected readonly query = signal('');
   protected readonly vegOnly = signal(false);
   protected readonly foodLabel = FOOD_LABEL;
+  /** Categories whose next batch is on its way / failed to load. */
+  protected readonly loadingMore = signal<ReadonlySet<string>>(new Set());
+  protected readonly failedMore = signal<ReadonlySet<string>>(new Set());
+  /** True while the filters changed and the new results are on their way. */
+  protected readonly refreshing = signal(false);
+  protected readonly filtersOn = computed(() => this.vegOnly() || !!this.query().trim());
+  private generation = 0; // a batch for old filters is ignored
+  private searchTimer: ReturnType<typeof setTimeout> | undefined;
 
+  /** Veg-only and search run on the server, so they also cover dishes not loaded yet; meal type is local. */
   protected readonly categories = computed<PublicCategory[]>(() => {
     const m = this.menu();
     if (!m) return [];
     const meal = this.meal();
-    const q = this.query().trim().toLowerCase();
-    return m.categories
-      .filter((c) => !meal || c.meal_type_ids.includes(meal))
-      .map((c) => ({
-        ...c,
-        items: c.items.filter(
-          (i) =>
-            (!this.vegOnly() || i.food_class === 'veg') &&
-            (!q || i.name.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)),
-        ),
-      }))
-      .filter((c) => c.items.length);
+    return m.categories.filter((c) => (!meal || c.meal_type_ids.includes(meal)) && c.items.length);
+  });
+
+  /** Row that fetches the next batch when it scrolls into view: item ID → category ID. */
+  protected readonly triggers = computed(() => {
+    const map = new Map<string, string>();
+    for (const c of this.categories()) {
+      const total = c.item_count ?? c.items.length;
+      if (c.items.length < total && !this.failedMore().has(c.id)) {
+        map.set(c.items[Math.max(0, c.items.length - LOAD_AHEAD)].id, c.id);
+      }
+    }
+    return map;
   });
 
   protected readonly spreads = computed<Spread[]>(() => {
@@ -109,8 +141,13 @@ export class StorefrontMenuPage implements OnInit {
     return out;
   });
 
-  /** Legend entries, only for marks this menu actually uses. */
+  /** Legend entries, only for marks this menu actually uses (the server knows them for unloaded dishes). */
   protected readonly legend = computed(() => {
+    const marks = this.menu()?.marks;
+    if (marks) {
+      const on = new Set(marks);
+      return { bestseller: on.has('bestseller'), special: on.has('special'), classic: on.has('classic'), jain: on.has('jain'), custom: on.has('custom') };
+    }
     const items = (this.menu()?.categories ?? []).flatMap((c) => c.items);
     return {
       bestseller: items.some((i) => i.is_bestseller),
@@ -123,6 +160,7 @@ export class StorefrontMenuPage implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.destroyRef.onDestroy(() => clearTimeout(this.searchTimer));
     this.branchId.set(this.ctx.primaryBranch()?.id ?? null);
     const pre = this.route.snapshot.queryParamMap.get('preorder');
     if (pre) {
@@ -158,9 +196,76 @@ export class StorefrontMenuPage implements OnInit {
     setTimeout(() => this.toast.set(null), 2500);
   }
 
+  private menuQuery(): MenuQuery {
+    return { limit: MENU_BATCH, veg: this.vegOnly(), q: this.query() };
+  }
+
+  /** First batch of every category (with the current filters). */
   protected load(): void {
+    const gen = ++this.generation;
     this.error.set(null);
-    this.ctx.menu().subscribe({ next: (m) => this.menu.set(m), error: (e: ApiError) => this.error.set(e) });
+    this.refreshing.set(!!this.menu());
+    this.loadingMore.set(new Set());
+    this.failedMore.set(new Set());
+    this.ctx.menuPage(this.menuQuery()).subscribe({
+      next: (m) => {
+        if (gen !== this.generation) return;
+        this.refreshing.set(false);
+        this.menu.set(m);
+      },
+      error: (e: ApiError) => {
+        if (gen !== this.generation) return;
+        this.refreshing.set(false);
+        this.error.set(e);
+      },
+    });
+  }
+
+  protected setVeg(on: boolean): void {
+    this.vegOnly.set(on);
+    this.load();
+  }
+
+  /** Search runs on the server: wait until the guest pauses typing. */
+  protected setQuery(q: string): void {
+    this.query.set(q);
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.load(), 300);
+  }
+
+  /** The next batch of one category, appended to what is shown. */
+  protected loadMore(categoryId: string): void {
+    const cat = this.menu()?.categories.find((c) => c.id === categoryId);
+    if (!cat || this.loadingMore().has(categoryId)) return;
+    if (cat.items.length >= (cat.item_count ?? cat.items.length)) return;
+    const gen = this.generation;
+    this.loadingMore.update((s) => new Set(s).add(categoryId));
+    this.failedMore.update((s) => without(s, categoryId));
+    this.ctx.menuItems(categoryId, cat.items.length, this.menuQuery()).subscribe({
+      next: (page) => {
+        this.loadingMore.update((s) => without(s, categoryId));
+        if (gen !== this.generation) return;
+        this.menu.update((m) =>
+          m && {
+            ...m,
+            categories: m.categories.map((c) => {
+              if (c.id !== categoryId) return c;
+              const have = new Set(c.items.map((i) => i.id));
+              return { ...c, items: [...c.items, ...page.items.filter((i) => !have.has(i.id))], item_count: page.total };
+            }),
+          },
+        );
+      },
+      error: () => {
+        this.loadingMore.update((s) => without(s, categoryId));
+        if (gen === this.generation) this.failedMore.update((s) => new Set(s).add(categoryId));
+      },
+    });
+  }
+
+  /** "12 more dishes" — shown under a category while it still has unloaded dishes. */
+  protected remaining(c: PublicCategory): number {
+    return Math.max(0, (c.item_count ?? c.items.length) - c.items.length);
   }
 
   protected price(v: string | number): string {
@@ -239,4 +344,10 @@ export class StorefrontMenuPage implements OnInit {
   protected spice(level: number): string {
     return '🌶'.repeat(level);
   }
+}
+
+function without(s: ReadonlySet<string>, key: string): ReadonlySet<string> {
+  const next = new Set(s);
+  next.delete(key);
+  return next;
 }

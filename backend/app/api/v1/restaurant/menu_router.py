@@ -3,7 +3,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 
 from app.api.deps import SessionDep, require_permission
 from app.schemas.menu import (
@@ -17,6 +17,7 @@ from app.schemas.menu import (
     ItemPatch,
     MealTypeIn,
     MealTypePatch,
+    PublicItemsPage,
     PublicMenu,
     StockPatch,
     SubcategoryIn,
@@ -161,5 +162,29 @@ async def preview_storefront(session: SessionDep, ctx: ProfileView) -> Storefron
 
 
 @router.get("/storefront/menu", response_model=PublicMenu, summary="Preview your public menu")
-async def preview_menu(session: SessionDep, ctx: ProfileView) -> PublicMenu:
-    return await profile_svc.preview_menu(session, ctx)
+async def preview_menu(
+    session: SessionDep,
+    ctx: ProfileView,
+    limit: Annotated[int | None, Query(ge=1, le=100)] = None,
+    veg: bool = False,
+    q: Annotated[str, Query(max_length=60)] = "",
+) -> PublicMenu:
+    return profile_svc.page_menu(await profile_svc.preview_menu(session, ctx), limit=limit, veg=veg, q=q)
+
+
+@router.get(
+    "/storefront/menu/categories/{category_id}/items",
+    response_model=PublicItemsPage,
+    summary="Preview: next batch of a category's dishes",
+)
+async def preview_menu_items(
+    category_id: uuid.UUID,
+    session: SessionDep,
+    ctx: ProfileView,
+    offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+    veg: bool = False,
+    q: Annotated[str, Query(max_length=60)] = "",
+) -> PublicItemsPage:
+    menu = await profile_svc.preview_menu(session, ctx)
+    return profile_svc.page_items(menu, category_id, offset=offset, limit=limit, veg=veg, q=q)

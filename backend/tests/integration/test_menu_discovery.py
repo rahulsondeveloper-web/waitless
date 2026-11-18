@@ -331,3 +331,60 @@ async def test_contact_form(client: httpx.AsyncClient, admin_engine: AsyncEngine
     async with admin_engine.connect() as conn:
         rows = (await conn.execute(text("SELECT email, topic FROM support_tickets"))).all()
     assert [tuple(r) for r in rows] == [("riya@example.com", "restaurant_signup")]  # honeypot not stored
+
+
+async def test_public_menu_in_batches_with_filters(client: httpx.AsyncClient) -> None:
+    """Storefront "load more on scroll": first 10 per category, the rest in batches; filters cover all dishes."""
+    await create_super_admin()
+    admin = bearer(await login(client, "admin@waitless.test"))
+    tenant, h = await _owner(client, restaurant_name="Batch House")
+    mains = _cat(await _menu(client, h), "Main Course")
+    for n in range(25):
+        r = await client.post(
+            "/api/v1/restaurant/menu/items",
+            json={
+                "category_id": mains["id"],
+                "name": f"Dish {n:02d}",
+                "base_price": "100",
+                "food_class": "veg" if n % 2 else "non_veg",
+                "tags": ["jain"] if n == 24 else [],
+            },
+            headers=h,
+        )
+        assert r.status_code == 201, r.text
+    await _publish(client, tenant, h, admin, lat="18.52", lng="73.85", city="Pune")
+    slug = (await client.get("/api/v1/restaurant/profile", headers=h)).json()["slug"]
+    base = f"/api/v1/public/restaurants/{slug}/menu"
+
+    full = (await client.get(base)).json()  # no limit: everything, as before
+    assert len(_cat(full, "Main Course")["items"]) == 25
+
+    first = (await client.get(base, params={"limit": 10})).json()
+    m = _cat(first, "Main Course")
+    assert len(m["items"]) == 10 and m["item_count"] == 25
+    assert "jain" in first["marks"]  # dish 24 is not in the first batch, but the legend knows it
+
+    seen = [i["name"] for i in m["items"]]
+    offset = 10
+    while offset < 25:
+        page = (await client.get(f"{base}/categories/{m['id']}/items", params={"offset": offset, "limit": 10})).json()
+        assert page["total"] == 25 and page["offset"] == offset
+        seen += [i["name"] for i in page["items"]]
+        offset += 10
+    assert seen == [f"Dish {n:02d}" for n in range(25)]  # menu order, no gaps or repeats
+
+    veg = (await client.get(base, params={"limit": 10, "veg": "true"})).json()
+    vm = _cat(veg, "Main Course")
+    assert vm["item_count"] == 12 and all(i["food_class"] == "veg" for i in vm["items"])
+    nxt = (await client.get(f"{base}/categories/{m['id']}/items", params={"offset": 10, "veg": "true"})).json()
+    assert nxt["total"] == 12 and len(nxt["items"]) == 2
+
+    found = (await client.get(base, params={"limit": 10, "q": "dish 2"})).json()
+    assert [i["name"] for i in _cat(found, "Main Course")["items"]] == [f"Dish {n}" for n in range(20, 25)]
+    assert all(c["item_count"] for c in found["categories"])  # categories without a match are left out
+
+    missing = await client.get(f"{base}/categories/00000000-0000-0000-0000-000000000000/items")
+    assert missing.status_code == 404
+
+    preview = (await client.get("/api/v1/restaurant/storefront/menu", params={"limit": 10}, headers=h)).json()
+    assert _cat(preview, "Main Course")["item_count"] == 25

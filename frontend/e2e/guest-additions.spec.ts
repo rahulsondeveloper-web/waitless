@@ -169,3 +169,36 @@ test('the owner sees which pages each role can open and can customise a built-in
   await dlg.getByRole('button', { name: 'Cancel' }).click();
   await page.context().close();
 });
+
+test('a long category shows 10 dishes first and loads the rest in batches while scrolling', async ({ page }, info) => {
+  test.setTimeout(90_000);
+  const { headers } = await api(page.request);
+  const menu = await (await page.request.get('/api/v1/restaurant/menu', { headers })).json();
+  const mains = menu.categories.find((c: { name: string }) => c.name === 'Main Course');
+  const tag = `Batch${info.project.name}${Date.now() % 100000}`;
+  const ids: string[] = [];
+  for (let n = 1; n <= 14; n++) {
+    const r = await page.request.post('/api/v1/restaurant/menu/items', {
+      headers,
+      data: { category_id: mains.id, name: `${tag} Dish ${String(n).padStart(2, '0')}`, base_price: '199' },
+    });
+    expect(r.ok()).toBeTruthy();
+    ids.push((await r.json()).id);
+  }
+  try {
+    await page.goto(`/r/${SLUG}/menu`);
+    const mine = page.getByTestId('menu-item').filter({ hasText: tag });
+    await expect(mine.first()).toBeVisible();
+    const first = await mine.count();
+    expect(first).toBeLessThan(14); // only the first batch of 10 for the category
+    // Scrolling down the list fetches the next batch when the 8th/9th dish comes into view.
+    for (let i = 0; i < 6 && (await mine.count()) < 14; i++) {
+      await mine.last().scrollIntoViewIfNeeded();
+      await page.waitForTimeout(400);
+    }
+    await expect(mine).toHaveCount(14);
+    await expect(page.getByText(`${tag} Dish 14`)).toBeVisible();
+  } finally {
+    for (const id of ids) await page.request.post(`/api/v1/restaurant/menu/items/${id}/archive`, { headers });
+  }
+});

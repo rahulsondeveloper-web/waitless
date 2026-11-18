@@ -107,6 +107,23 @@ export interface PublicCategory {
   meal_type_ids: string[];
   items: PublicItem[];
   image_url?: string | null;
+  /** Dishes matching the filters; more than items.length while the rest load in batches. */
+  item_count?: number | null;
+}
+
+/** The next batch of a category's dishes ("load more on scroll"). */
+export interface PublicItemsPage {
+  category_id: string;
+  offset: number;
+  total: number;
+  items: PublicItem[];
+}
+
+/** Server-side menu filters + batch size. */
+export interface MenuQuery {
+  limit?: number;
+  veg?: boolean;
+  q?: string;
 }
 
 export interface PublicMenu {
@@ -114,6 +131,8 @@ export interface PublicMenu {
   meal_types: { id: string; name: string }[];
   categories: PublicCategory[];
   ordering_enabled: boolean;
+  /** Legend marks used anywhere on the menu: bestseller, special, classic, jain, custom. */
+  marks?: string[];
 }
 
 export interface DiscoveryCard {

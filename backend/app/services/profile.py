@@ -23,7 +23,7 @@ from app.models.profile import (
     RestaurantProfile,
     SocialLink,
 )
-from app.schemas.menu import PublicMenu
+from app.schemas.menu import PublicItem, PublicItemsPage, PublicMenu
 from app.schemas.profile import (
     BranchLocationUpdate,
     BrandingOut,
@@ -659,6 +659,54 @@ async def public_menu(session: AsyncSession, slug: str) -> PublicMenu:
     out = await build_public_menu(session, tenant)
     await _cache_set(key, out.model_dump_json())
     return out
+
+
+# ---------- batches ("load more on scroll") ----------
+
+
+def _matches(item: PublicItem, veg: bool, q: str) -> bool:
+    if veg and item.food_class != "veg":
+        return False
+    if q and q not in item.name.lower() and q not in item.description.lower():
+        return False
+    return True
+
+
+def _marks(menu: PublicMenu) -> list[str]:
+    items = [i for c in menu.categories for i in c.items]
+    tags = {t.strip().lower() for i in items for t in i.tags}
+    checks = {
+        "bestseller": any(i.is_bestseller for i in items),
+        "special": any(i.is_todays_special for i in items),
+        "classic": "classic" in tags,
+        "jain": "jain" in tags,
+        "custom": any(len(i.variants) > 1 or i.addon_groups for i in items),
+    }
+    return [k for k, on in checks.items() if on]
+
+
+def page_menu(menu: PublicMenu, *, limit: int | None, veg: bool = False, q: str = "") -> PublicMenu:
+    """Filter (veg only, search) and keep the first `limit` dishes per category; `item_count` tells the
+    browser how many more there are. Categories with no matching dish are left out."""
+    q = q.strip().lower()
+    cats = []
+    for c in menu.categories:
+        items = [i for i in c.items if _matches(i, veg, q)]
+        if not items:
+            continue
+        cats.append(c.model_copy(update={"items": items[:limit] if limit else items, "item_count": len(items)}))
+    return menu.model_copy(update={"categories": cats, "marks": _marks(menu)})
+
+
+def page_items(
+    menu: PublicMenu, category_id: uuid.UUID, *, offset: int, limit: int, veg: bool = False, q: str = ""
+) -> PublicItemsPage:
+    cat = next((c for c in menu.categories if c.id == category_id), None)
+    if cat is None:
+        raise NotFoundError("Category not found.")
+    q = q.strip().lower()
+    items = [i for i in cat.items if _matches(i, veg, q)]
+    return PublicItemsPage(category_id=cat.id, offset=offset, total=len(items), items=items[offset : offset + limit])
 
 
 # ---------- owner preview (unpublished storefront, never cached) ----------

@@ -297,6 +297,7 @@ class PublicCategory(ApiModel):
     meal_type_ids: list[uuid.UUID]
     items: list[PublicItem]
     image_url: str | None = None
+    item_count: int | None = None  # dishes matching the filters; more than len(items) when sent in batches
 
 
 class PublicMealType(ApiModel):
@@ -311,3 +312,15 @@ class PublicMenu(ApiModel):
     meal_types: list[PublicMealType]
     categories: list[PublicCategory]
     ordering_enabled: bool = False  # plan includes digital ordering (Phase 7)
+    # legend marks used anywhere on the menu (also by dishes not loaded yet):
+    # bestseller, special, classic, jain, custom
+    marks: list[str] = Field(default_factory=list)
+
+
+class PublicItemsPage(ApiModel):
+    """The next batch of one category's dishes (storefront "load more on scroll")."""
+
+    category_id: uuid.UUID
+    offset: int
+    total: int
+    items: list[PublicItem]

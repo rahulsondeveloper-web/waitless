@@ -5,7 +5,7 @@ import { AuthService } from '../auth/auth.service';
 import { ApiError } from '../http/api-error';
 import { ThemeService } from '../theme/theme.service';
 import { StorefrontApi } from './storefront.api';
-import { Gallery, PublicMenu, Storefront } from './storefront.models';
+import { Gallery, MenuQuery, PublicItemsPage, PublicMenu, Storefront } from './storefront.models';
 
 export type StorefrontStatus = 'idle' | 'loading' | 'ready' | 'not_found' | 'error';
 
@@ -99,6 +99,24 @@ export class TenantContextService {
       this.menu$ = { slug, obs: src.pipe(shareReplay(1)) };
     }
     return this.menu$.obs.pipe(tap(() => this.assertStill(slug)));
+  }
+
+  /** The menu page's batched, filtered menu (not cached: filters change it). */
+  menuPage(query: MenuQuery): Observable<PublicMenu> {
+    const slug = this._slug();
+    if (!slug) return throwError(() => new ApiError(0, 'NO_RESTAURANT', 'No restaurant selected.'));
+    const src = this._preview() ? this.api.previewMenu(query) : this.api.menu(slug, query);
+    return src.pipe(tap(() => this.assertStill(slug)));
+  }
+
+  /** The next batch of one category's dishes, with the same filters. */
+  menuItems(categoryId: string, offset: number, query: MenuQuery): Observable<PublicItemsPage> {
+    const slug = this._slug();
+    if (!slug) return throwError(() => new ApiError(0, 'NO_RESTAURANT', 'No restaurant selected.'));
+    const src = this._preview()
+      ? this.api.previewMenuItems(categoryId, offset, query)
+      : this.api.menuItems(slug, categoryId, offset, query);
+    return src.pipe(tap(() => this.assertStill(slug)));
   }
 
   gallery(): Observable<Gallery> {

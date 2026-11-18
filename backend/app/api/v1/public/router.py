@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Path, Query, status
@@ -6,7 +7,7 @@ from app.api.deps import ClientDep, SessionDep
 from app.core import rate_limit
 from app.core.config import get_settings
 from app.schemas.discovery import ContactRequest, ContactResponse, DiscoveryFilters, DiscoveryPage
-from app.schemas.menu import PublicMenu
+from app.schemas.menu import PublicItemsPage, PublicMenu
 from app.schemas.profile import BrandingOut, GalleryOut, StorefrontOut
 from app.schemas.tenancy import RegistrationResponse, RestaurantRegistration, SlugAvailability, TenantOut
 from app.services import discovery, registration
@@ -82,9 +83,40 @@ async def contact(body: ContactRequest, session: SessionDep, client: ClientDep) 
     return await discovery.submit_contact(session, body)
 
 
+MenuLimit = Annotated[int | None, Query(ge=1, le=100, description="Dishes per category; more via /items")]
+VegOnly = Annotated[bool, Query()]
+MenuSearch = Annotated[str, Query(max_length=60)]
+
+
 @router.get("/restaurants/{slug}/menu", response_model=PublicMenu, summary="Menu (active categories with dishes)")
-async def storefront_menu(slug: Annotated[str, Path(max_length=60)], session: SessionDep) -> PublicMenu:
-    return await profile_service.public_menu(session, slug)
+async def storefront_menu(
+    slug: Annotated[str, Path(max_length=60)],
+    session: SessionDep,
+    limit: MenuLimit = None,
+    veg: VegOnly = False,
+    q: MenuSearch = "",
+) -> PublicMenu:
+    """Without `limit` every dish is returned. With it, each category carries its first `limit` dishes and
+    `item_count`; the storefront loads the rest in batches while the guest scrolls."""
+    return profile_service.page_menu(await profile_service.public_menu(session, slug), limit=limit, veg=veg, q=q)
+
+
+@router.get(
+    "/restaurants/{slug}/menu/categories/{category_id}/items",
+    response_model=PublicItemsPage,
+    summary="Next batch of a category's dishes",
+)
+async def storefront_menu_items(
+    slug: Annotated[str, Path(max_length=60)],
+    category_id: uuid.UUID,
+    session: SessionDep,
+    offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+    veg: VegOnly = False,
+    q: MenuSearch = "",
+) -> PublicItemsPage:
+    menu = await profile_service.public_menu(session, slug)
+    return profile_service.page_items(menu, category_id, offset=offset, limit=limit, veg=veg, q=q)
 
 
 @router.get(

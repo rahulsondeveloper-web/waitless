@@ -29,7 +29,7 @@
       <wl-error-state title="Could not load the menu" [message]="e.message" (retry)="load()" />
     } @else if (!menu()) {
       <wl-loading-state label="Loading menu…" />
-    } @else if (!menu()!.categories.length) {
+    } @else if (!menu()!.categories.length && !filtersOn() && !refreshing()) {
       <wl-empty-state icon="restaurant_menu" title="The menu is being prepared" message="Please check back soon." />
     } @else {
       <div class="toolbar">
@@ -44,11 +44,11 @@
         <div class="filters">
           <label class="search">
             <span class="material-symbols-outlined" aria-hidden="true">search</span>
-            <input type="search" placeholder="Search dishes" [value]="query()" (input)="query.set($any($event.target).value)"
+            <input type="search" placeholder="Search dishes" [value]="query()" (input)="setQuery($any($event.target).value)"
                    aria-label="Search dishes" />
           </label>
           <label class="veg-toggle">
-            <input type="checkbox" [checked]="vegOnly()" (change)="vegOnly.set($any($event.target).checked)" />
+            <input type="checkbox" [checked]="vegOnly()" (change)="setVeg($any($event.target).checked)" />
             <span class="mark mark--veg" aria-hidden="true"></span> Veg only
           </label>
         </div>
@@ -61,6 +61,7 @@
         }
       </div>
 
+      <div class="results" [class.results--busy]="refreshing()" [attr.aria-busy]="refreshing()">
       @for (s of spreads(); track s.id) {
         <div class="spread" [class.spread--reverse]="s.layout === 'b'" [class.spread--single]="!s.second"
              [attr.data-layout]="s.layout" data-testid="menu-spread">
@@ -79,6 +80,7 @@
               <div class="spread__page">
                 @if (s.first.description) { <p class="tagline">{{ s.first.description }}</p> }
                 <ng-container *ngTemplateOutlet="grouped; context: { $implicit: s.first.items }" />
+                <ng-container *ngTemplateOutlet="moreTpl; context: { $implicit: s.first }" />
                 @if (s.second; as c2) {
                   <div class="divider-wave" aria-hidden="true"></div>
                   <section [id]="'cat-' + c2.id" [attr.aria-labelledby]="'h-' + c2.id">
@@ -86,6 +88,7 @@
                       @if (tail(c2.name)) { <small>{{ head(c2.name) }}</small>{{ tail(c2.name) }} } @else { {{ c2.name }} }</h2>
                     @if (c2.description) { <p class="tagline">{{ c2.description }}</p> }
                     <ng-container *ngTemplateOutlet="grouped; context: { $implicit: c2.items }" />
+                    <ng-container *ngTemplateOutlet="moreTpl; context: { $implicit: c2 }" />
                   </section>
                 }
               </div>
@@ -102,6 +105,7 @@
                     @if (highlight(s.first); as h) { <figcaption class="note note--light">{{ h }}</figcaption> }
                   </figure>
                   <ng-container *ngTemplateOutlet="list; context: { $implicit: s.first.items, cls: 'items items--two items--onpanel' }" />
+                  <ng-container *ngTemplateOutlet="moreTpl; context: { $implicit: s.first }" />
                 </div>
               </section>
               @if (s.second; as c2) {
@@ -110,6 +114,7 @@
                     @if (tail(c2.name)) { <small>{{ head(c2.name) }}</small>{{ tail(c2.name) }} } @else { {{ c2.name }} }</h2>
                   @if (c2.description) { <p class="tagline">{{ c2.description }}</p> }
                   <ng-container *ngTemplateOutlet="grouped; context: { $implicit: c2.items }" />
+                  <ng-container *ngTemplateOutlet="moreTpl; context: { $implicit: c2 }" />
                 </section>
               }
             }
@@ -121,6 +126,7 @@
                 <h2 class="display display--xl" [id]="'h-' + s.first.id">{{ s.first.name }}</h2>
                 <div class="divider-wave" aria-hidden="true"></div>
                 <ng-container *ngTemplateOutlet="list; context: { $implicit: s.first.items, cls: 'items items--two' }" />
+                <ng-container *ngTemplateOutlet="moreTpl; context: { $implicit: s.first }" />
                 <figure class="plate-shot">
                   <img [src]="catImage(s.first)" [alt]="s.first.name" loading="lazy" data-testid="category-photo" />
                 </figure>
@@ -152,6 +158,7 @@
                       <ng-container *ngTemplateOutlet="list; context: { $implicit: d.feature, cls: 'items' }" />
                     </div>
                   </div>
+                  <ng-container *ngTemplateOutlet="moreTpl; context: { $implicit: c2 }" />
                 </section>
               }
             }
@@ -165,9 +172,24 @@
       } @empty {
         <wl-empty-state icon="search_off" title="No dishes match" message="Try another search or meal type." />
       }
+      </div>
     }
   </div>
 </section>
+
+<!-- Under a category while more dishes are coming: loading / retry -->
+<ng-template #moreTpl let-c>
+  @if (remaining(c); as left) {
+    @if (failedMore().has(c.id)) {
+      <p class="more" role="alert">Could not load the other {{ left }} dishes.
+        <button type="button" class="more__retry" (click)="loadMore(c.id)">Try again</button></p>
+    } @else if (loadingMore().has(c.id)) {
+      <p class="more" role="status" data-testid="loading-more"><span class="wl-spinner more__spin" aria-hidden="true"></span> Loading more dishes…</p>
+    } @else {
+      <p class="more"><button type="button" class="more__retry" (click)="loadMore(c.id)">Show {{ left }} more</button></p>
+    }
+  }
+</ng-template>
 
 <!-- A list split by subcategory with the template's ◇ handwritten ◇ headings -->
 <ng-template #grouped let-items>
@@ -181,7 +203,8 @@
 <ng-template #list let-items let-cls="cls">
   <ul [class]="cls">
     @for (i of items; track i.id) {
-      <li class="item" [class.item--off]="!!unavailable(i)" data-testid="menu-item">
+      <li class="item" [class.item--off]="!!unavailable(i)" data-testid="menu-item"
+          [wlNearEndKey]="triggers().get(i.id)" (wlNearEnd)="loadMore($event)">
         <div class="item__body">
           <h4>
             <span [class]="'mark mark--' + i.food_class" role="img" [attr.aria-label]="food(i)"></span>

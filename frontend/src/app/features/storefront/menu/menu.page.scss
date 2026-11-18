@@ -752,3 +752,41 @@
   border-radius: 10px;
   font-size: 0.9rem;
 }
+
+/* ---------- load more on scroll ---------- */
+.results {
+  transition: opacity 0.2s;
+  &--busy {
+    opacity: 0.55;
+  }
+}
+.more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0.8rem 0 0;
+  font-family: var(--wl-font-hand);
+  font-size: 1.15rem;
+  color: var(--wl-muted);
+}
+.panel .more {
+  color: rgba(255, 250, 243, 0.85);
+}
+.more__retry {
+  border: 0;
+  background: none;
+  padding: 0.2rem 0.4rem;
+  font: inherit;
+  color: var(--wl-primary);
+  text-decoration: underline;
+  cursor: pointer;
+  .panel & {
+    color: #fff;
+  }
+}
+.more__spin {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
