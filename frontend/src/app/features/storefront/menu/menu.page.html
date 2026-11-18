@@ -1,100 +1,217 @@
-<section class="wl-container page">
-  <header class="head">
-    <p class="eyebrow">Our menu</p>
-    <h1 class="title">Crafted with love, <span class="script">served with joy</span></h1>
-    <p class="note">
-      <span class="material-symbols-outlined" aria-hidden="true">timer</span>
-      Every dish comes with our 15-minute serving promise.
-      @if (canOrder()) {
-        @if (cart.tableToken()) { Order straight from your table. }
-        @else if (cart.preorderFor()) { You are pre-ordering for your booking. }
-        @else { At the restaurant? <a routerLink="../session">Enter your order ID</a> to order from your table. }
+<!-- Menu in the Remelle template's "magazine spread" design (design/default-theme/index.html#menu). -->
+<section class="menu">
+  <div class="wl-container page">
+    <div class="menu__intro">
+      <p class="eyebrow">Our Menu</p>
+      <h1 class="h-serif">Crafted with love, <span class="script">served with joy</span></h1>
+      @if (legend(); as lg) {
+        <ul class="legend" aria-label="What the marks mean">
+          @if (lg.bestseller) { <li><span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span> Chef's favourite</li> }
+          @if (lg.special) { <li><span class="material-symbols-outlined" aria-hidden="true">wb_sunny</span> Today's special</li> }
+          @if (lg.classic) { <li><span class="material-symbols-outlined" aria-hidden="true">all_inclusive</span> Classic</li> }
+          @if (lg.jain) { <li><span class="dot-j">J</span> Jain option</li> }
+          @if (lg.custom) { <li><span class="material-symbols-outlined" aria-hidden="true">tune</span> Customise</li> }
+          <li><span class="mark mark--veg" aria-hidden="true"></span> Veg <span class="mark mark--non_veg" aria-hidden="true"></span> Non-veg</li>
+        </ul>
       }
-    </p>
-  </header>
-
-  @if (error(); as e) {
-    <wl-error-state title="Could not load the menu" [message]="e.message" (retry)="load()" />
-  } @else if (!menu()) {
-    <wl-loading-state label="Loading menu…" />
-  } @else if (!menu()!.categories.length) {
-    <wl-empty-state icon="restaurant_menu" title="The menu is being prepared" message="Please check back soon." />
-  } @else {
-    <div class="toolbar">
-      <div class="meals" role="tablist" aria-label="Meal type">
-        <button type="button" role="tab" [attr.aria-selected]="meal() === null" [class.on]="meal() === null"
-                (click)="meal.set(null)">All</button>
-        @for (m of menu()!.meal_types; track m.id) {
-          <button type="button" role="tab" [attr.aria-selected]="meal() === m.id" [class.on]="meal() === m.id"
-                  (click)="meal.set(m.id)">{{ m.name }}</button>
+      <p class="promise">
+        <span class="material-symbols-outlined" aria-hidden="true">timer</span>
+        Every dish comes with our 15-minute serving promise.
+        @if (canOrder()) {
+          @if (cart.tableToken()) { Order straight from your table. }
+          @else if (cart.preorderFor()) { You are pre-ordering for your booking. }
+          @else { At the restaurant? <a routerLink="../session">Enter your order ID</a> to order from your table. }
         }
-      </div>
-      <div class="filters">
-        <label class="search">
-          <span class="material-symbols-outlined" aria-hidden="true">search</span>
-          <input type="search" placeholder="Search dishes" [value]="query()" (input)="query.set($any($event.target).value)"
-                 aria-label="Search dishes" />
-        </label>
-        <label class="veg-toggle">
-          <input type="checkbox" [checked]="vegOnly()" (change)="vegOnly.set($any($event.target).checked)" />
-          <span class="mark mark--veg" aria-hidden="true"></span> Veg only
-        </label>
-      </div>
-      @if (categories().length > 1) {
-        <nav class="cat-cards" aria-label="Categories" data-testid="category-cards">
-          @for (c of categories(); track c.id) {
-            <button type="button" class="cat-card" (click)="jump(c.id)">
-              <img [src]="catImage(c)" [alt]="''" loading="lazy" width="300" height="225" />
-              <span>{{ c.name }}</span>
-            </button>
-          }
-        </nav>
-      }
+      </p>
     </div>
 
-    @for (c of categories(); track c.id) {
-      <section class="category" [id]="'cat-' + c.id" [attr.aria-labelledby]="'h-' + c.id">
-        <h2 class="cat-title" [id]="'h-' + c.id">{{ c.name }}</h2>
-        @if (c.description) { <p class="cat-desc">{{ c.description }}</p> }
-        <ul class="items">
-          @for (i of c.items; track i.id) {
-            <li class="item" [class.item--off]="!!unavailable(i)">
-              @if (i.image_url) {
-                <img class="item__img" [src]="i.image_url" [alt]="i.name" loading="lazy" />
-              }
-              <div class="item__body">
-                <h3>
-                  <span class="mark" [class]="'mark mark--' + i.food_class" role="img" [attr.aria-label]="foodLabel[i.food_class]"></span>
-                  {{ i.name }}
-                  @if (i.spice_level) { <span class="spice" [attr.aria-label]="'Spice level ' + i.spice_level + ' of 3'">{{ spice(i.spice_level) }}</span> }
-                </h3>
-                <div class="badges">
-                  @if (i.is_bestseller) { <span class="badge">Bestseller</span> }
-                  @if (i.is_todays_special) { <span class="badge badge--accent">Today's special</span> }
-                  @if (i.subcategory) { <span class="sub">{{ i.subcategory }}</span> }
-                </div>
-                @if (i.description) { <p>{{ i.description }}</p> }
-                @if (i.allergens.length) { <p class="allergens">Contains: {{ i.allergens.join(', ') }}</p> }
+    @if (error(); as e) {
+      <wl-error-state title="Could not load the menu" [message]="e.message" (retry)="load()" />
+    } @else if (!menu()) {
+      <wl-loading-state label="Loading menu…" />
+    } @else if (!menu()!.categories.length) {
+      <wl-empty-state icon="restaurant_menu" title="The menu is being prepared" message="Please check back soon." />
+    } @else {
+      <div class="toolbar">
+        <div class="meals" role="tablist" aria-label="Meal type">
+          <button type="button" role="tab" [attr.aria-selected]="meal() === null" [class.on]="meal() === null"
+                  (click)="meal.set(null)">All</button>
+          @for (m of menu()!.meal_types; track m.id) {
+            <button type="button" role="tab" [attr.aria-selected]="meal() === m.id" [class.on]="meal() === m.id"
+                    (click)="meal.set(m.id)">{{ m.name }}</button>
+          }
+        </div>
+        <div class="filters">
+          <label class="search">
+            <span class="material-symbols-outlined" aria-hidden="true">search</span>
+            <input type="search" placeholder="Search dishes" [value]="query()" (input)="query.set($any($event.target).value)"
+                   aria-label="Search dishes" />
+          </label>
+          <label class="veg-toggle">
+            <input type="checkbox" [checked]="vegOnly()" (change)="vegOnly.set($any($event.target).checked)" />
+            <span class="mark mark--veg" aria-hidden="true"></span> Veg only
+          </label>
+        </div>
+        @if (categories().length > 1) {
+          <nav class="jump" aria-label="Categories" data-testid="category-nav">
+            @for (c of categories(); track c.id) {
+              <button type="button" (click)="jump(c.id)">{{ c.name }}</button>
+            }
+          </nav>
+        }
+      </div>
+
+      @for (s of spreads(); track s.id) {
+        <div class="spread" [class.spread--reverse]="s.layout === 'b'" [class.spread--single]="!s.second"
+             [attr.data-layout]="s.layout" data-testid="menu-spread">
+          @switch (s.layout) {
+            <!-- (a) photo page with the title over it | the list, then the second category -->
+            @case ('a') {
+              <div class="spread__page">
+                <section class="display-block" [id]="'cat-' + s.first.id" [attr.aria-labelledby]="'h-' + s.first.id">
+                  <figure class="display-block__img">
+                    <img [src]="catImage(s.first)" [alt]="s.first.name" loading="lazy" data-testid="category-photo" />
+                  </figure>
+                  <h2 class="display display--overlay" [class.display--long]="head(s.first.name).length > 6" [id]="'h-' + s.first.id">{{ head(s.first.name) }}
+                    @if (tail(s.first.name)) { <span class="display__script">{{ tail(s.first.name) }}</span> }</h2>
+                </section>
               </div>
-              <div class="item__side">
-                <span class="price">{{ shownPrice(i) }}</span>
-                @if (unavailable(i); as why) {
-                  <span class="sold">{{ why }}</span>
-                } @else if (canOrder()) {
-                  <button type="button" class="add" (click)="picking.set(i)" [attr.aria-label]="'Add ' + i.name">
-                    <span class="material-symbols-outlined" aria-hidden="true">add</span> Add
-                  </button>
+              <div class="spread__page">
+                @if (s.first.description) { <p class="tagline">{{ s.first.description }}</p> }
+                <ng-container *ngTemplateOutlet="grouped; context: { $implicit: s.first.items }" />
+                @if (s.second; as c2) {
+                  <div class="divider-wave" aria-hidden="true"></div>
+                  <section [id]="'cat-' + c2.id" [attr.aria-labelledby]="'h-' + c2.id">
+                    <h2 class="display display--sm" [id]="'h-' + c2.id">
+                      @if (tail(c2.name)) { <small>{{ head(c2.name) }}</small>{{ tail(c2.name) }} } @else { {{ c2.name }} }</h2>
+                    @if (c2.description) { <p class="tagline">{{ c2.description }}</p> }
+                    <ng-container *ngTemplateOutlet="grouped; context: { $implicit: c2.items }" />
+                  </section>
                 }
               </div>
-            </li>
+            }
+
+            <!-- (b) title + photo panel with the list on it | accent title, tagline, subcategory headings -->
+            @case ('b') {
+              <section class="spread__page" [id]="'cat-' + s.first.id" [attr.aria-labelledby]="'h-' + s.first.id">
+                <h2 class="display" [id]="'h-' + s.first.id">{{ s.first.name }}</h2>
+                @if (s.first.description) { <p class="display__sub">{{ s.first.description }}</p> }
+                <div class="panel">
+                  <figure class="panel__img">
+                    <img [src]="catImage(s.first)" [alt]="s.first.name" loading="lazy" data-testid="category-photo" />
+                    @if (highlight(s.first); as h) { <figcaption class="note note--light">{{ h }}</figcaption> }
+                  </figure>
+                  <ng-container *ngTemplateOutlet="list; context: { $implicit: s.first.items, cls: 'items items--two items--onpanel' }" />
+                </div>
+              </section>
+              @if (s.second; as c2) {
+                <section class="spread__page" [id]="'cat-' + c2.id" [attr.aria-labelledby]="'h-' + c2.id">
+                  <h2 class="display display--accent" [id]="'h-' + c2.id">
+                    @if (tail(c2.name)) { <small>{{ head(c2.name) }}</small>{{ tail(c2.name) }} } @else { {{ c2.name }} }</h2>
+                  @if (c2.description) { <p class="tagline">{{ c2.description }}</p> }
+                  <ng-container *ngTemplateOutlet="grouped; context: { $implicit: c2.items }" />
+                </section>
+              }
+            }
+
+            <!-- (c) kicker + huge lowercase title, two columns, round plate photo | label box, list, framed photo -->
+            @case ('c') {
+              <section class="spread__page" [id]="'cat-' + s.first.id" [attr.aria-labelledby]="'h-' + s.first.id">
+                @if (s.first.description) { <p class="kicker">{{ s.first.description }}</p> }
+                <h2 class="display display--xl" [id]="'h-' + s.first.id">{{ s.first.name }}</h2>
+                <div class="divider-wave" aria-hidden="true"></div>
+                <ng-container *ngTemplateOutlet="list; context: { $implicit: s.first.items, cls: 'items items--two' }" />
+                <figure class="plate-shot">
+                  <img [src]="catImage(s.first)" [alt]="s.first.name" loading="lazy" data-testid="category-photo" />
+                </figure>
+              </section>
+              @if (s.second; as c2) {
+                @let d = drinkSplit(c2);
+                <section class="spread__page" [id]="'cat-' + c2.id" [attr.aria-labelledby]="'h-' + c2.id">
+                  <div class="label-box">
+                    <b [id]="'h-' + c2.id" role="heading" aria-level="2">{{ c2.name }}:</b>
+                    <span>{{ c2.description || 'Crafted with care, made to remember.' }}</span>
+                  </div>
+                  @if (d.main.length) {
+                    @if (d.mainTitle) {
+                      <h3 class="display display--thin">{{ head(d.mainTitle) }}
+                        @if (tail(d.mainTitle)) { <span class="display__script display__script--inline">{{ tail(d.mainTitle) }}</span> }</h3>
+                    }
+                    <ng-container *ngTemplateOutlet="list; context: { $implicit: d.main, cls: 'items items--two' }" />
+                  }
+                  <div class="drink-feature">
+                    <figure>
+                      <img [src]="catImage(c2)" [alt]="c2.name" loading="lazy" data-testid="category-photo" />
+                      @if (d.feature[0]; as f) { <figcaption class="note note--light">{{ f.name }}</figcaption> }
+                    </figure>
+                    <div>
+                      @if (d.featureTitle) {
+                        <h3 class="display display--thin display--sm">{{ head(d.featureTitle) }}
+                          @if (tail(d.featureTitle)) { <span class="display__script display__script--inline">{{ tail(d.featureTitle) }}</span> }</h3>
+                      }
+                      <ng-container *ngTemplateOutlet="list; context: { $implicit: d.feature, cls: 'items' }" />
+                    </div>
+                  </div>
+                </section>
+              }
+            }
           }
-        </ul>
-      </section>
-    } @empty {
-      <wl-empty-state icon="search_off" title="No dishes match" message="Try another search or meal type." />
+
+          <footer class="spread__foot">
+            <span>{{ s.first.name }}{{ s.second ? ' & ' + s.second.name : '' }}</span>
+            <q>{{ s.quote }}</q>
+          </footer>
+        </div>
+      } @empty {
+        <wl-empty-state icon="search_off" title="No dishes match" message="Try another search or meal type." />
+      }
     }
-  }
+  </div>
 </section>
+
+<!-- A list split by subcategory with the template's ◇ handwritten ◇ headings -->
+<ng-template #grouped let-items>
+  @for (g of groups(items); track g.name) {
+    @if (g.name) { <h3 class="subhead"><span>{{ g.name }}</span></h3> }
+    <ng-container *ngTemplateOutlet="list; context: { $implicit: g.items, cls: 'items' }" />
+  }
+</ng-template>
+
+<!-- One list of dishes, exactly like the template's .items / .item -->
+<ng-template #list let-items let-cls="cls">
+  <ul [class]="cls">
+    @for (i of items; track i.id) {
+      <li class="item" [class.item--off]="!!unavailable(i)" data-testid="menu-item">
+        <div class="item__body">
+          <h4>
+            <span [class]="'mark mark--' + i.food_class" role="img" [attr.aria-label]="food(i)"></span>
+            @if (i.is_bestseller) { <span class="material-symbols-outlined star" role="img" aria-label="Chef's favourite">auto_awesome</span> }
+            {{ i.name }}
+            @if (jain(i)) { <span class="dot-j" role="img" aria-label="Jain option">J</span> }
+            @if (i.is_todays_special) { <span class="material-symbols-outlined star" role="img" aria-label="Today's special">wb_sunny</span> }
+            @if (classic(i)) { <span class="material-symbols-outlined star" role="img" aria-label="Classic">all_inclusive</span> }
+            @if (customisable(i)) { <span class="material-symbols-outlined star" role="img" aria-label="Can be customised">tune</span> }
+            @if (i.spice_level) { <span class="spice" role="img" [attr.aria-label]="'Spice level ' + i.spice_level + ' of 3'">{{ spice(i.spice_level) }}</span> }
+          </h4>
+          @if (i.description) { <p>{{ i.description }}</p> }
+          @if (i.allergens.length) { <p class="allergens">Contains: {{ i.allergens.join(', ') }}</p> }
+          @if (i.prep_minutes > 20) { <p class="note">takes {{ i.prep_minutes }} minutes to prepare</p> }
+        </div>
+        <div class="item__side">
+          @let pp = priceParts(i);
+          <span class="price">@if (pp.from) {<small class="from">from</small> }<span class="cur">{{ pp.sign }}</span> {{ pp.amount }}</span>
+          @if (unavailable(i); as why) {
+            <span class="sold">{{ why }}</span>
+          } @else if (canOrder()) {
+            <button type="button" class="add" (click)="picking.set(i)" [attr.aria-label]="'Add ' + i.name">
+              <span class="material-symbols-outlined" aria-hidden="true">add</span>
+            </button>
+          }
+        </div>
+      </li>
+    }
+  </ul>
+</ng-template>
 
 @if (picking(); as item) {
   <wl-dish-picker [item]="item" [currency]="menu()?.currency ?? 'INR'" [basePrice]="basePrice(item)"

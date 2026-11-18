@@ -34,11 +34,13 @@ interface Dish {
   availability: unknown[];
 }
 
-test('the menu shows category photo cards', async ({ page }) => {
+test('the menu is laid out in the template spreads with category photos', async ({ page }) => {
   await page.goto(`/r/${SLUG}/menu`);
-  const cards = page.getByTestId('category-cards');
-  await expect(cards).toBeVisible();
-  await expect(cards.locator('img').first()).toHaveAttribute('src', /.+/);
+  const spread = page.getByTestId('menu-spread').first();
+  await expect(spread).toBeVisible();
+  await expect(spread.getByTestId('category-photo').first()).toHaveAttribute('src', /.+/);
+  await expect(spread.getByTestId('menu-item').first()).toBeVisible();
+  await expect(page.getByTestId('category-nav')).toBeVisible();
 });
 
 test('a guest scans the table QR, opens the table with their name and orders under it', async ({ page, browser }, info) => {
