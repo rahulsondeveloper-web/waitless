@@ -108,3 +108,15 @@ describe('httpCacheInterceptor', () => {
     ).toBe('urban-bites');
   });
 });
+
+describe('HttpCacheService change counters', () => {
+  it('a reply to a request sent before a push is stale, even in the same millisecond', () => {
+    const cache = new HttpCacheService();
+    const before = cache.stamp('urban-bites');
+    cache.invalidate('urban-bites'); // the push arrives while the request is in flight
+    cache.put('k', 'urban-bites', 'W/"a"', { v: 1 }, before);
+    expect(cache.isFresh(cache.get('k')!)).toBe(false);
+    cache.put('k', 'urban-bites', 'W/"a"', { v: 1 }, cache.stamp('urban-bites'));
+    expect(cache.isFresh(cache.get('k')!)).toBe(true);
+  });
+});
