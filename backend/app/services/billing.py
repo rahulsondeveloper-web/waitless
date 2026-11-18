@@ -1237,7 +1237,83 @@ async def _guest_bill(
     return b, s, tenant
 
 
-async def pay_online(session: AsyncSession, token: str | None, bill_id: uuid.UUID) -> OnlinePaymentOut:
+async def invoice_names(session: AsyncSession, inv: Invoice) -> dict[str, str]:
+    """order_item_id → who ordered it, for the "invoice with names" copy (the stored invoice has no names)."""
+    from app.models import OrderItem
+
+    ids = [ln.get("order_item_id") for ln in ((inv.snapshot or {}).get("bill") or {}).get("lines", [])]
+    ids = [uuid.UUID(str(i)) for i in ids if i]
+    if not ids:
+        return {}
+    rows = await session.execute(
+        select(OrderItem.id, Order.ordered_by_name)
+        .join(Order, Order.id == OrderItem.order_id)
+        .where(OrderItem.id.in_(ids))
+    )
+    return {str(i): n for i, n in rows.tuples() if n}
+
+
+async def guest_split_by_person(session: AsyncSession, token: str | None, bill_id: uuid.UUID) -> SessionBillsOut:
+    """The table splits the bill so that each person pays for their own dishes (by the name they ordered
+    under). Dishes without a name stay on the first bill. Only before any payment."""
+    b, s, _ = await _guest_bill(session, token, bill_id)
+    _editable(b)
+    lines = list((await session.execute(select(BillItem).where(BillItem.bill_id == b.id))).scalars())
+    names = dict(
+        (
+            await session.execute(
+                select(Order.id, Order.ordered_by_name).where(Order.id.in_({ln.order_id for ln in lines}))
+            )
+        )
+        .tuples()
+        .all()
+    )
+    groups: dict[str, list[BillItem]] = {}
+    for ln in lines:
+        groups.setdefault((names.get(ln.order_id) or "").strip(), []).append(ln)
+    named = [n for n in groups if n]
+    if len(groups) < 2 or not named:
+        raise AppError(
+            "Everything was ordered under one name — split it equally instead.", code="ONE_PERSON", status_code=422
+        )
+    # the first group (unnamed dishes, or the first person) stays on this bill
+    keep = "" if "" in groups else named[0]
+    st = await get_settings(session, b.tenant_id)
+    for who in [n for n in named if n != keep]:
+        new = await _new_bill(session, s, None)
+        for ln in groups[who]:
+            ln.bill_id = new.id
+        await session.flush()
+        await recompute(session, new, st)
+    await recompute(session, b, st)
+    write_audit(
+        session,
+        action="bill.split_by_person",
+        entity="bill",
+        entity_id=b.id,
+        tenant_id=s.tenant_id,
+        actor_user_id=None,
+        diff={"people": len(named)},
+    )
+    await session.commit()
+    await _changed(s.tenant_id, b.branch_id, {s.id})
+    return await session_bills_out(session, s)
+
+
+def _share(amount: Decimal | None, due: Decimal) -> Decimal:
+    """An equal share (or any part) of what is due; nothing = all of it."""
+    if amount is None:
+        return due
+    if amount <= 0:
+        raise AppError("Enter an amount above zero.", code="INVALID_AMOUNT", status_code=422)
+    if amount > due:
+        raise ConflictError(f"Only {due} is left to pay on this bill.", code="OVERPAYMENT")
+    return amount
+
+
+async def pay_online(
+    session: AsyncSession, token: str | None, bill_id: uuid.UUID, amount: Decimal | None = None
+) -> OnlinePaymentOut:
     b, s, tenant = await _guest_bill(session, token, bill_id)
     if b.status != "open":
         raise ConflictError(f"This bill is {b.status}.", code="BILL_CLOSED")
@@ -1252,6 +1328,7 @@ async def pay_online(session: AsyncSession, token: str | None, bill_id: uuid.UUI
     due = b.grand_total - b.paid_total
     if due <= 0:
         raise ConflictError("Nothing is due on this bill.", code="NOTHING_DUE")
+    due = _share(amount, due)  # one person's equal share, or everything
     currency = str((tenant.settings or {}).get("currency", "INR"))
     gateway = get_gateway()
     order = await gateway.create_order(
@@ -1375,7 +1452,9 @@ async def mock_bill_payment(session: AsyncSession, token: str | None, order_id: 
 # ---------- paying the restaurant's own UPI ID (guest claims, staff confirm) ----------
 
 
-async def upi_claim(session: AsyncSession, token: str | None, bill_id: uuid.UUID, reference: str) -> SessionBillsOut:
+async def upi_claim(
+    session: AsyncSession, token: str | None, bill_id: uuid.UUID, reference: str, amount: Decimal | None = None
+) -> SessionBillsOut:
     """The guest paid the restaurant's UPI ID from the checkout page. WaitLess cannot see that money, so the
     payment waits as "pending" until staff confirm it on the Billing screen."""
     b, s, tenant = await _guest_bill(session, token, bill_id)
@@ -1387,19 +1466,24 @@ async def upi_claim(session: AsyncSession, token: str | None, bill_id: uuid.UUID
     if b.status != "open":
         raise ConflictError(f"This bill is {b.status}.", code="BILL_CLOSED")
     await _require_all_served(session, s.id, "pay")
-    pending = (
-        await session.execute(
-            select(BillPayment).where(
-                BillPayment.bill_id == b.id, BillPayment.status == "pending", BillPayment.provider == "upi_direct"
+    claims = list(
+        (
+            await session.execute(
+                select(BillPayment).where(
+                    BillPayment.bill_id == b.id, BillPayment.status == "pending", BillPayment.provider == "upi_direct"
+                )
             )
-        )
-    ).scalar_one_or_none()
-    if pending is None:
+        ).scalars()
+    )
+    # A full-amount claim: one at a time (a repeated tap changes nothing). Equal shares: one claim per
+    # person, as long as all claims together stay within what is due.
+    if not claims or amount is not None:
         if not b.locked:
             await recompute(session, b, st)
-        due = b.grand_total - b.paid_total
+        due = b.grand_total - b.paid_total - sum((c.amount for c in claims), Decimal(0))
         if due <= 0:
             raise ConflictError("Nothing is due on this bill.", code="NOTHING_DUE")
+        due = _share(amount, due)
         session.add(
             BillPayment(
                 tenant_id=b.tenant_id,
@@ -1476,7 +1560,10 @@ async def review_upi_claim(session: AsyncSession, ctx: TenantContext, payment_id
 
 
 async def my_invoices(session: AsyncSession, user: User) -> list[dict[str, Any]]:
-    """Invoices of every visit where the signed-in customer ordered or had the booking, at all restaurants."""
+    """Invoices of every visit where the signed-in customer ordered, had the booking, or joined the table
+    (QR or order ID) — at all restaurants, with no order ID / PIN and no time limit."""
+    from app.models import TableSessionGuest
+
     await use_system(session)
     bill_ids = select(BillItem.bill_id).join(Order, Order.id == BillItem.order_id).where(Order.customer_id == user.id)
     booked = (
@@ -1484,11 +1571,16 @@ async def my_invoices(session: AsyncSession, user: User) -> list[dict[str, Any]]
         .join(Reservation, Reservation.table_session_id == Bill.table_session_id)
         .where(Reservation.customer_id == user.id)
     )
+    joined = (
+        select(Bill.id)
+        .join(TableSessionGuest, TableSessionGuest.table_session_id == Bill.table_session_id)
+        .where(TableSessionGuest.user_id == user.id)
+    )
     rows = list(
         (
             await session.execute(
                 select(Invoice)
-                .where(Invoice.bill_id.in_(bill_ids.union(booked)))
+                .where(Invoice.bill_id.in_(bill_ids.union(booked, joined)))
                 .order_by(Invoice.issued_at.desc())
                 .limit(200)
             )

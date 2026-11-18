@@ -30,7 +30,16 @@ def _safe(text: Any) -> str:
     )
 
 
-def render(number: str, issued_at: str, snapshot: dict[str, Any], *, receipt: bool = False) -> bytes:
+def render(
+    number: str,
+    issued_at: str,
+    snapshot: dict[str, Any],
+    *,
+    receipt: bool = False,
+    names: dict[str, str] | None = None,
+) -> bytes:
+    """`names` (order_item_id → who ordered it) prints the "with names" copy: dishes grouped per person
+    with each person's total, then the usual totals. Without it the invoice never shows names."""
     r = snapshot["restaurant"]
     b = snapshot["bill"]
     cur = r.get("currency", "INR")
@@ -83,7 +92,8 @@ def render(number: str, issued_at: str, snapshot: dict[str, Any], *, receipt: bo
         pdf.ln(2)
         row("Credit amount", _amt(abs(Decimal(snapshot["total"])), cur), "B", body + 1)
     else:
-        for ln in b["lines"]:
+
+        def dish(ln: dict[str, Any]) -> None:
             row(f"{ln['quantity']} x {ln['name']}", _amt(ln["line_total"], cur), size=body)
             if not receipt:
                 pdf.set_text_color(110, 110, 110)
@@ -93,6 +103,26 @@ def render(number: str, issued_at: str, snapshot: dict[str, Any], *, receipt: bo
                     "",
                     size=small,
                 )
+                pdf.set_text_color(0, 0, 0)
+
+        if names is None:
+            for ln in b["lines"]:
+                dish(ln)
+        else:
+            groups: dict[str, list[dict[str, Any]]] = {}
+            for ln in b["lines"]:
+                groups.setdefault(names.get(str(ln.get("order_item_id"))) or "Shared / table", []).append(ln)
+            for who, lines in groups.items():
+                line(who, body + 0.5, "B")
+                for ln in lines:
+                    dish(ln)
+                # what this person ordered, with GST, after any discount on their dishes
+                own = sum((Decimal(ln["taxable"]) * (1 + Decimal(ln["tax_pct"]) / 100) for ln in lines), Decimal(0))
+                row(f"{who} - total incl. GST", _amt(own.quantize(Decimal("0.01")), cur), "B", small)
+                pdf.ln(1.5)
+            if Decimal(b["service_charge"]) > 0 or Decimal(b["booking_credit"]) > 0:
+                pdf.set_text_color(110, 110, 110)
+                line("Service charge, booking credit and round-off apply to the whole bill below.", small)
                 pdf.set_text_color(0, 0, 0)
         rule()
         row("Food", _amt(b["subtotal"], cur))

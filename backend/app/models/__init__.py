@@ -3,6 +3,7 @@
 from app.models.base import Base
 from app.models.billing import Bill, BillItem, BillPayment, BillRefund, Invoice
 from app.models.booking import QueueEntry, Reservation, ReservationPayment, ReservationPolicy, ReservationTable
+from app.models.guest_service import Review, ServiceRequest, TableSessionGuest
 from app.models.identity import OtpChallenge, RefreshToken, User
 from app.models.inventory import (
     InventoryCategory,
@@ -118,4 +119,7 @@ __all__ = [
     "Tenant",
     "User",
     "UserBranch",
+    "Review",
+    "ServiceRequest",
+    "TableSessionGuest",
 ]

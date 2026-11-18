@@ -16,6 +16,8 @@ from app.api.v1.restaurant.menu_router import router as restaurant_menu_router
 from app.api.v1.restaurant.orders_router import router as restaurant_orders_router
 from app.api.v1.restaurant.profile_router import router as restaurant_profile_router
 from app.api.v1.restaurant.router import router as restaurant_router
+from app.api.v1.restaurant.service_router import guest_router as service_guest_router
+from app.api.v1.restaurant.service_router import router as restaurant_service_router
 from app.api.v1.restaurant.staff_router import router as restaurant_ops_router
 from app.api.v1.super_admin.router import router as super_admin_router
 
@@ -35,4 +37,6 @@ api_router.include_router(restaurant_billing_router)
 api_router.include_router(billing_guest_router)
 api_router.include_router(restaurant_insights_router)
 api_router.include_router(orders_router)
+api_router.include_router(restaurant_service_router)
+api_router.include_router(service_guest_router)
 api_router.include_router(super_admin_router)

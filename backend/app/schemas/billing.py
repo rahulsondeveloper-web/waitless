@@ -197,6 +197,13 @@ class RefundIn(ApiModel):
 
 class UpiClaimIn(ApiModel):
     reference: str = Field(default="", max_length=80)  # UPI transaction / UTR number, if the guest has it
+    amount: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)  # one person's share
+
+
+class GuestPayIn(ApiModel):
+    """Empty = pay everything that is due; `amount` = this person's equal share."""
+
+    amount: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
 
 
 class OnlinePaymentOut(ApiModel):

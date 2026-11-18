@@ -26,14 +26,24 @@ def _status(response: Response, created: bool) -> None:
     response_model=TableJoinOut,
     summary="Guests enter the order code + PIN they got from staff",
 )
-async def join_table(slug: Slug, body: TableJoinIn, session: SessionDep, client: ClientDep) -> TableJoinOut:
+async def join_table(
+    slug: Slug, body: TableJoinIn, session: SessionDep, client: ClientDep, user: OptionalUser
+) -> TableJoinOut:
+    from app.services.guest_service import link_token
+
     tenant = await _public_tenant(session, slug)
-    return await svc.join_table(session, tenant, body, client.ip)
+    out = await svc.join_table(session, tenant, body, client.ip)
+    await link_token(session, out.token, user)  # signed in → the visit's invoices show under My orders
+    return out
 
 
 @router.get("/table-session", response_model=TableSessionView, summary="My table: orders, times, running total")
-async def table_view(session: SessionDep, token: TableToken = None) -> TableSessionView:
-    return await svc.table_view(session, token)
+async def table_view(session: SessionDep, user: OptionalUser, token: TableToken = None) -> TableSessionView:
+    from app.services.guest_service import link_token
+
+    view = await svc.table_view(session, token)
+    await link_token(session, token, user)
+    return view
 
 
 @router.post("/table-session/orders", response_model=OrderOut, status_code=201, summary="Order from the table")
@@ -117,11 +127,16 @@ async def qr_start(
     body: QrStartIn,
     session: SessionDep,
     client: ClientDep,
+    user: OptionalUser,
 ) -> dict:
     from app.services import table_qr
 
     tenant = await table_qr.public_tenant(session, slug)
-    return await table_qr.start(session, tenant, qr, body.guest_name, body.party_size, client.ip)
+    out = await table_qr.start(session, tenant, qr, body.guest_name, body.party_size, client.ip)
+    from app.services.guest_service import link_token
+
+    await link_token(session, out["token"], user)
+    return out
 
 
 @router.post("/public/restaurants/{slug}/tables/{qr}/join", summary="Join an occupied table with its PIN")
@@ -131,8 +146,13 @@ async def qr_join(
     body: QrJoinIn,
     session: SessionDep,
     client: ClientDep,
+    user: OptionalUser,
 ) -> dict:
     from app.services import table_qr
 
     tenant = await table_qr.public_tenant(session, slug)
-    return await table_qr.join(session, tenant, qr, body.pin, client.ip)
+    out = await table_qr.join(session, tenant, qr, body.pin, client.ip)
+    from app.services.guest_service import link_token
+
+    await link_token(session, out["token"], user)
+    return out

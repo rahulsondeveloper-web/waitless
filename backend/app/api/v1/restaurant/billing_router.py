@@ -12,6 +12,7 @@ from app.schemas.billing import (
     BillingSettings,
     BillOut,
     DiscountIn,
+    GuestPayIn,
     InvoiceOut,
     MergeIn,
     OnlinePaymentOut,
@@ -52,8 +53,8 @@ class Ack(BaseModel):
     result: str
 
 
-def _pdf(inv, receipt: bool) -> Response:  # type: ignore[no-untyped-def]
-    data = invoice_pdf.render(inv.number, inv.issued_at.isoformat(), inv.snapshot, receipt=receipt)
+def _pdf(inv, receipt: bool, names: dict[str, str] | None = None) -> Response:  # type: ignore[no-untyped-def]
+    data = invoice_pdf.render(inv.number, inv.issued_at.isoformat(), inv.snapshot, receipt=receipt, names=names)
     return Response(
         content=data,
         media_type="application/pdf",
@@ -201,8 +202,19 @@ async def finish(session: SessionDep, token: TableToken = None) -> SessionBillsO
 
 
 @guest_router.post("/table-session/bills/{bill_id}/pay", response_model=OnlinePaymentOut, summary="Pay the bill online")
-async def pay_online(bill_id: uuid.UUID, session: SessionDep, token: TableToken = None) -> OnlinePaymentOut:
-    return await svc.pay_online(session, token, bill_id)
+async def pay_online(
+    bill_id: uuid.UUID, session: SessionDep, token: TableToken = None, body: GuestPayIn | None = None
+) -> OnlinePaymentOut:
+    return await svc.pay_online(session, token, bill_id, body.amount if body else None)
+
+
+@guest_router.post(
+    "/table-session/bills/{bill_id}/split-by-person",
+    response_model=SessionBillsOut,
+    summary="Split the bill so each person pays for their own dishes",
+)
+async def split_by_person(bill_id: uuid.UUID, session: SessionDep, token: TableToken = None) -> SessionBillsOut:
+    return await svc.guest_split_by_person(session, token, bill_id)
 
 
 @guest_router.get("/table-session/invoices/{invoice_id}/pdf", summary="Receipt PDF for the guest")
@@ -211,9 +223,11 @@ async def guest_invoice_pdf(
     session: SessionDep,
     token: str | None = Query(default=None, alias="t"),
     x_token: TableToken = None,
+    names: bool = Query(default=False, description="Copy with who ordered which dish, and each person's total"),
 ) -> Response:
     """The token can come as a header or `?t=` (so the receipt opens in a new browser tab)."""
-    return _pdf(await svc.guest_invoice(session, x_token or token, invoice_id), receipt=False)
+    inv = await svc.guest_invoice(session, x_token or token, invoice_id)
+    return _pdf(inv, receipt=False, names=await svc.invoice_names(session, inv) if names else None)
 
 
 @guest_router.post("/public/payments/mock-bill/{order_id}", response_model=Ack, summary="Dev mock checkout for bills")
@@ -242,7 +256,7 @@ async def reject_upi(payment_id: uuid.UUID, session: SessionDep, ctx: Collect) -
 async def upi_claim(
     bill_id: uuid.UUID, body: UpiClaimIn, session: SessionDep, token: TableToken = None
 ) -> SessionBillsOut:
-    return await svc.upi_claim(session, token, bill_id, body.reference)
+    return await svc.upi_claim(session, token, bill_id, body.reference, body.amount)
 
 
 @guest_router.get("/me/invoices", summary="My invoices at every restaurant (signed in)")
@@ -251,5 +265,8 @@ async def my_invoices(session: SessionDep, user: CurrentUser) -> list[dict]:
 
 
 @guest_router.get("/me/invoices/{invoice_id}/pdf", summary="Download one of my invoices")
-async def my_invoice_pdf(invoice_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Response:
-    return _pdf(await svc.my_invoice(session, user, invoice_id), receipt=False)
+async def my_invoice_pdf(
+    invoice_id: uuid.UUID, session: SessionDep, user: CurrentUser, names: bool = Query(default=False)
+) -> Response:
+    inv = await svc.my_invoice(session, user, invoice_id)
+    return _pdf(inv, receipt=False, names=await svc.invoice_names(session, inv) if names else None)
