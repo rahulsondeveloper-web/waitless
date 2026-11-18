@@ -188,6 +188,23 @@
   } @else if (loading()) {
     <div class="wl-state"><span class="wl-spinner" aria-label="Loading"></span></div>
   } @else {
+    @if (cart.endedVisit(); as ended) {
+      <article class="bk-card thanks" role="status" data-testid="visit-ended">
+        <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+        <h2>Thank you for dining with {{ ended.restaurantName }}!</h2>
+        <p>Your bill is paid and your table is closed. This phone no longer keeps your table, order or name.</p>
+        @if (ended.receipts.length) {
+          <div class="bk-actions">
+            @for (r of ended.receipts; track r.number) {
+              <a class="wl-btn wl-btn--primary" [href]="r.url" target="_blank" rel="noopener" data-testid="ended-receipt">
+                Download invoice {{ r.number }}</a>
+            }
+          </div>
+        }
+        <p class="bk-muted">Need the invoice later? Enter order ID <b>{{ ended.code }}</b> and your PIN below.</p>
+        <div class="bk-actions"><a routerLink="../menu" class="wl-btn wl-btn--ghost wl-btn--sm">Back to the menu</a></div>
+      </article>
+    }
     <article class="bk-card">
       <p>Your waiter gives you an <b>order ID</b> (like <b>UB-4821</b>) and a <b>4-digit PIN</b> when you are seated.</p>
       <form class="bk-row" (ngSubmit)="join()">

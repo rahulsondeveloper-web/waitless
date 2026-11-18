@@ -60,12 +60,15 @@
               <div>
                 <h2>{{ tableName(s) }} <span class="muted">· {{ s.session_code }}</span></h2>
                 <p class="muted small">{{ s.guest_name ?? '' }} {{ s.party_size }} guests · since {{ s.opened_at | date: 'HH:mm' }}
-                  @if (s.session_status === 'finished') { · <b>guest pressed Finish</b> }</p>
+                  @if (s.session_status === 'finished') { · <b>guest pressed Finish</b> }
+                  @if (s.session_status === 'closed') { · <b class="closed-note" data-testid="auto-closed">paid — table closed and set to cleaning</b> }</p>
               </div>
               <div class="visit-actions">
                 <button mat-button (click)="open(s.session_id, false)"><mat-icon>refresh</mat-icon>Refresh</button>
                 @if (s.session_status === 'finished') { <button mat-button (click)="reopen()">Reopen for orders</button> }
-                @if (canClose()) {
+                @if (s.session_status === 'closed') {
+                  <button mat-flat-button (click)="done()" data-testid="billing-done"><mat-icon>check</mat-icon>Done</button>
+                } @else if (canClose()) {
                   <button mat-flat-button (click)="closeTable()" [disabled]="!s.can_close || busy() === 'close'" data-testid="close-table"
                           [title]="s.can_close ? '' : 'Every bill must be paid first'"><mat-icon>logout</mat-icon>Guests left</button>
                 }

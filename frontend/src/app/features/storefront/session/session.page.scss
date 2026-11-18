@@ -191,3 +191,22 @@
     color: var(--wl-primary);
   }
 }
+
+.thanks {
+  text-align: center;
+  display: grid;
+  gap: 0.6rem;
+  justify-items: center;
+  margin-bottom: 1rem;
+  > .material-symbols-outlined {
+    font-size: 3rem;
+    color: #2e7d4f;
+  }
+  h2,
+  p {
+    margin: 0;
+  }
+  .bk-actions {
+    justify-content: center;
+  }
+}

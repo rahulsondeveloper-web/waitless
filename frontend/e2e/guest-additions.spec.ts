@@ -149,8 +149,9 @@ test("Finish shows the bill in a popup; the guest pays the restaurant's UPI ID a
     await staff.getByTestId('upi-confirm').click();
     await expect(page.getByTestId('checkout-paid')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId('download-invoice')).toBeVisible();
-    await staff.getByTestId('close-table').click();
-    await expect(staff.getByText(`Table ${seated!.label} closed`)).toBeVisible();
+    await expect(page.getByTestId('checkout-closed')).toBeVisible(); // paid → closed → browser cleared
+    await expect(staff.getByTestId('auto-closed')).toBeVisible();
+    await staff.getByTestId('billing-done').click();
     await staff.context().close();
     await page.request.patch(`/api/v1/restaurant/tables/${seated!.tableId}/status`, { headers, data: { status: 'available' } });
   } finally {

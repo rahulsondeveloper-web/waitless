@@ -85,20 +85,27 @@ test('guest presses Finish, pays online and gets the receipt; staff then closes 
   await page.getByTestId('mock-pay').click();
   await expect(page.getByTestId('checkout-paid')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('download-invoice')).toHaveAttribute('href', /\/invoices\/.+\/pdf\?t=/);
+  // Paid in full → the visit closed by itself and this browser forgot the table.
+  await expect(page.getByTestId('checkout-closed')).toBeVisible();
+  const kept = await page.evaluate(() => Object.keys(localStorage).filter((k) => /^wl\.(table|cart|name|preorder)\./.test(k)));
+  expect(kept).toEqual([]);
 
   await page.goto(`/r/${SLUG}/session`);
-  const bill = page.getByTestId('guest-bill');
-  await expect(bill).toContainText('Paid');
-  await expect(page.getByTestId('order-more')).toHaveCount(0); // no more orders after Finish
-  await expect(bill.getByTestId('receipt')).toHaveAttribute('href', /\/invoices\/.+\/pdf\?t=/);
+  await expect(page.getByTestId('table-view')).toHaveCount(0); // no table any more: the join form instead
+  await expect(page.getByTestId('join-code')).toBeVisible();
+  // The invoice is still there with the order ID + PIN.
+  await page.getByTestId('join-code').fill(seated.session.public_code);
+  await page.getByTestId('join-pin').fill(seated.pin);
+  await page.getByRole('button', { name: 'Open my table' }).click();
+  const ended = page.getByTestId('visit-ended');
+  await expect(ended).toBeVisible();
+  await expect(ended.getByTestId('ended-receipt')).toHaveAttribute('href', /\/invoices\/.+\/pdf\?t=/);
 
+  // Staff: the table left the billing list and went to cleaning — no "Guests left" needed.
   const staff = await ownerPage(browser, '/restaurant-admin/billing');
-  const card = staff.getByTestId('billing-table').filter({ hasText: `Table ${seated.label}` });
-  await expect(card).toContainText('Paid');
-  await card.click();
-  await expect(staff.getByTestId('bill')).toContainText('Online');
-  await staff.getByTestId('close-table').click();
-  await expect(staff.getByText(`Table ${seated.label} closed`)).toBeVisible();
+  await expect(staff.getByTestId('billing-table').filter({ hasText: `Table ${seated.label}` })).toHaveCount(0);
+  const board = await (await page.request.get(`/api/v1/restaurant/tables/board?branch_id=${seated.branchId}`, { headers: seated.headers })).json();
+  expect(board.tables.find((x: { id: string }) => x.id === seated.tableId).status).toBe('cleaning');
   await page.request.patch(`/api/v1/restaurant/tables/${seated.tableId}/status`, { headers: seated.headers, data: { status: 'available' } });
   await staff.context().close();
 });
@@ -147,8 +154,10 @@ test('cashier splits a bill, gives a discount, takes cash with change and a card
   await staff.getByRole('dialog').getByTestId('pay-confirm').click();
   await expect(b2).toContainText('Paid');
 
-  await staff.getByTestId('close-table').click();
-  await expect(staff.getByText(`Table ${seated.label} closed`)).toBeVisible();
+  // Last bill paid → the visit closed by itself.
+  await expect(staff.getByTestId('auto-closed')).toBeVisible();
+  await staff.getByTestId('billing-done').click();
+  await expect(staff.getByTestId('billing-table').filter({ hasText: `Table ${seated.label}` })).toHaveCount(0);
   await page.request.patch(`/api/v1/restaurant/tables/${seated.tableId}/status`, { headers: seated.headers, data: { status: 'available' } });
 
   const payments = await ownerPage(browser, '/restaurant-admin/payments');

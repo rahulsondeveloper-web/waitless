@@ -207,3 +207,53 @@ async def test_guest_cannot_finish_or_pay_before_everything_is_served(client: ht
     assert cancel.status_code == 200, cancel.text
     done = await client.post(f"{T}/finish", headers=t)
     assert done.status_code == 200 and done.json()["session_status"] == "finished"
+
+
+async def test_visit_closes_by_itself_once_every_bill_is_paid(client: httpx.AsyncClient) -> None:
+    tenant, h, branch, tables = await _setup(client)
+    await _settings(client, h, round_off=False)
+    dosa = await _dish(client, h, "Dosa", "150", tax_pct="5")
+    lassi = await _dish(client, h, "Lassi", "80", tax_pct="5")
+    seated = await _seat(client, h, tables["T1"])
+    sid = seated["session"]["id"]
+    t = await _join(client, tenant["slug"], seated)
+    o = await _order(client, t, (dosa, 1), (lassi, 1))
+    await _serve(client, h, o)
+
+    async def status() -> str:
+        return (await client.get(T, headers=t)).json()["status"]
+
+    # Two bills (split): paying the first keeps the table; paying the last closes it.
+    bill = (await client.post(f"{B}/table-sessions/{sid}/bill", headers=h)).json()["bills"][0]
+    lassi_line = next(ln for ln in bill["lines"] if ln["name"] == "Lassi")
+    bills = (
+        await client.post(
+            f"{B}/bills/{bill['id']}/split", json={"order_item_ids": [lassi_line["order_item_id"]]}, headers=h
+        )
+    ).json()["bills"]
+    first, second = bills[0], bills[1]
+    await client.post(f"{B}/bills/{first['id']}/payments", json={"method": "cash", "amount": first["due"]}, headers=h)
+    assert await status() == "open"
+    paid = await client.post(
+        f"{B}/bills/{second['id']}/payments", json={"method": "card", "amount": second["due"]}, headers=h
+    )
+    assert paid.status_code == 201, paid.text
+    assert await status() == "closed"  # cash/card at the counter closes it too — no "Guests left" needed
+    board = (await client.get(f"{B}/tables", params={"branch_id": branch["id"]}, headers=h)).json()
+    assert next(x for x in board if x["id"] == tables["T1"]["id"])["status"] == "cleaning"
+    assert (await client.post(f"{B}/table-sessions/{sid}/close", headers=h)).status_code == 200  # harmless
+
+    # Staff took the money early while a dish was still cooking: the table stays until it is served.
+    seated2 = await _seat(client, h, tables["T2"])
+    sid2 = seated2["session"]["id"]
+    t2 = await _join(client, tenant["slug"], seated2)
+    first_order = await _order(client, t2, (dosa, 1))
+    await _serve(client, h, first_order)
+    late = await _order(client, t2, (lassi, 1))  # not served yet
+    b2 = (await client.post(f"{B}/table-sessions/{sid2}/bill", headers=h)).json()["bills"][0]
+    pay2 = await client.post(f"{B}/bills/{b2['id']}/payments", json={"method": "cash", "amount": b2["due"]}, headers=h)
+    assert pay2.status_code == 201
+    assert (await client.get(T, headers=t2)).json()["status"] == "open"
+    await _serve(client, h, late)
+    closed = await client.post(f"{B}/table-sessions/{sid2}/close", headers=h)  # staff close it as before
+    assert closed.status_code == 200 and closed.json()["status"] == "closed"

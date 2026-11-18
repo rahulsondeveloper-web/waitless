@@ -203,7 +203,25 @@ export class StorefrontSessionPage implements OnInit {
   private loadBills(): void {
     const token = this.cart.tableToken();
     if (!token) return;
-    this.billing.guestBills(token).subscribe({ next: (b) => this.bills.set(b), error: () => this.bills.set(null) });
+    this.billing.guestBills(token).subscribe({
+      next: (b) => {
+        if (b.session_status === 'closed') this.endVisit(b, token);
+        else this.bills.set(b);
+      },
+      error: () => this.bills.set(null),
+    });
+  }
+
+  /** Paid and closed: clear this browser's table data; keep a thank-you with the invoices on screen. */
+  private endVisit(bs: SessionBills, token: string): void {
+    const receipts = bs.bills.flatMap((b) =>
+      b.invoices
+        .filter((i) => i.kind === 'invoice')
+        .map((i) => ({ number: i.number, url: this.billing.guestReceiptUrl(token, i.id) })),
+    );
+    this.popup.set(null);
+    this.leave();
+    this.cart.endVisit({ code: bs.session_code, restaurantName: bs.restaurant_name, receipts });
   }
 
   protected cancel(o: Order): void {

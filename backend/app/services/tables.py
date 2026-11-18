@@ -447,7 +447,9 @@ async def seat(session: AsyncSession, ctx: TenantContext, data: SeatIn, *, sourc
     return SeatedOut(session=await _session_out(session, s), pin=pin)
 
 
-async def _open_session(session: AsyncSession, ctx: TenantContext, session_id: uuid.UUID) -> TableSession:
+async def _open_session(
+    session: AsyncSession, ctx: TenantContext, session_id: uuid.UUID, *, allow_closed: bool = False
+) -> TableSession:
     s = (
         await session.execute(select(TableSession).where(TableSession.id == session_id).with_for_update())
     ).scalar_one_or_none()
@@ -455,7 +457,7 @@ async def _open_session(session: AsyncSession, ctx: TenantContext, session_id: u
         raise NotFoundError("Table session not found.")
     if not ctx.can_act_in_branch("tables.operate", s.branch_id):
         raise ForbiddenError("You do not have access to this branch.", code="BRANCH_FORBIDDEN")
-    if s.status == "closed":
+    if s.status == "closed" and not allow_closed:
         raise ConflictError("This table session is already closed.", code="SESSION_CLOSED")
     return s
 
@@ -506,11 +508,24 @@ async def transfer(session: AsyncSession, ctx: TenantContext, session_id: uuid.U
 
 
 async def close(session: AsyncSession, ctx: TenantContext, session_id: uuid.UUID) -> SessionOut:
-    """Guests left: release tables (→ cleaning). Every bill must be paid first (Phase 10)."""
-    s = await _open_session(session, ctx, session_id)
+    """Guests left: release tables (→ cleaning). Every bill must be paid first (Phase 10).
+    A visit that already closed itself when its last bill was paid is simply returned."""
+    s = await _open_session(session, ctx, session_id, allow_closed=True)
+    if s.status == "closed":
+        return await _session_out(session, s)
     from app.services.billing import ensure_settled  # local: billing imports this module
 
     await ensure_settled(session, s, ctx.user_id)
+    if s.status != "closed":  # settling the last ₹0 bill may already have closed it
+        await release_session(session, s, ctx.user_id)
+    await session.commit()
+    await _changed(ctx, s.branch_id)
+    return await _session_out(session, s)
+
+
+async def release_session(session: AsyncSession, s: TableSession, actor: uuid.UUID | None) -> None:
+    """Close a visit: free its tables (→ cleaning) and complete its booking. Caller commits and announces.
+    Used by "Guests left" and automatically when the visit's last bill is paid (actor None)."""
     now = datetime.now(UTC)
     tables = (
         (
@@ -530,14 +545,11 @@ async def close(session: AsyncSession, ctx: TenantContext, session_id: uuid.UUID
     )
     if tables:
         await session.execute(update(RestaurantTable).where(RestaurantTable.id.in_(tables)).values(status="cleaning"))
-    s.status, s.closed_at, s.closed_by = "closed", now, ctx.user_id
+    s.status, s.closed_at, s.closed_by = "closed", now, actor
     if s.source == "reservation":
         from app.services.reservations import complete_for_session  # local: reservations imports this module
 
         await complete_for_session(session, s.id)
-    await session.commit()
-    await _changed(ctx, s.branch_id)
-    return await _session_out(session, s)
 
 
 async def new_pin(session: AsyncSession, ctx: TenantContext, session_id: uuid.UUID) -> SeatedOut:

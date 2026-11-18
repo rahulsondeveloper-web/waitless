@@ -256,6 +256,13 @@ export class BillingPage implements OnInit {
     this.api.reopen(s.session_id).subscribe({ next: this.after('Table reopened for more orders.'), error: this.fail });
   }
 
+  /** The visit closed by itself when paid: just put it away. */
+  protected done(): void {
+    this.selected.set(null);
+    this.current.set(null);
+    this.loadTables();
+  }
+
   protected closeTable(): void {
     const s = this.current();
     if (!s) return;

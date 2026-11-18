@@ -62,6 +62,9 @@ export class CartService {
   readonly preorderFor = this._preorder.asReadonly();
   /** "Riya" — shown with this guest's dishes to the table, kitchen and staff (never on the invoice). */
   readonly guestName = this._name.asReadonly();
+  private readonly _ended = signal<EndedVisit | null>(null);
+  /** The visit that just ended (paid and closed) — memory only, gone on reload. */
+  readonly endedVisit = this._ended.asReadonly();
   readonly count = computed(() => this._lines().reduce((n, l) => n + l.quantity, 0));
   readonly subtotal = computed(() => round(this._lines().reduce((s, l) => s + l.unit_price * l.quantity, 0)));
   readonly tax = computed(() =>
@@ -100,7 +103,27 @@ export class CartService {
     this.save([]);
   }
 
+  /**
+   * The table's bill is paid and the visit closed: forget everything this browser kept for it
+   * (table link, cart, name, pre-order). Only a thank-you with the invoice links stays, in memory.
+   */
+  endVisit(summary: EndedVisit): void {
+    this._ended.set(summary);
+    this.setTableToken(null);
+    this.setGuestName('');
+    this.setPreorder(null);
+    this._lines.set([]);
+    const slug = this.ctx.slug();
+    if (slug) write(this.key(slug, 'cart'), null); // removed, not just emptied
+  }
+
+  /** A new visit starts (joined a table): the old thank-you goes away. */
+  forgetEndedVisit(): void {
+    this._ended.set(null);
+  }
+
   setTableToken(token: string | null): void {
+    if (token) this._ended.set(null);
     this._table.set(token);
     const slug = this.ctx.slug();
     if (slug) write(this.key(slug, 'table'), token);
@@ -143,4 +166,11 @@ export class CartService {
 
 function round(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+export interface EndedVisit {
+  code: string;
+  restaurantName: string;
+  /** invoice download links (they carry the old table link, which still works for reading) */
+  receipts: { number: string; url: string }[];
 }

@@ -187,11 +187,19 @@ async def test_guest_finish_pays_online_and_gets_the_receipt(client: httpx.Async
     blocked = await client.post(f"{T}/orders", json={"items": [{"menu_item_id": dish["id"]}]}, headers=t)
     assert blocked.status_code == 409 and blocked.json()["error"]["code"] == "SESSION_CLOSED"
 
+    # Staff can reopen a finished (unpaid) table: the guest orders more, then finishes again.
+    reopened = await client.post(f"{B}/table-sessions/{seated['session']['id']}/reopen", headers=h)
+    assert reopened.json()["session_status"] == "open"
+    await _serve(client, h, await _order(client, t, (dish, 1)))
+    fin = await client.post(f"{T}/finish", headers=t)
+    bill = fin.json()["bills"][0]
+    assert bill["grand_total"] == "472.50"
+
     pay = await client.post(f"{T}/bills/{bill['id']}/pay", headers=t)
     assert pay.status_code == 200, pay.text
     order_id = pay.json()["order_id"]
-    assert pay.json()["amount"] == "315.00"
-    raw, sig = MockGateway.build_event(order_id, Decimal("315.00"), True)
+    assert pay.json()["amount"] == "472.50"
+    raw, sig = MockGateway.build_event(order_id, Decimal("472.50"), True)
     hook = await client.post("/api/v1/webhooks/payments/mock", content=raw, headers={"X-Mock-Signature": sig})
     assert hook.json()["result"] == "paid"
     replay = await client.post("/api/v1/webhooks/payments/mock", content=raw, headers={"X-Mock-Signature": sig})
@@ -199,17 +207,21 @@ async def test_guest_finish_pays_online_and_gets_the_receipt(client: httpx.Async
 
     after = (await client.get(f"{T}/bills", headers=t)).json()
     paid = after["bills"][0]
-    assert paid["status"] == "paid" and paid["payments"][0]["method"] == "gateway" and after["can_close"] is True
+    assert paid["status"] == "paid" and paid["payments"][0]["method"] == "gateway"
+    # Paid in full with nothing cooking → the visit closed by itself and the table went to cleaning.
+    assert after["session_status"] == "closed"
+    board = (await client.get(f"{B}/tables", params={"branch_id": seated["session"]["branch_id"]}, headers=h)).json()
+    assert next(x for x in board if x["id"] == tables["T1"]["id"])["status"] == "cleaning"
+    # The receipt still downloads with the same table link, and later with the order ID + PIN.
     receipt = await client.get(f"{T}/invoices/{paid['invoices'][0]['id']}/pdf?t={t['X-Table-Token']}")
     assert receipt.status_code == 200 and receipt.content[:5] == b"%PDF-"
     assert (await client.get(f"{T}/invoices/{paid['invoices'][0]['id']}/pdf")).status_code == 401
-
-    # Staff can reopen a finished table: new orders then go on a new bill.
-    reopened = await client.post(f"{B}/table-sessions/{seated['session']['id']}/reopen", headers=h)
-    assert reopened.json()["session_status"] == "open"
-    await _order(client, t, (dish, 1))
-    again = (await client.post(f"{B}/table-sessions/{seated['session']['id']}/bill", headers=h)).json()
-    assert [b["label"] for b in again["bills"]] == ["Bill 1", "Bill 2"] and again["bills"][1]["grand_total"] == "157.50"
+    assert (
+        await client.post(f"{T}/orders", json={"items": [{"menu_item_id": dish["id"]}]}, headers=t)
+    ).status_code == 409
+    # Reopening is for finished tables, not closed ones.
+    late = await client.post(f"{B}/table-sessions/{seated['session']['id']}/reopen", headers=h)
+    assert late.status_code == 409
 
 
 async def test_booking_credit_split_merge_and_cancelled_lines(client: httpx.AsyncClient) -> None:

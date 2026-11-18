@@ -44,7 +44,7 @@ import { BillSummaryComponent } from './bill-summary.component';
       <header class="bk-head"><h1>Checkout</h1><p>Pay your bill from your phone.</p></header>
       @if (error(); as e) { <p class="bk-error" role="alert">{{ e }}</p> }
 
-      @if (!cart.tableToken()) {
+      @if (!token) {
         <article class="bk-card"><p>Open your table first with the order ID and PIN.</p>
           <div class="bk-actions"><a routerLink="../../session" class="wl-btn wl-btn--primary">Open my table</a></div></article>
       } @else if (!bill()) {
@@ -62,6 +62,9 @@ import { BillSummaryComponent } from './bill-summary.component';
                 <a class="wl-btn wl-btn--primary" [href]="receiptUrl(inv.id)" target="_blank" rel="noopener" data-testid="download-invoice">
                   Download invoice {{ inv.number }}</a>
               }
+            }
+            @if (data()?.session_status === 'closed') {
+              <p data-testid="checkout-closed">Your table is closed — this phone no longer keeps your table, order or name.</p>
             }
             <p class="bk-muted">You can download it again any time from "Have an order ID?" with your order ID {{ data()?.session_code }} and PIN.</p>
           </article>
@@ -120,6 +123,8 @@ export class StorefrontCheckoutPage implements OnInit {
   readonly billId = input.required<string>();
   protected readonly ctx = inject(TenantContextService);
   protected readonly cart = inject(CartService);
+  /** Kept for this page even after the visit ends and the browser forgets it (invoice links still work). */
+  protected readonly token = this.cart.tableToken();
   private readonly api = inject(BillingService);
   private readonly checkout = inject(CheckoutService);
   private readonly realtime = inject(RealtimeService);
@@ -156,11 +161,11 @@ export class StorefrontCheckoutPage implements OnInit {
   }
 
   protected receiptUrl(invoiceId: string): string {
-    return this.api.guestReceiptUrl(this.cart.tableToken() ?? '', invoiceId);
+    return this.api.guestReceiptUrl(this.token ?? '', invoiceId);
   }
 
   protected payOnline(): void {
-    const token = this.cart.tableToken();
+    const token = this.token;
     const b = this.bill();
     if (!token || !b) return;
     this.busy.set(true);
@@ -182,7 +187,7 @@ export class StorefrontCheckoutPage implements OnInit {
   }
 
   protected mockPay(success: boolean): void {
-    const token = this.cart.tableToken();
+    const token = this.token;
     const m = this.mock();
     if (!token || !m) return;
     this.busy.set(true);
@@ -198,7 +203,7 @@ export class StorefrontCheckoutPage implements OnInit {
   }
 
   protected claimUpi(): void {
-    const token = this.cart.tableToken();
+    const token = this.token;
     const b = this.bill();
     if (!token || !b) return;
     this.busy.set(true);
@@ -218,11 +223,21 @@ export class StorefrontCheckoutPage implements OnInit {
   }
 
   private load(): void {
-    const token = this.cart.tableToken();
+    const token = this.token;
     if (!token) return;
     this.api.guestBills(token).subscribe({
       next: (d) => {
         this.data.set(d);
+        if (d.session_status === 'closed' && this.cart.tableToken() === token) {
+          // Paid in full → the visit closed: clear the browser's table data, keep this page's invoice links.
+          this.cart.endVisit({
+            code: d.session_code,
+            restaurantName: d.restaurant_name,
+            receipts: d.bills.flatMap((b) =>
+              b.invoices.filter((i) => i.kind === 'invoice').map((i) => ({ number: i.number, url: this.receiptUrl(i.id) })),
+            ),
+          });
+        }
         const link = this.upi();
         if (link) void QRCode.toDataURL(link, { margin: 1, width: 400 }).then((q) => this.qr.set(q));
       },

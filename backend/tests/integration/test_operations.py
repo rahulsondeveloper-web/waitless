@@ -296,7 +296,8 @@ async def test_table_lifecycle(client: httpx.AsyncClient) -> None:
 
     closed = (await client.post(f"{B}/table-sessions/{sid}/close", headers=h)).json()
     assert closed["status"] == "closed" and closed["table_ids"] == []
-    assert (await client.post(f"{B}/table-sessions/{sid}/close", headers=h)).status_code == 409
+    again = await client.post(f"{B}/table-sessions/{sid}/close", headers=h)  # already closed: nothing to do
+    assert again.status_code == 200 and again.json()["status"] == "closed"
     cleaned = await client.patch(f"{B}/tables/{t2['id']}/status", json={"status": "available"}, headers=h)
     assert cleaned.json()["status"] == "available"
 

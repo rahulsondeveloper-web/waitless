@@ -163,6 +163,7 @@ async def _changed(tenant_id: uuid.UUID, branch_id: uuid.UUID, session_ids: set[
 
     data = {"branch_id": str(branch_id)}
     await emit("bills.changed", data, branch_staff_room(tenant_id, branch_id))
+    await emit("tables.changed", data, branch_staff_room(tenant_id, branch_id))  # paid → table freed
     for sid in session_ids:
         await emit("bills.changed", {**data, "session_id": str(sid)}, table_session_room(tenant_id, sid))
 
@@ -759,11 +760,47 @@ async def void_bill(session: AsyncSession, ctx: TenantContext, bill_id: uuid.UUI
 # ---------- payments ----------
 
 
-async def _paid_check(session: AsyncSession, b: Bill) -> None:
-    """Fully paid → paid + invoice (caller commits)."""
+async def _paid_check(session: AsyncSession, b: Bill, *, auto_close: bool = True) -> None:
+    """Fully paid → paid + invoice; and when that was the visit's last open bill and nothing is still
+    cooking, the visit closes by itself (tables → cleaning). Caller commits and calls `_changed`."""
     if b.status == "open" and b.paid_total >= b.grand_total:
         b.status, b.paid_at = "paid", _now()
         await _issue(session, b, "invoice", b.grand_total)
+        if auto_close:
+            await _close_if_settled(session, b.table_session_id)
+
+
+async def _close_if_settled(session: AsyncSession, session_id: uuid.UUID) -> bool:
+    s = (await session.execute(select(TableSession).where(TableSession.id == session_id))).scalar_one_or_none()
+    if s is None or s.status == "closed":
+        return False
+    await session.flush()
+    still_open = (
+        await session.execute(
+            select(func.count())
+            .select_from(Bill)
+            .where(
+                Bill.table_session_id == session_id,
+                Bill.status == "open",
+                Bill.id.in_(select(BillItem.bill_id)),  # an empty leftover bill does not hold the table
+            )
+        )
+    ).scalar_one()
+    if still_open or await pending_orders(session, session_id):
+        return False
+    from app.services.tables import release_session  # local: tables imports billing lazily too
+
+    await release_session(session, s, None)
+    write_audit(
+        session,
+        action="table_session.auto_closed",
+        entity="table_session",
+        entity_id=s.id,
+        tenant_id=s.tenant_id,
+        actor_user_id=None,
+        diff={"reason": "all bills paid"},
+    )
+    return True
 
 
 async def take_payment(
@@ -1111,7 +1148,7 @@ async def ensure_settled(session: AsyncSession, s: TableSession, actor: uuid.UUI
             continue
         if b.grand_total - b.paid_total <= 0:
             b.locked = True
-            await _paid_check(session, b)
+            await _paid_check(session, b, auto_close=False)
             continue
         raise ConflictError(
             f"Bill {b.sequence} still has {b.grand_total - b.paid_total} due."
