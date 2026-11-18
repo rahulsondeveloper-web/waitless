@@ -173,3 +173,37 @@ async def test_table_qr_self_seating_join_and_rotate(client: httpx.AsyncClient) 
     rotated = (await client.post(f"{B}/table-qr/{t1['table_id']}/rotate", headers=h)).json()
     assert next(x for x in rotated["tables"] if x["label"] == "T1")["path"] != t1["path"]
     assert (await client.get(f"{P}/{slug}/tables/{qr}")).status_code == 404
+
+
+async def test_guest_cannot_finish_or_pay_before_everything_is_served(client: httpx.AsyncClient) -> None:
+    """Reported: a guest could press Finish while the kitchen had not even accepted the order."""
+    tenant, h, _, tables = await _setup(client)
+    await _settings(client, h, round_off=False, upi_id="urbanbites@okhdfc", upi_payee_name="Urban Bites")
+    dish = await _dish(client, h, "Dosa", "150", tax_pct="5")
+    seated = await _seat(client, h, tables["T1"])
+    t = await _join(client, tenant["slug"], seated)
+    first = await _order(client, t, (dish, 1))
+    second = await _order(client, t, (dish, 2))
+
+    blocked = await client.post(f"{T}/finish", headers=t)  # nothing accepted yet
+    assert blocked.status_code == 409 and blocked.json()["error"]["code"] == "ORDERS_PENDING"
+    assert blocked.json()["error"]["details"]["pending"] == 2
+    view = (await client.get(T, headers=t)).json()
+    assert view["status"] == "open" and view["ordering_open"]  # still open: can order more
+
+    await _serve(client, h, first)
+    still = await client.post(f"{T}/finish", headers=t)  # one served, one still cooking
+    assert still.status_code == 409 and still.json()["error"]["details"]["pending"] == 1
+
+    # Staff may still prepare the bill early, but the guest cannot pay it while food is on its way.
+    bill = (await client.post(f"{B}/table-sessions/{seated['session']['id']}/bill", headers=h)).json()["bills"][0]
+    pay = await client.post(f"{T}/bills/{bill['id']}/pay", headers=t)
+    assert pay.status_code == 409 and pay.json()["error"]["code"] == "ORDERS_PENDING"
+    upi = await client.post(f"{T}/bills/{bill['id']}/upi-claim", json={}, headers=t)
+    assert upi.status_code == 409 and upi.json()["error"]["code"] == "ORDERS_PENDING"
+
+    # A cancelled order does not hold the table: cancel the rest → Finish works.
+    cancel = await client.post(f"{T}/orders/{second['id']}/cancel", headers=t)
+    assert cancel.status_code == 200, cancel.text
+    done = await client.post(f"{T}/finish", headers=t)
+    assert done.status_code == 200 and done.json()["session_status"] == "finished"

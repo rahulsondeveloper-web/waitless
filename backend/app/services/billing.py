@@ -1142,8 +1142,36 @@ async def guest_bills(session: AsyncSession, token: str | None) -> SessionBillsO
     return await session_bills_out(session, s)
 
 
+PENDING_STATUSES = ("placed", "accepted", "preparing", "ready")
+
+
+async def pending_orders(session: AsyncSession, session_id: uuid.UUID) -> int:
+    """Orders of a table visit the kitchen has not served yet (cancelled ones do not count)."""
+    return int(
+        (
+            await session.execute(
+                select(func.count(Order.id)).where(
+                    Order.table_session_id == session_id, Order.status.in_(PENDING_STATUSES)
+                )
+            )
+        ).scalar_one()
+    )
+
+
+async def _require_all_served(session: AsyncSession, session_id: uuid.UUID, action: str) -> None:
+    n = await pending_orders(session, session_id)
+    if n:
+        what = "1 of your orders is" if n == 1 else f"{n} of your orders are"
+        raise ConflictError(
+            f"{what} still being prepared — you can {action} once everything is served.",
+            code="ORDERS_PENDING",
+            details={"pending": n},
+        )
+
+
 async def finish(session: AsyncSession, token: str | None) -> SessionBillsOut:
-    """The guest's Finish (D10): no more orders; the final bill is ready to pay."""
+    """The guest's Finish (D10): no more orders; the final bill is ready to pay.
+    Only once the kitchen has served everything (or the rest was cancelled)."""
     from app.services.orders import table_from_token
 
     s, _ = await table_from_token(session, token)
@@ -1151,6 +1179,7 @@ async def finish(session: AsyncSession, token: str | None) -> SessionBillsOut:
     s = (await session.execute(select(TableSession).where(TableSession.id == s.id).with_for_update())).scalar_one()
     if s.status == "closed":
         raise ConflictError("This table is already closed.", code="SESSION_CLOSED")
+    await _require_all_served(session, s.id, "finish")
     if s.status == "open":
         s.status = "finished"
     await sync(session, s, None)
@@ -1175,6 +1204,7 @@ async def pay_online(session: AsyncSession, token: str | None, bill_id: uuid.UUI
     b, s, tenant = await _guest_bill(session, token, bill_id)
     if b.status != "open":
         raise ConflictError(f"This bill is {b.status}.", code="BILL_CLOSED")
+    await _require_all_served(session, s.id, "pay")
     st = settings_of(tenant)
     if "gateway" not in st.methods:
         raise AppError(
@@ -1319,6 +1349,7 @@ async def upi_claim(session: AsyncSession, token: str | None, bill_id: uuid.UUID
         )
     if b.status != "open":
         raise ConflictError(f"This bill is {b.status}.", code="BILL_CLOSED")
+    await _require_all_served(session, s.id, "pay")
     pending = (
         await session.execute(
             select(BillPayment).where(

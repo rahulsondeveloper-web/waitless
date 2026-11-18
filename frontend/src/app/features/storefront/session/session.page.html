@@ -93,9 +93,16 @@
         <p class="bk-muted">Discounts grow while an order is late and are fixed once it is served. The final bill comes when you finish.</p>
         @if (v.status === 'open' && bills()) {
           <div class="bk-actions">
-            <button type="button" class="wl-btn wl-btn--ghost" (click)="finish()" [disabled]="billBusy()" data-testid="finish">
+            <button type="button" class="wl-btn wl-btn--ghost" (click)="finish()" [disabled]="billBusy() || pending() > 0"
+                    [attr.aria-describedby]="pending() ? 'finish-wait' : null" data-testid="finish">
               Finish &amp; get the bill</button>
           </div>
+          @if (pending(); as n) {
+            <p class="bk-muted finish-wait" id="finish-wait" data-testid="finish-wait">
+              <span class="material-symbols-outlined" aria-hidden="true">soup_kitchen</span>
+              {{ n === 1 ? '1 order is' : n + ' orders are' }} still on the way — you can finish once everything is served.
+            </p>
+          }
         }
       </article>
     }
@@ -131,7 +138,9 @@
                 </div>
               } @else {
                 <div class="bk-actions">
-                  @if (b.methods.includes('gateway') || bs.upi_id) {
+                  @if (pending()) {
+                    <span class="bk-muted">You can pay once every dish is served.</span>
+                  } @else if (b.methods.includes('gateway') || bs.upi_id) {
                     <a class="wl-btn wl-btn--primary" [routerLink]="['../checkout', b.id]" data-testid="pay-now">Pay {{ price(b.due) }} now</a>
                   }
                   <button type="button" class="wl-btn wl-btn--ghost wl-btn--sm" (click)="popup.set('bill')">See the full bill</button>

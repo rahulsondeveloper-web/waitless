@@ -62,6 +62,8 @@ export class StorefrontSessionPage implements OnInit {
   private watching: string | null = null;
 
   protected readonly active = computed(() => (this.view()?.orders ?? []).filter((o) => o.status !== 'cancelled'));
+  /** Orders the kitchen has not served yet — the guest can finish and pay only once this is 0. */
+  protected readonly pending = computed(() => this.active().filter((o) => o.status !== 'served').length);
 
   ngOnInit(): void {
     if (this.cart.tableToken()) this.load();
@@ -112,6 +114,7 @@ export class StorefrontSessionPage implements OnInit {
   // ---------- the bill ----------
 
   protected finish(): void {
+    if (this.pending()) return; // the button is disabled; the server refuses it too (ORDERS_PENDING)
     this.popup.set('confirm');
   }
 

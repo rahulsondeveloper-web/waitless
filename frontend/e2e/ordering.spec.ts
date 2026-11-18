@@ -95,6 +95,9 @@ test('guest enters the order ID + PIN, orders, and follows it live to Served', a
   await expect(order).toContainText('Sent to kitchen');
   await expect(page.getByTestId('serving-promise')).toContainText('Served within 15 min');
   await expect(order.getByTestId('serving-timer')).toHaveText(/Timer starts when the kitchen accepts/);
+  // Not served yet → the guest cannot finish (and the server refuses it too).
+  await expect(page.getByTestId('finish')).toBeDisabled();
+  await expect(page.getByTestId('finish-wait')).toContainText('1 order is still on the way');
 
   // Kitchen moves the ticket along; the guest's page follows without reloading.
   const kitchen = await ownerPage(browser, '/restaurant-admin/kitchen');
@@ -110,9 +113,12 @@ test('guest enters the order ID + PIN, orders, and follows it live to Served', a
   await kitchen.getByTestId('ticket').filter({ hasText: `Table ${seated.label}` }).getByRole('button', { name: 'Start cooking' }).click();
   await kitchen.getByTestId('ticket').filter({ hasText: `Table ${seated.label}` }).getByRole('button', { name: 'Ready' }).click();
   await expect(order).toContainText('Ready', { timeout: 15_000 });
+  await expect(page.getByTestId('finish')).toBeDisabled(); // ready is not served
   await kitchen.getByTestId('ticket').filter({ hasText: `Table ${seated.label}` }).getByRole('button', { name: 'Served' }).click();
   await expect(order).toContainText('Served', { timeout: 15_000 });
   await expect(order.getByTestId('serving-timer')).toHaveText(/Served in \d+ min/);
+  await expect(page.getByTestId('finish')).toBeEnabled(); // everything served → Finish & get the bill
+  await expect(page.getByTestId('finish-wait')).toHaveCount(0);
   await expect(page.getByTestId('table-total')).not.toHaveText('₹0');
   await kitchen.context().close();
   await seated.release();
