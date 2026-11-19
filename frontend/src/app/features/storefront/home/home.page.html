@@ -32,7 +32,7 @@
       <div class="hero__cta">
         <a routerLink="reservations" class="wl-btn wl-btn--primary">Book a table</a>
         @if (wait()?.accepting && branch()?.open_now) {
-          <a routerLink="queue" class="wl-btn wl-btn--light">Join the queue</a>
+          <button type="button" class="wl-btn wl-btn--light" (click)="popup.set('queue')" data-testid="join-queue">Join the queue</button>
         }
         <a routerLink="menu" class="wl-btn wl-btn--light">View menu</a>
         <a routerLink="session" class="wl-btn wl-btn--light" data-testid="have-order-id">Have an order ID?</a>
@@ -40,9 +40,42 @@
         @if (r.gallery_count) {
           <a routerLink="gallery" class="wl-btn wl-btn--light">View gallery</a>
         }
+        @if (branch()) {
+          <button type="button" class="wl-btn wl-btn--light" (click)="popup.set('location')" data-testid="location-button">
+            <span class="material-symbols-outlined" aria-hidden="true">location_on</span> Location
+          </button>
+        }
       </div>
     </div>
   </section>
+
+  @switch (popup()) {
+    @case ('location') {
+      <wl-popup title="Find us" testId="location-popup" (closed)="popup.set(null)" style="--popup-width: 720px">
+        @if (branch(); as b) {
+          <p class="loc__addr"><b>{{ b.name }}</b><br />{{ b.address_line }}, {{ b.city }}, {{ b.state }}</p>
+        }
+        @if (markers().length) {
+          <wl-map-view [markers]="markers()" [highlight]="branch()?.id ?? null" [label]="'Map of ' + r.name" style="--map-height: min(420px, 55vh)" />
+        } @else {
+          <p class="loc__none">The exact spot isn't on the map yet — use the address above.</p>
+        }
+        <div class="loc__actions">
+          @if (directionsUrl(); as d) {
+            <a [href]="d" target="_blank" rel="noopener noreferrer" class="wl-btn wl-btn--primary" data-testid="location-directions">Get directions</a>
+          }
+          @if (mapsUrl(); as m) {
+            <a [href]="m" target="_blank" rel="noopener noreferrer" class="wl-btn wl-btn--ghost">Open in maps</a>
+          }
+        </div>
+      </wl-popup>
+    }
+    @case ('queue') {
+      @if (branch(); as b) {
+        <wl-join-queue-popup [branchId]="b.id" [freeTables]="wait()?.free_tables ?? 0" (closed)="popup.set(null)" />
+      }
+    }
+  }
 
   <section class="wl-container info">
     <article class="card promise">

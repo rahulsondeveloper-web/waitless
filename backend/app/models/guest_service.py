@@ -28,7 +28,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, CreatedAtMixin, UUIDPkMixin
 
-REQUEST_KINDS = ("water", "tissue", "bill", "help")
+REQUEST_KINDS = ("water", "tissue", "bill", "help")  # what guests can ask for
+ALERT_KINDS = (*REQUEST_KINDS, "seat")  # + "seat": a party seated itself from the queue page
 REQUEST_STATUSES = ("open", "done")
 
 
@@ -41,6 +42,7 @@ class ServiceRequest(UUIDPkMixin, CreatedAtMixin, Base):
     kind: Mapped[str] = mapped_column(String(8))
     table_labels: Mapped[str] = mapped_column(String(80), default="", server_default="")  # snapshot for the alert
     guest_name: Mapped[str | None] = mapped_column(String(60))
+    note: Mapped[str | None] = mapped_column(String(120))  # e.g. "Party of 6 at a 4-seat table — add 2 chairs"
     status: Mapped[str] = mapped_column(String(5), default="open", server_default="open")
     done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     done_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -51,7 +53,7 @@ class ServiceRequest(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKeyConstraint(
             ["tenant_id", "table_session_id"], ["table_sessions.tenant_id", "table_sessions.id"], ondelete="CASCADE"
         ),
-        CheckConstraint(f"kind IN {REQUEST_KINDS}", name="kind"),
+        CheckConstraint(f"kind IN {ALERT_KINDS}", name="kind"),
         CheckConstraint(f"status IN {REQUEST_STATUSES}", name="status"),
         Index("ix_service_requests_open", "tenant_id", "branch_id", postgresql_where="status = 'open'"),
         Index("ix_service_requests_session", "table_session_id", "created_at"),

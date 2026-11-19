@@ -170,6 +170,31 @@ async def start(
     name = guest_name.strip()[:60]
     if not name:
         raise AppError("Tell us your name.", code="NAME_REQUIRED", status_code=422)
+    s, code, pin = await open_visit(
+        session, tenant, t, name, party_size, source="walk_in", audit_action="table.self_seated", ip=ip
+    )
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise ConflictError("Someone just took this table — enter their PIN.", code="TABLE_OCCUPIED") from exc
+    await emit("tables.changed", {"branch_id": str(t.branch_id)}, branch_staff_room(tenant.id, t.branch_id))
+    jwt, exp = create_table_token(s.id, tenant.id, s.pin_hash)
+    return {"token": jwt, "expires_at": exp, "session_id": s.id, "code": code, "pin": pin, "table_label": t.label}
+
+
+async def open_visit(
+    session: AsyncSession,
+    tenant: Tenant,
+    t: RestaurantTable,
+    name: str,
+    party_size: int,
+    *,
+    source: str,
+    audit_action: str,
+    ip: str | None,
+) -> tuple[TableSession, str, str]:
+    """Open a guest visit at a free (locked) table: order ID + PIN, table occupied. Caller commits."""
     prefix = _prefix(tenant.slug)
     code = ""
     for _ in range(20):
@@ -185,7 +210,7 @@ async def start(
         branch_id=t.branch_id,
         public_code=code,
         pin_hash=hash_otp(code, pin),
-        source="walk_in",
+        source=source,
         party_size=party_size,
         guest_name=name,
     )
@@ -195,21 +220,14 @@ async def start(
     t.status = "occupied"
     write_audit(
         session,
-        action="table.self_seated",
+        action=audit_action,
         entity="table",
         entity_id=t.id,
         tenant_id=tenant.id,
         diff={"guest": name, "party": party_size},
         ip=ip,
     )
-    try:
-        await session.commit()
-    except IntegrityError as exc:
-        await session.rollback()
-        raise ConflictError("Someone just took this table — enter their PIN.", code="TABLE_OCCUPIED") from exc
-    await emit("tables.changed", {"branch_id": str(t.branch_id)}, branch_staff_room(tenant.id, t.branch_id))
-    jwt, exp = create_table_token(s.id, tenant.id, s.pin_hash)
-    return {"token": jwt, "expires_at": exp, "session_id": s.id, "code": code, "pin": pin, "table_label": t.label}
+    return s, code, pin
 
 
 async def join(session: AsyncSession, tenant: Tenant, token: str, pin: str, ip: str | None) -> dict[str, Any]:

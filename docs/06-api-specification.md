@@ -57,7 +57,7 @@ Storefront reads (`/public/restaurants/{slug}`, `/branding`, `/gallery`, `/menu`
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| POST | `/public/restaurants/{slug}/queue` | C | Join queue → token, position, ETA. 409 `ALREADY_IN_QUEUE` / `QUEUE_CLOSED`, 422 `PHONE_REQUIRED` *(Phase 6)* |
+| POST | `/public/restaurants/{slug}/queue` | C | Join queue → token, position, ETA. 409 `ALREADY_IN_QUEUE` / `QUEUE_CLOSED`, 422 `PHONE_REQUIRED` *(Phase 6)*. With `seat_now: true` (D119): if a free table suits the party (capacity −1…+2) and nobody waiting fits it, the guest is seated at once — `status: "seated"` and `seated_now {table_label, capacity, extra_chairs, code, pin, token, expires_at, session_id}`; the waiters get a `seat` alert. 409 `TABLE_TAKEN` on a race |
 | GET | `/me/queue/{id}` · POST `/me/queue/{id}/leave` | C | My token (live position) / leave *(Phase 6)* |
 | POST | `/public/restaurants/{slug}/reservations` | C | Free or paid booking → `{reservation, payment}`; paid starts as `pending_payment` with a checkout. 409 `SLOT_TAKEN` / `DUPLICATE_BOOKING`, 422 `INVALID_SLOT` *(Phase 6)* |
 | POST | `/me/reservations/{id}/pay` | C | New gateway order for an unpaid booking *(Phase 6)* |

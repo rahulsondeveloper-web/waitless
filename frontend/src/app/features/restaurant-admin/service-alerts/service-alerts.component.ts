@@ -8,7 +8,13 @@ import { GuestServiceApi, ServiceCall } from '../../../core/ordering/guest-servi
 import { RealtimeService } from '../../../core/realtime/realtime.service';
 import { TenancyService } from '../../../core/tenancy/tenancy.service';
 
-const ICON: Record<string, string> = { water: 'water_drop', tissue: 'layers', bill: 'receipt_long', help: 'support_agent' };
+const ICON: Record<string, string> = {
+  water: 'water_drop',
+  tissue: 'layers',
+  bill: 'receipt_long',
+  help: 'support_agent',
+  seat: 'event_seat',
+};
 
 /**
  * Waiter calls from the tables, on every admin page for staff who serve tables (waiters, managers,
@@ -24,12 +30,13 @@ const ICON: Record<string, string> = { water: 'water_drop', tissue: 'layers', bi
     .count { position: absolute; top: 2px; right: 2px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
       background: #c62828; color: #fff; font: 700 0.7rem/18px sans-serif; text-align: center; pointer-events: none; }
     .stack { position: fixed; top: 72px; right: 16px; z-index: 1000; width: min(340px, calc(100vw - 32px)); display: grid; gap: 8px; }
-    .call { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px 12px;
+    .call { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px;
       background: var(--mat-sys-surface, #fff); color: inherit; border-left: 4px solid #c62828; border-radius: 10px;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); }
     .call mat-icon { color: #c62828; }
     .call b { display: block; font-size: 1rem; }
     .call small { color: var(--mat-sys-on-surface-variant, #666); }
+    .call .note { display: block; font-size: 0.85rem; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
     .none { padding: 10px 12px; background: var(--mat-sys-surface, #fff); border-radius: 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); }
     @keyframes ring { 0%, 100% { transform: rotate(0) } 25% { transform: rotate(-14deg) } 75% { transform: rotate(14deg) } }
     .ringing mat-icon { animation: ring 0.5s ease-in-out 3; }
@@ -49,6 +56,7 @@ const ICON: Record<string, string> = { water: 'water_drop', tissue: 'layers', bi
               <mat-icon aria-hidden="true">{{ icon[c.kind] }}</mat-icon>
               <div>
                 <b>{{ c.table_labels ? 'Table ' + c.table_labels : 'A table' }} · {{ c.label }}</b>
+                @if (c.note) { <span class="note" data-testid="service-note">{{ c.note }}</span> }
                 <small>{{ c.guest_name ? c.guest_name + ' · ' : '' }}{{ ago(c.created_at) }}</small>
               </div>
               <button mat-flat-button type="button" (click)="done(c)" [disabled]="busy() === c.id" data-testid="service-done">Done</button>

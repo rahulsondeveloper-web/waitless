@@ -6,6 +6,10 @@
 
   @if (!loaded()) {
     <div class="wl-state"><span class="wl-spinner" aria-label="Loading"></span></div>
+  } @else if (entry()?.seated_now; as s) {
+    <article class="bk-card" aria-live="polite" data-testid="queue-seated">
+      <wl-seated-now [seated]="s" />
+    </article>
   } @else if (entry(); as e) {
     <article class="bk-card token" aria-live="polite" data-testid="queue-token">
       @if (e.status === 'notified') {
@@ -97,7 +101,7 @@
       <div class="bk-actions">
         @if (auth.isAuthenticated()) {
           <button type="button" class="wl-btn wl-btn--primary" (click)="join()" [disabled]="busy() || party < 1">
-            Get my token
+            {{ (wait()?.free_tables ?? 0) > 0 ? 'Continue' : 'Get my token' }}
           </button>
         } @else {
           <button type="button" class="wl-btn wl-btn--primary" (click)="signIn()">Sign in with your mobile to join</button>

@@ -131,6 +131,20 @@ export interface QueueEntry {
   notified_table_label: string | null;
   restaurant_name: string | null;
   restaurant_slug: string | null;
+  /** Only on the join response when a free table suited the party: the guest is seated right away. */
+  seated_now?: SeatedNow | null;
+}
+
+export interface SeatedNow {
+  table_label: string;
+  capacity: number;
+  /** guests beyond the table's seats — the waiter brings chairs */
+  extra_chairs: number;
+  code: string;
+  pin: string;
+  token: string;
+  expires_at: string;
+  session_id: string;
 }
 
 export interface WaitTime {
@@ -196,7 +210,11 @@ export class BookingsService {
   }
 
   // ---------- guest ----------
-  joinQueue(slug: string, body: { branch_id: string; party_size: number; guest_name?: string }): Observable<QueueEntry> {
+  /** `seat_now`: seat the guest at once when a free table suits the party (else a normal token). */
+  joinQueue(
+    slug: string,
+    body: { branch_id: string; party_size: number; guest_name?: string; seat_now?: boolean },
+  ): Observable<QueueEntry> {
     return this.api.post(`public/restaurants/${encodeURIComponent(slug)}/queue`, body);
   }
   book(

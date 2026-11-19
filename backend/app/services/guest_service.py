@@ -25,7 +25,13 @@ from app.services.audit import write_audit
 from app.websocket.bus import branch_staff_room, emit
 
 COOLDOWN = timedelta(minutes=2)
-KIND_LABEL = {"water": "Water", "tissue": "Tissue paper", "bill": "The bill", "help": "Help"}
+KIND_LABEL = {
+    "water": "Water",
+    "tissue": "Tissue paper",
+    "bill": "The bill",
+    "help": "Help",
+    "seat": "New guests seated",
+}
 
 
 def _now() -> datetime:
@@ -85,6 +91,7 @@ def request_out(r: ServiceRequest) -> dict[str, Any]:
         "label": KIND_LABEL[r.kind],
         "table_labels": r.table_labels,
         "guest_name": r.guest_name,
+        "note": r.note,
         "status": r.status,
         "created_at": r.created_at,
         "done_at": r.done_at,
@@ -95,7 +102,7 @@ async def _last_call(session: AsyncSession, session_id: uuid.UUID) -> ServiceReq
     return (
         await session.execute(
             select(ServiceRequest)
-            .where(ServiceRequest.table_session_id == session_id)
+            .where(ServiceRequest.table_session_id == session_id, ServiceRequest.kind.in_(REQUEST_KINDS))
             .order_by(ServiceRequest.created_at.desc())
             .limit(1)
         )
@@ -117,7 +124,11 @@ async def guest_calls(session: AsyncSession, token: str | None) -> dict[str, Any
     open_calls = (
         await session.execute(
             select(ServiceRequest)
-            .where(ServiceRequest.table_session_id == s.id, ServiceRequest.status == "open")
+            .where(
+                ServiceRequest.table_session_id == s.id,
+                ServiceRequest.status == "open",
+                ServiceRequest.kind.in_(REQUEST_KINDS),
+            )
             .order_by(ServiceRequest.created_at)
         )
     ).scalars()
@@ -163,6 +174,30 @@ async def call_waiter(session: AsyncSession, token: str | None, kind: str, guest
     return {"request": out, "cooldown_until": r.created_at + COOLDOWN, "server_time": _now()}
 
 
+async def seat_alert(session: AsyncSession, s: TableSession, table: RestaurantTable) -> ServiceRequest:
+    """A party seated itself from the queue page: tell the waiters (extra chairs when it is over capacity).
+    Not a guest call — no cooldown. Caller commits, then emits with `emit_alert`."""
+    extra = s.party_size - table.capacity
+    note = f"Party of {s.party_size} at a {table.capacity}-seat table"
+    note += f" — add {extra} chair{'s' if extra > 1 else ''}" if extra > 0 else " — please welcome them"
+    r = ServiceRequest(
+        tenant_id=s.tenant_id,
+        branch_id=s.branch_id,
+        table_session_id=s.id,
+        kind="seat",
+        table_labels=table.label[:80],
+        guest_name=s.guest_name,
+        note=note[:120],
+    )
+    session.add(r)
+    return r
+
+
+async def emit_alert(session: AsyncSession, r: ServiceRequest) -> None:
+    await session.refresh(r)
+    await emit("service.requested", _event(request_out(r)), branch_staff_room(r.tenant_id, r.branch_id))
+
+
 def _event(out: dict[str, Any]) -> dict[str, Any]:
     return {k: (str(v) if isinstance(v, uuid.UUID | datetime) else v) for k, v in out.items()}
 
@@ -194,9 +229,10 @@ async def call_done(session: AsyncSession, ctx: TenantContext, request_id: uuid.
         await session.refresh(r)
     out = request_out(r)
     await emit("service.done", _event(out), branch_staff_room(r.tenant_id, r.branch_id))
-    from app.services.orders import table_session_room
+    if r.kind in REQUEST_KINDS:  # the guest asked → "the waiter has seen to it" on their phone
+        from app.services.orders import table_session_room
 
-    await emit("service.done", {"id": str(r.id)}, table_session_room(r.tenant_id, r.table_session_id))
+        await emit("service.done", {"id": str(r.id)}, table_session_room(r.tenant_id, r.table_session_id))
     return out
 
 

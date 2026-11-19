@@ -164,6 +164,28 @@
   }
 }
 
+.hero__cta button.wl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  .material-symbols-outlined {
+    font-size: 1.15rem;
+  }
+}
+.loc__addr {
+  margin: 0;
+  color: var(--wl-text-soft);
+}
+.loc__none {
+  margin: 0;
+  color: var(--wl-muted);
+}
+.loc__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .wait {
   display: inline-flex;
   align-items: center;

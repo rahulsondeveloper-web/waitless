@@ -34,19 +34,30 @@ function tomorrowInIndia(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 }
 
-test('guest joins the queue; staff says "table ready" and seats them — live', async ({ page, browser }) => {
+test('guest joins the queue; staff says "table ready" and seats them — live', async ({ page, browser, request }) => {
   test.setTimeout(60_000); // guest + staff devices
   const name = `Queue Guest ${unique()}`;
+  // A party of 2 already waits (added by staff), so the 2-seat tables are theirs: our guest gets a token
+  // instead of being seated straight away.
+  const login = await request.post('/api/v1/auth/login', { data: { identifier: OWNER, password: OWNER_PASSWORD } });
+  const headers = { Authorization: `Bearer ${(await login.json()).access_token}` };
+  const me = await (await request.get('/api/v1/restaurant/me', { headers })).json();
+  const branch = me.branches.find((b: { is_primary: boolean }) => b.is_primary) ?? me.branches[0];
+  const ahead = await (
+    await request.post('/api/v1/restaurant/queue', { headers, data: { branch_id: branch.id, party_size: 2, guest_name: `Ahead ${unique()}` } })
+  ).json();
+
   await page.goto(`/r/${SLUG}/queue`);
   await page.getByRole('button', { name: 'Sign in with your mobile to join' }).click();
   await guestSignIn(page, name);
-  await expect(page).toHaveURL(new RegExp(`/r/${SLUG}/queue$`), { timeout: 15_000 });
+  await expect(page).toHaveURL(new RegExp(`/r/${SLUG}/queue`), { timeout: 15_000 });
 
   await page.getByTestId('queue-party').fill('2');
-  await page.getByRole('button', { name: 'Get my token' }).click();
+  await page.getByRole('button', { name: /Continue|Get my token/ }).click();
   const token = page.getByTestId('queue-token');
   await expect(token).toContainText(/A-\d{3}/);
   await expect(token).toContainText('Waiting');
+  await request.post(`/api/v1/restaurant/queue/${ahead.id}/cancel`, { headers });
 
   const staff = await ownerPage(browser, '/restaurant-admin/queue');
   const row = staff.getByTestId('queue-row').filter({ hasText: name });

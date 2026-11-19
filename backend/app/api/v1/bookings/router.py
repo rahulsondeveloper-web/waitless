@@ -8,7 +8,7 @@ from fastapi import APIRouter, Header, Path, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from app.api.deps import CurrentUser, SessionDep, feature_enabled
+from app.api.deps import ClientDep, CurrentUser, SessionDep, feature_enabled
 from app.core.config import get_settings
 from app.core.db import use_system
 from app.core.errors import AppError, NotFoundError
@@ -83,10 +83,14 @@ async def wait_time(
 
 
 @router.post("/public/restaurants/{slug}/queue", response_model=QueueEntryOut, status_code=201, summary="Join queue")
-async def join_queue(slug: Slug, body: QueueJoinIn, session: SessionDep, user: CurrentUser) -> QueueEntryOut:
+async def join_queue(
+    slug: Slug, body: QueueJoinIn, session: SessionDep, user: CurrentUser, client: ClientDep
+) -> QueueEntryOut:
+    """With `seat_now: true` the guest may be seated at once (`seated_now` has the table, order ID, PIN and
+    table token) when a free table suits the party and nobody waiting fits it."""
     tenant = await _public_tenant(session, slug)
     await _gate(session, tenant, "queue")
-    return await queue_svc.join(session, tenant, user, body)
+    return await queue_svc.join(session, tenant, user, body, client.ip)
 
 
 @router.post(

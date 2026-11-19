@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { catchError, of, switchMap } from 'rxjs';
@@ -7,12 +7,15 @@ import { BookingsService, WaitTime } from '../../../core/bookings/bookings.servi
 
 import { TenantContextService } from '../../../core/storefront/tenant-context.service';
 import { GuestServiceApi } from '../../../core/ordering/guest-service.service';
+import { MapMarker, MapViewComponent } from '../../../shared/ui/map/map-view.component';
+import { PopupComponent } from '../../../shared/ui/popup/popup.component';
+import { JoinQueuePopupComponent } from './join-queue-popup.component';
 import { WifiButtonComponent } from './wifi-button.component';
 
 /** Restaurant homepage (PRD §6 Home). */
 @Component({
   selector: 'wl-storefront-home',
-  imports: [RouterLink, WifiButtonComponent],
+  imports: [RouterLink, WifiButtonComponent, PopupComponent, MapViewComponent, JoinQueuePopupComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './home.page.html',
   styleUrl: './home.page.scss',
@@ -65,4 +68,19 @@ export class StorefrontHomePage {
     const q = b.lat && b.lng ? `${b.lat},${b.lng}` : `${b.address_line}, ${b.city}`;
     return `https://www.openstreetmap.org/search?query=${encodeURIComponent(q)}`;
   });
+  protected readonly directionsUrl = computed(() => {
+    const b = this.branch();
+    if (!b) return null;
+    const q = b.lat && b.lng ? `${b.lat},${b.lng}` : `${b.address_line}, ${b.city}, ${b.state}`;
+    return `https://www.openstreetmap.org/directions?to=${encodeURIComponent(q)}`;
+  });
+
+  /** Which pop-up is open: the map ("Location") or the guests question ("Join the queue"). */
+  protected readonly popup = signal<'location' | 'queue' | null>(null);
+  /** Every branch with a pin on the map; the main branch is highlighted. */
+  protected readonly markers = computed<MapMarker[]>(() =>
+    (this.r()?.branches ?? [])
+      .filter((b) => b.lat && b.lng)
+      .map((b) => ({ id: b.id, lat: +b.lat!, lng: +b.lng!, title: b.name, subtitle: `${b.address_line}, ${b.city}` })),
+  );
 }

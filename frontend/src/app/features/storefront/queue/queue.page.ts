@@ -1,8 +1,11 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { interval } from 'rxjs';
+
+import { CartService } from '../../../core/ordering/cart.service';
+import { SeatedNowComponent, takeSeat } from './seated-now.component';
 
 import { AuthService } from '../../../core/auth/auth.service';
 import {
@@ -21,7 +24,7 @@ const ACTIVE = ['waiting', 'notified'];
 /** Join the walk-in queue and follow your token live (PRD §12 Queue Management). */
 @Component({
   selector: 'wl-storefront-queue',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, SeatedNowComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './queue.page.html',
   styleUrl: './queue.page.scss',
@@ -32,6 +35,8 @@ export class StorefrontQueuePage implements OnInit {
   private readonly api = inject(BookingsService);
   private readonly realtime = inject(RealtimeService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly cart = inject(CartService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly statusLabel = QUEUE_STATUS_LABEL;
@@ -57,6 +62,8 @@ export class StorefrontQueuePage implements OnInit {
     const slug = this.ctx.slug();
     if (!slug) return;
     this.name = this.auth.user()?.full_name ?? '';
+    const party = Number(this.route.snapshot.queryParamMap.get('party')); // from the home page's guests pop-up
+    if (Number.isInteger(party) && party >= 1 && party <= 50) this.party = party;
     this.api.options(slug).subscribe({
       next: (opts) => {
         this.options.set(opts);
@@ -102,7 +109,9 @@ export class StorefrontQueuePage implements OnInit {
   }
 
   protected signIn(): void {
-    void this.router.navigate(['/login'], { queryParams: { returnUrl: `/r/${this.ctx.slug()}/queue` } });
+    void this.router.navigate(['/login'], {
+      queryParams: { returnUrl: `/r/${this.ctx.slug()}/queue?party=${this.party}` },
+    });
   }
 
   protected join(): void {
@@ -111,9 +120,11 @@ export class StorefrontQueuePage implements OnInit {
     if (!slug || !branch) return;
     this.busy.set(true);
     this.error.set(null);
-    this.api.joinQueue(slug, { branch_id: branch, party_size: this.party, guest_name: this.name.trim() || undefined }).subscribe({
+    const name = this.name.trim();
+    this.api.joinQueue(slug, { branch_id: branch, party_size: this.party, guest_name: name || undefined, seat_now: true }).subscribe({
       next: (e) => {
         this.busy.set(false);
+        if (e.seated_now) takeSeat(this.cart, e.seated_now, name || e.guest_name);
         this.track(e);
       },
       error: (e: ApiError) => {

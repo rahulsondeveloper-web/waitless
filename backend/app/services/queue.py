@@ -19,7 +19,7 @@ from app.core.errors import AppError, ConflictError, ForbiddenError, NotFoundErr
 from app.models import Branch, Tenant, User
 from app.models.booking import QUEUE_ACTIVE, QueueEntry, ReservationPolicy
 from app.models.tables import RestaurantTable, TableSession
-from app.schemas.booking import QueueEntryOut, QueueJoinIn, StaffQueueIn, WaitTime
+from app.schemas.booking import QueueEntryOut, QueueJoinIn, SeatedNow, StaffQueueIn, WaitTime
 from app.schemas.tables import SeatedOut, SeatIn
 from app.services import tables as tables_svc
 from app.services.access import TenantContext
@@ -176,7 +176,9 @@ async def _add(
     phone: str | None,
     customer_id: uuid.UUID | None,
     source: str,
+    seated_session_id: uuid.UUID | None = None,
 ) -> QueueEntry:
+    """A new token; with `seated_session_id` it is recorded as already seated (today's history)."""
     today = local_today(branch.timezone)
     for _ in range(5):  # sequence numbers are unique per branch per day; retry on a race
         seq, pos = (
@@ -200,6 +202,8 @@ async def _add(
             customer_id=customer_id,
             source=source,
         )
+        if seated_session_id is not None:
+            entry.status, entry.ended_at, entry.table_session_id = "seated", datetime.now(UTC), seated_session_id
         try:
             async with session.begin_nested():
                 session.add(entry)
@@ -210,8 +214,97 @@ async def _add(
     raise AppError("The queue is busy. Please try again.", code="QUEUE_BUSY", status_code=503)
 
 
-async def join(session: AsyncSession, tenant: Tenant, user: User, data: QueueJoinIn) -> QueueEntryOut:
-    """Customer joins (session already scoped to the tenant)."""
+def suits(capacity: int, party: int) -> bool:
+    """A table suits a party of up to 2 more guests than its seats (chairs are added) or 1 fewer."""
+    return capacity - 1 <= party <= capacity + 2
+
+
+async def _seat_directly(
+    session: AsyncSession, tenant: Tenant, user: User, branch: Branch, party: int, name: str, ip: str | None
+) -> QueueEntryOut | None:
+    """Tables free and nobody waiting for them: open the best-suited table for the guest now.
+    None → no suitable table (or self-seating is off); the guest joins the line as usual."""
+    from app.core import rate_limit
+    from app.core.security import create_table_token
+    from app.services import guest_service, table_qr
+
+    if not table_qr.self_seating(tenant):
+        return None  # the restaurant seats every guest itself
+    active = await _active(session, branch.id)
+    if any(e.customer_id == user.id for e in active):
+        return None  # already in line → the usual ALREADY_IN_QUEUE
+    waiting = [e.party_size for e in active if e.status == "waiting"]
+    tables = (
+        await session.execute(
+            select(RestaurantTable)
+            .where(
+                RestaurantTable.branch_id == branch.id,
+                RestaurantTable.is_active,
+                RestaurantTable.status == "available",
+                RestaurantTable.capacity.between(party - 2, party + 1),
+            )
+            .with_for_update(skip_locked=True)
+        )
+    ).scalars()
+    # Best fit first: enough seats (smallest spare), then the fewest chairs to add.
+    for t in sorted(tables, key=lambda t: (t.capacity < party, abs(t.capacity - party), t.label)):
+        if not suits(t.capacity, party) or any(suits(t.capacity, w) for w in waiting):
+            continue  # someone already in line fits this table: they go first
+        if await table_qr._open_session(session, t):
+            continue
+        try:  # a photographed link can't be used to grab tables from home again and again
+            await rate_limit.hit(f"queue-seat:{user.id}", limit=3, window_seconds=3600)
+            if ip:
+                await rate_limit.hit(f"queue-seat-ip:{ip}", limit=10, window_seconds=3600)
+        except rate_limit.RateLimitedError:
+            return None  # too many: a normal token instead — staff seat them
+        s, code, pin = await table_qr.open_visit(
+            session, tenant, t, name[:60], party, source="queue", audit_action="table.seated_from_queue", ip=ip
+        )
+        entry = await _add(
+            session,
+            tenant_id=tenant.id,
+            branch=branch,
+            party=party,
+            name=name,
+            phone=user.phone,
+            customer_id=user.id,
+            source="online",
+            seated_session_id=s.id,
+        )
+        alert = await guest_service.seat_alert(session, s, t)
+        await guest_service.link_guest(session, s, user)
+        try:
+            await session.commit()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise ConflictError("Someone just took that table — please try again.", code="TABLE_TAKEN") from exc
+        await emit("tables.changed", {"branch_id": str(branch.id)}, branch_staff_room(tenant.id, branch.id))
+        await _changed(tenant.id, branch.id)
+        await guest_service.emit_alert(session, alert)
+        jwt, exp = create_table_token(s.id, tenant.id, s.pin_hash)
+        out = await entry_out(session, entry, tenant=tenant)
+        return out.model_copy(
+            update={
+                "seated_now": SeatedNow(
+                    table_label=t.label,
+                    capacity=t.capacity,
+                    extra_chairs=max(0, party - t.capacity),
+                    code=code,
+                    pin=pin,
+                    token=jwt,
+                    expires_at=exp,
+                    session_id=s.id,
+                )
+            }
+        )
+    return None
+
+
+async def join(
+    session: AsyncSession, tenant: Tenant, user: User, data: QueueJoinIn, ip: str | None = None
+) -> QueueEntryOut:
+    """Customer joins (session already scoped to the tenant); with `seat_now`, seated at once if a table suits."""
     branch = (
         await session.execute(select(Branch).where(Branch.id == data.branch_id, Branch.is_active))
     ).scalar_one_or_none()
@@ -222,6 +315,11 @@ async def join(session: AsyncSession, tenant: Tenant, user: User, data: QueueJoi
         raise ConflictError("This branch is not taking online queue entries right now.", code="QUEUE_CLOSED")
     if not user.phone:
         raise AppError("Add a verified mobile number to join the queue.", code="PHONE_REQUIRED", status_code=422)
+    name = (data.guest_name or user.full_name or "Guest").strip()[:80] or "Guest"
+    if data.seat_now:
+        seated = await _seat_directly(session, tenant, user, branch, data.party_size, name, ip)
+        if seated is not None:
+            return seated
     suitable, _ = await _tables_for(session, branch.id, data.party_size)
     if suitable == 0:
         raise ConflictError("No table here seats that many guests. Please call the restaurant.", code="PARTY_TOO_LARGE")
@@ -230,7 +328,7 @@ async def join(session: AsyncSession, tenant: Tenant, user: User, data: QueueJoi
         tenant_id=tenant.id,
         branch=branch,
         party=data.party_size,
-        name=(data.guest_name or user.full_name or "Guest").strip()[:80],
+        name=name,
         phone=user.phone,
         customer_id=user.id,
         source="online",

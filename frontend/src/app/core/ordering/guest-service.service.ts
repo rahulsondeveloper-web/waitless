@@ -18,10 +18,13 @@ export interface ServiceCall {
   id: string;
   branch_id: string;
   table_session_id: string;
-  kind: CallKind;
+  /** 'seat' = a party seated itself from "Join the queue" (not a guest call). */
+  kind: CallKind | 'seat';
   label: string;
   table_labels: string;
   guest_name: string | null;
+  /** e.g. "Party of 6 at a 4-seat table — add 2 chairs" */
+  note: string | null;
   status: 'open' | 'done';
   created_at: string;
   done_at: string | null;

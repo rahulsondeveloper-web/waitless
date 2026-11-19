@@ -160,6 +160,9 @@ class QueueJoinIn(ApiModel):
     branch_id: uuid.UUID
     party_size: int = Field(ge=1, le=50)
     guest_name: str | None = Field(default=None, max_length=80)
+    # True: when a free table suits the party (capacity −1 … +2 guests) and nobody waiting fits it, the
+    # guest is seated at once instead of getting a token (the waiter is alerted to arrange chairs).
+    seat_now: bool = False
 
 
 class StaffQueueIn(ApiModel):
@@ -187,6 +190,23 @@ class QueueEntryOut(ApiModel):
     notified_table_label: str | None = None
     restaurant_name: str | None = None
     restaurant_slug: str | None = None
+    seated_now: "SeatedNow | None" = None  # only on the join response when the guest was seated directly
+
+
+class SeatedNow(ApiModel):
+    """A table opened straight from "Join the queue": same as self-seating with a table QR."""
+
+    table_label: str
+    capacity: int
+    extra_chairs: int  # guests beyond the table's seats (the waiter brings chairs)
+    code: str
+    pin: str
+    token: str
+    expires_at: datetime
+    session_id: uuid.UUID
+
+
+QueueEntryOut.model_rebuild()
 
 
 class QueueNotifyIn(ApiModel):
