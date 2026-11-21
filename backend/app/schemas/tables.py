@@ -40,6 +40,7 @@ class TablePatch(ApiModel):
     capacity: int | None = Field(default=None, ge=1, le=50)
     is_active: bool | None = None
     sort_order: int | None = Field(default=None, ge=0, le=999)
+    waiter_user_id: uuid.UUID | None = None  # send null to remove the waiter
 
 
 class TableOut(ApiModel):
@@ -51,6 +52,17 @@ class TableOut(ApiModel):
     status: TableStatus
     is_active: bool
     sort_order: int
+    waiter_user_id: uuid.UUID | None = None
+
+
+class WaiterOption(ApiModel):
+    """Staff who can be put in charge of tables in a branch (anyone allowed to operate tables there)."""
+
+    user_id: uuid.UUID
+    full_name: str
+    role_name: str
+    status: str  # active | invited
+    table_labels: list[str]  # tables of this branch they look after
 
 
 class TableStatusIn(ApiModel):
@@ -77,6 +89,7 @@ class BoardBooking(ApiModel):
 
 class BoardTable(TableOut):
     section_name: str | None
+    waiter_name: str | None = None
     session: BoardSession | None
     next_booking: BoardBooking | None = None  # next reservation holding this table (within 48 h)
 

@@ -32,6 +32,7 @@ from app.schemas.tables import (
     TablePatch,
     TableStatusIn,
     TransferIn,
+    WaiterOption,
 )
 from app.schemas.tenancy import BranchOut
 from app.services import staff as staff_svc
@@ -148,6 +149,15 @@ async def list_tables(session: SessionDep, ctx: TablesOperate, branch_id: uuid.U
 @router.post("/tables", response_model=TableOut, status_code=201, summary="Add a table (plan limit applies)")
 async def create_table(body: TableIn, session: SessionDep, ctx: TablesConfigure) -> TableOut:
     return await tables_svc.create_table(session, ctx, body)
+
+
+@router.get(
+    "/tables/waiters", response_model=list[WaiterOption], summary="Staff who can look after tables, with their tables"
+)
+async def table_waiters(
+    session: SessionDep, ctx: TablesConfigure, branch_id: uuid.UUID = Query()
+) -> list[WaiterOption]:
+    return await tables_svc.list_waiters(session, ctx, branch_id)
 
 
 @router.get("/tables/board", response_model=BoardOut, summary="Live floor: tables, status, seated parties")

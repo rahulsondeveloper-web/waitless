@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, ConflictError, ForbiddenError, NotFoundError
 from app.core.security import hash_otp
-from app.models import Branch, Membership
+from app.models import Branch, Membership, Role, RolePermission, User, UserBranch
 from app.models.menu import MenuCategory, MenuItem
 from app.models.tables import RestaurantTable, TableAssignment, TableSection, TableSession
 from app.schemas.tables import (
@@ -33,6 +33,7 @@ from app.schemas.tables import (
     TableIn,
     TableOut,
     TablePatch,
+    WaiterOption,
 )
 from app.services.access import TenantContext
 from app.services.audit import write_audit
@@ -151,6 +152,77 @@ async def delete_section(session: AsyncSession, ctx: TenantContext, section_id: 
     await _changed(ctx, branch_id)
 
 
+# ---------- waiters in charge of tables ----------
+
+
+async def _branch_staff(session: AsyncSession, branch_id: uuid.UUID) -> list[tuple[User, Role, Membership]]:
+    """Staff (not disabled) whose role may operate tables in this branch — the people who can look after one."""
+    rows = (
+        await session.execute(
+            select(User, Role, Membership, RolePermission.scope)
+            .join(Membership, Membership.user_id == User.id)
+            .join(Role, Role.id == Membership.role_id)
+            .join(
+                RolePermission,
+                (RolePermission.role_id == Role.id) & (RolePermission.permission_key == "tables.operate"),
+            )
+            .where(Membership.status != "disabled")
+            .order_by(User.full_name)
+        )
+    ).tuples()
+    rows = list(rows)
+    in_branch = set(
+        (
+            await session.execute(
+                select(UserBranch.membership_id).where(
+                    UserBranch.branch_id == branch_id, UserBranch.membership_id.in_([m.id for _, _, m, _ in rows])
+                )
+            )
+        ).scalars()
+    )
+    return [(u, r, m) for u, r, m, scope in rows if scope == "all" or m.all_branches or m.id in in_branch]
+
+
+async def list_waiters(session: AsyncSession, ctx: TenantContext, branch_id: uuid.UUID) -> list[WaiterOption]:
+    await _branch(session, ctx, branch_id, "tables.configure")
+    staff = await _branch_staff(session, branch_id)
+    labels: dict[uuid.UUID, list[str]] = {}
+    for uid, label in (
+        await session.execute(
+            select(RestaurantTable.waiter_user_id, RestaurantTable.label)
+            .where(RestaurantTable.branch_id == branch_id, RestaurantTable.waiter_user_id.is_not(None))
+            .order_by(RestaurantTable.sort_order, RestaurantTable.label)
+        )
+    ).tuples():
+        labels.setdefault(uid, []).append(label)
+    # Waiters first, then managers/owner — they can cover a table too.
+    staff.sort(key=lambda row: (row[1].key != "waiter", (row[0].full_name or "").lower()))
+    return [
+        WaiterOption(
+            user_id=u.id,
+            full_name=u.full_name or u.phone or "Staff member",
+            role_name=r.name,
+            status=m.status,
+            table_labels=labels.get(u.id, []),
+        )
+        for u, r, m in staff
+    ]
+
+
+async def _check_waiter(session: AsyncSession, branch_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    if not any(u.id == user_id for u, _, _ in await _branch_staff(session, branch_id)):
+        raise AppError(
+            "This person cannot look after tables in this branch.", code="WAITER_NOT_ELIGIBLE", status_code=422
+        )
+
+
+async def release_waiter_tables(session: AsyncSession, user_id: uuid.UUID) -> None:
+    """A waiter left or was disabled: their tables have nobody in charge until reassigned (no commit)."""
+    await session.execute(
+        update(RestaurantTable).where(RestaurantTable.waiter_user_id == user_id).values(waiter_user_id=None)
+    )
+
+
 # ---------- tables ----------
 
 
@@ -212,6 +284,8 @@ async def update_table(session: AsyncSession, ctx: TenantContext, table_id: uuid
     changes = data.model_dump(exclude_unset=True)
     if "section_id" in changes and changes["section_id"] is not None:
         await _section(session, changes["section_id"], table.branch_id)
+    if changes.get("waiter_user_id") is not None:
+        await _check_waiter(session, table.branch_id, changes["waiter_user_id"])
     if changes.get("is_active") is False and table.status == "occupied":
         raise ConflictError("Guests are seated at this table.", code="TABLE_OCCUPIED")
     if changes.get("is_active") is True and not table.is_active:
@@ -226,7 +300,7 @@ async def update_table(session: AsyncSession, ctx: TenantContext, table_id: uuid
     for key, value in changes.items():
         if key == "label" and value is not None:
             value = value.strip()
-        if value is None and key != "section_id":
+        if value is None and key not in ("section_id", "waiter_user_id"):
             continue
         setattr(table, key, value)
     try:
@@ -334,6 +408,12 @@ async def board(session: AsyncSession, ctx: TenantContext, branch_id: uuid.UUID)
         .all()
     )
     by_table = {tid: s for tid, s in open_rows}
+    waiter_ids = {t.waiter_user_id for t in tables if t.waiter_user_id}
+    waiter_names = (
+        dict((await session.execute(select(User.id, User.full_name).where(User.id.in_(waiter_ids)))).tuples().all())
+        if waiter_ids
+        else {}
+    )
     next_booking = await _next_bookings(session, [t.id for t in tables])
     counts = {s: 0 for s in ("available", "reserved", "occupied", "cleaning")}
     out = []
@@ -344,6 +424,7 @@ async def board(session: AsyncSession, ctx: TenantContext, branch_id: uuid.UUID)
             BoardTable(
                 **TableOut.model_validate(t).model_dump(),
                 section_name=section_names.get(t.section_id) if t.section_id else None,
+                waiter_name=waiter_names.get(t.waiter_user_id) if t.waiter_user_id else None,
                 session=BoardSession(
                     id=s.id,
                     public_code=s.public_code,

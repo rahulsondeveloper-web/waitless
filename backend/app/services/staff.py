@@ -32,6 +32,7 @@ from app.services.access import TenantContext
 from app.services.audit import write_audit
 from app.services.limits import enforce_limit
 from app.services.storefront_cache import invalidate_storefront
+from app.services.tables import release_waiter_tables
 
 PROTECTED_ROLE_KEYS = {"owner", "manager"}
 
@@ -259,6 +260,8 @@ async def update_staff(
     m.role_id, m.all_branches = role_id, all_branches
     if data.status is not None:
         m.status = data.status
+        if m.status == "disabled":
+            await release_waiter_tables(session, m.user_id)
     await _set_branches(session, ctx, m, branch_ids)
     write_audit(
         session,
@@ -284,6 +287,7 @@ async def remove_staff(session: AsyncSession, ctx: TenantContext, membership_id:
         actor_user_id=ctx.user_id,
         diff={"user_id": str(m.user_id)},
     )
+    await release_waiter_tables(session, m.user_id)
     await session.delete(m)  # user account stays (they may work elsewhere or be a guest)
     await session.commit()
 

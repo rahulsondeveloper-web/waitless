@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.db import use_system
 from app.core.storage import get_storage
-from app.models import Branch, Tenant
+from app.models import Branch, Membership, Role, Tenant, User, UserBranch
 from app.models.booking import QueueEntry, Reservation, ReservationPolicy
 from app.models.inventory import (
     InventoryCategory,
@@ -83,6 +83,17 @@ class DemoRestaurant:
     palette: list[tuple[int, int, int]]
     menu: dict[str, list[Dish]] = field(default_factory=dict)
     new_categories: dict[str, tuple[list[str], list[str]]] = field(default_factory=dict)  # name -> (meals, subs)
+    waiters: list["DemoWaiter"] = field(default_factory=list)
+
+
+@dataclass
+class DemoWaiter:
+    """A waiter who signs in with email + DEMO_PASSWORD and looks after the listed tables."""
+
+    name: str
+    email: str
+    mobile: str
+    tables: list[str]
 
 
 DEMOS = [
@@ -105,6 +116,10 @@ DEMOS = [
         button_style="rounded",
         palette=[(10, 124, 134), (242, 177, 52), (246, 239, 222), (36, 61, 66)],
         new_categories={"Wood-fired Pizzas": (["Lunch", "Dinner"], ["Napoletana Style", "Sourdough Style"])},
+        waiters=[
+            DemoWaiter("Rohan Waiter", "rohan@urbanbites.example.com", "9000000111", ["T1", "T2", "T3", "T4"]),
+            DemoWaiter("Priya Waiter", "priya@urbanbites.example.com", "9000000112", ["T5", "P1", "P2", "P3"]),
+        ],
         menu={
             "Starters": [
                 Dish(
@@ -303,6 +318,51 @@ async def _ensure_tables(session: AsyncSession, tenant_id: uuid.UUID, branch_id:
     return n
 
 
+async def _ensure_waiters(
+    session: AsyncSession, tenant_id: uuid.UUID, branch_id: uuid.UUID, demo: "DemoRestaurant"
+) -> int:
+    """Demo waiters (added once) and their tables — a table that already has a waiter keeps it."""
+    from app.core.security import hash_password
+
+    if not demo.waiters:
+        return 0
+    role_id = (
+        await session.execute(select(Role.id).where(Role.key == "waiter", Role.tenant_id.is_(None)))
+    ).scalar_one()
+    tables = {
+        t.label: t
+        for t in (
+            await session.execute(select(RestaurantTable).where(RestaurantTable.branch_id == branch_id))
+        ).scalars()
+    }
+    added = 0
+    for w in demo.waiters:
+        user = (await session.execute(select(User).where(User.email == w.email))).scalar_one_or_none()
+        if user is None:
+            user = User(
+                email=w.email, phone="+91" + w.mobile, full_name=w.name, password_hash=hash_password(DEMO_PASSWORD)
+            )
+            session.add(user)
+            await session.flush()
+        member = (
+            await session.execute(
+                select(Membership).where(Membership.tenant_id == tenant_id, Membership.user_id == user.id)
+            )
+        ).scalar_one_or_none()
+        if member is None:
+            member = Membership(tenant_id=tenant_id, user_id=user.id, role_id=role_id, all_branches=False)
+            session.add(member)
+            await session.flush()
+            session.add(UserBranch(tenant_id=tenant_id, membership_id=member.id, branch_id=branch_id))
+            added += 1
+        for label in w.tables:
+            table = tables.get(label)
+            if table is not None and table.waiter_user_id is None:
+                table.waiter_user_id = user.id
+    await session.flush()
+    return added
+
+
 # ---------- seeding ----------
 
 
@@ -406,9 +466,11 @@ async def _seed_one(session: AsyncSession, demo: DemoRestaurant, idx: int) -> st
         ).scalar_one()
         added = await _ensure_tables(session, existing, branch_id)
         stocked = await _ensure_inventory(session, existing, branch_id)
+        waiters = await _ensure_waiters(session, existing, branch_id, demo)
         await session.commit()
         extra = [f"added {added} tables"] if added else []
         extra += [f"added {stocked} inventory items"] if stocked else []
+        extra += [f"added {waiters} waiters"] if waiters else []
         return f"{demo.slug}: already exists" + (f" ({', '.join(extra)})" if extra else " (skipped)")
     tenant, _ = await register_restaurant(
         session,
@@ -499,6 +561,7 @@ async def _seed_one(session: AsyncSession, demo: DemoRestaurant, idx: int) -> st
     await _ensure_tables(session, tid, branch.id)
     await session.flush()
     await _ensure_inventory(session, tid, branch.id)
+    await _ensure_waiters(session, tid, branch.id, demo)
 
     tenant.status = "active"
     tenant.approved_at = datetime.now(UTC)
@@ -517,6 +580,7 @@ def _e2e_variant(demo: DemoRestaurant, idx: int) -> DemoRestaurant:
         owner=f"{demo.owner} (tests)",
         email=f"e2e.{demo.email}",
         mobile=f"90000002{idx:02d}",
+        waiters=[],  # tests add their own staff
     )
 
 
