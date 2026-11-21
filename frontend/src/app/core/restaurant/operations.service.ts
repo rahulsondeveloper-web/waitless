@@ -78,10 +78,24 @@ export interface Table {
   status: TableStatus;
   is_active: boolean;
   sort_order: number;
+  /** The waiter who looks after this table (one per table; a waiter can have many). */
+  waiter_user_id: string | null;
 }
+
+/** Staff who can be put in charge of tables in a branch, with the tables they have now. */
+export interface WaiterOption {
+  user_id: string;
+  full_name: string;
+  role_name: string;
+  status: 'active' | 'invited';
+  table_labels: string[];
+}
+
+export type TableChange = Partial<Pick<Table, 'section_id' | 'label' | 'capacity' | 'is_active' | 'waiter_user_id'>>;
 
 export interface BoardTable extends Table {
   section_name: string | null;
+  waiter_name?: string | null;
   session: {
     id: string;
     public_code: string;
@@ -99,6 +113,33 @@ export interface BoardTable extends Table {
     party_size: number;
     status: string;
   } | null;
+}
+
+/** A camera alert for one waiter ("guests at T2") — or for the whole branch when `user_id` is null. */
+export interface FloorAlert {
+  id: string;
+  branch_id: string;
+  table_id: string;
+  table_label: string;
+  kind: 'seated' | 'seated_unchecked' | 'left' | 'left_open';
+  message: string;
+  user_id: string | null;
+  created_at: string;
+  acked_at: string | null;
+}
+
+/** A restaurant laptop that watches the CCTV camera (the Floor Agent program). */
+export interface FloorAgent {
+  id: string;
+  branch_id: string;
+  name: string;
+  status: 'waiting' | 'paired' | 'revoked';
+  online: boolean;
+  last_seen_at: string | null;
+  created_at: string;
+  /** Only when just created: the one-time code to type into the laptop. */
+  pairing_code?: string;
+  expires_at?: string;
 }
 
 export interface Board {
@@ -241,8 +282,26 @@ export class OperationsService {
   createTable(body: { branch_id: string; section_id: string | null; label: string; capacity: number }): Observable<Table> {
     return this.api.post('restaurant/tables', body);
   }
-  updateTable(id: string, body: Partial<Pick<Table, 'section_id' | 'label' | 'capacity' | 'is_active'>>): Observable<Table> {
+  updateTable(id: string, body: TableChange): Observable<Table> {
     return this.api.patch(`restaurant/tables/${id}`, body);
+  }
+  floorAgents(branchId: string): Observable<FloorAgent[]> {
+    return this.api.get('restaurant/floor-agents', { branch_id: branchId });
+  }
+  createFloorAgent(branchId: string, name: string): Observable<FloorAgent> {
+    return this.api.post('restaurant/floor-agents', { branch_id: branchId, name });
+  }
+  revokeFloorAgent(id: string): Observable<void> {
+    return this.api.delete(`restaurant/floor-agents/${id}`);
+  }
+  floorAlerts(branchId: string): Observable<FloorAlert[]> {
+    return this.api.get('restaurant/floor-alerts', { branch_id: branchId });
+  }
+  ackFloorAlert(id: string): Observable<FloorAlert> {
+    return this.api.post(`restaurant/floor-alerts/${id}/ack`, {});
+  }
+  tableWaiters(branchId: string): Observable<WaiterOption[]> {
+    return this.api.get('restaurant/tables/waiters', { branch_id: branchId });
   }
   board(branchId: string): Observable<Board> {
     return this.api.get('restaurant/tables/board', { branch_id: branchId });

@@ -3,18 +3,28 @@
     <h1>Tables</h1>
     <p class="muted">
       @if (live()) {
-        <span class="live" role="status"><span class="dot"></span> Live — updates from every device</span>
+        <span class="live" role="status"
+          ><span class="dot"></span> Live — updates from every device</span
+        >
       } @else {
         Floor status
       }
     </p>
   </div>
-  <a mat-stroked-button routerLink="qr" data-testid="table-qr-link"><mat-icon>qr_code_2</mat-icon> QR codes for tables</a>
+  <a mat-stroked-button routerLink="qr" data-testid="table-qr-link"
+    ><mat-icon>qr_code_2</mat-icon> QR codes for tables</a
+  >
   @if (branches().length > 1) {
     <label class="branch">
       <span>Branch</span>
-      <select [value]="branchId() ?? ''" (change)="selectBranch($any($event.target).value)" aria-label="Branch">
-        @for (b of branches(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+      <select
+        [value]="branchId() ?? ''"
+        (change)="selectBranch($any($event.target).value)"
+        aria-label="Branch"
+      >
+        @for (b of branches(); track b.id) {
+          <option [value]="b.id">{{ b.name }}</option>
+        }
       </select>
     </label>
   }
@@ -29,7 +39,9 @@
     <mat-tab label="Floor">
       <div class="legend" aria-label="Table status counts">
         @for (s of statuses; track s) {
-          <span class="pill" [attr.data-status]="s">{{ statusLabel[s] }} <b>{{ board()!.counts[s] }}</b></span>
+          <span class="pill" [attr.data-status]="s"
+            >{{ statusLabel[s] }} <b>{{ board()!.counts[s] }}</b></span
+          >
         }
       </div>
 
@@ -39,40 +51,86 @@
           <ul class="floor">
             @for (t of g.tables; track t.id) {
               <li>
-                <button type="button" class="tile" [attr.data-status]="t.status" [matMenuTriggerFor]="menu"
-                        [disabled]="busy() === t.id"
-                        [attr.aria-label]="'Table ' + t.label + ', ' + statusLabel[t.status] + ', ' + t.capacity + ' seats'">
+                <button
+                  type="button"
+                  class="tile"
+                  [attr.data-status]="t.status"
+                  [matMenuTriggerFor]="menu"
+                  [disabled]="busy() === t.id"
+                  [attr.aria-label]="
+                    'Table ' +
+                    t.label +
+                    ', ' +
+                    statusLabel[t.status] +
+                    ', ' +
+                    t.capacity +
+                    ' seats' +
+                    (t.waiter_name ? ', waiter ' + t.waiter_name : '')
+                  "
+                >
                   <span class="label">{{ t.label }}</span>
-                  <span class="cap"><mat-icon>person</mat-icon>{{ t.session?.party_size ?? '—' }} / {{ t.capacity }}</span>
+                  <span class="cap"
+                    ><mat-icon>person</mat-icon>{{ t.session?.party_size ?? '—' }} /
+                    {{ t.capacity }}</span
+                  >
                   <span class="state">{{ statusLabel[t.status] }}</span>
+                  @if (t.waiter_name) {
+                    <span class="waiter" data-testid="table-waiter"
+                      ><mat-icon>badge</mat-icon>{{ t.waiter_name }}</span
+                    >
+                  }
                   @if (t.session; as s) {
-                    <span class="session">{{ s.public_code }} · {{ minutesSince(s.opened_at) }} min</span>
-                    @if (s.guest_name) { <span class="guest">{{ s.guest_name }}</span> }
+                    <span class="session"
+                      >{{ s.public_code }} · {{ minutesSince(s.opened_at) }} min</span
+                    >
+                    @if (s.guest_name) {
+                      <span class="guest">{{ s.guest_name }}</span>
+                    }
                   }
                   @if (t.next_booking; as nb) {
                     <span class="booked" data-testid="next-booking">
-                      Booked {{ bookingWhen(nb.starts_at) }} · {{ nb.guest_name }} ({{ nb.party_size }})
+                      Booked {{ bookingWhen(nb.starts_at) }} · {{ nb.guest_name }} ({{
+                        nb.party_size
+                      }})
                     </span>
                   }
                 </button>
                 <mat-menu #menu="matMenu">
                   @switch (t.status) {
                     @case ('available') {
-                      <button mat-menu-item (click)="seat(t)"><mat-icon>group_add</mat-icon>Seat guests</button>
-                      <button mat-menu-item (click)="setStatus(t, 'reserved')"><mat-icon>bookmark</mat-icon>Mark reserved</button>
-                      <button mat-menu-item (click)="setStatus(t, 'cleaning')"><mat-icon>cleaning_services</mat-icon>Mark cleaning</button>
+                      <button mat-menu-item (click)="seat(t)">
+                        <mat-icon>group_add</mat-icon>Seat guests
+                      </button>
+                      <button mat-menu-item (click)="setStatus(t, 'reserved')">
+                        <mat-icon>bookmark</mat-icon>Mark reserved
+                      </button>
+                      <button mat-menu-item (click)="setStatus(t, 'cleaning')">
+                        <mat-icon>cleaning_services</mat-icon>Mark cleaning
+                      </button>
                     }
                     @case ('reserved') {
-                      <button mat-menu-item (click)="seat(t)"><mat-icon>group_add</mat-icon>Seat guests</button>
-                      <button mat-menu-item (click)="setStatus(t, 'available')"><mat-icon>bookmark_remove</mat-icon>Remove reservation</button>
+                      <button mat-menu-item (click)="seat(t)">
+                        <mat-icon>group_add</mat-icon>Seat guests
+                      </button>
+                      <button mat-menu-item (click)="setStatus(t, 'available')">
+                        <mat-icon>bookmark_remove</mat-icon>Remove reservation
+                      </button>
                     }
                     @case ('occupied') {
-                      <button mat-menu-item (click)="move(t)"><mat-icon>swap_horiz</mat-icon>Move guests</button>
-                      <button mat-menu-item (click)="newPin(t)"><mat-icon>pin</mat-icon>New PIN for guests</button>
-                      <button mat-menu-item (click)="guestsLeft(t)"><mat-icon>logout</mat-icon>Guests left</button>
+                      <button mat-menu-item (click)="move(t)">
+                        <mat-icon>swap_horiz</mat-icon>Move guests
+                      </button>
+                      <button mat-menu-item (click)="newPin(t)">
+                        <mat-icon>pin</mat-icon>New PIN for guests
+                      </button>
+                      <button mat-menu-item (click)="guestsLeft(t)">
+                        <mat-icon>logout</mat-icon>Guests left
+                      </button>
                     }
                     @case ('cleaning') {
-                      <button mat-menu-item (click)="setStatus(t, 'available')"><mat-icon>check_circle</mat-icon>Mark clean</button>
+                      <button mat-menu-item (click)="setStatus(t, 'available')">
+                        <mat-icon>check_circle</mat-icon>Mark clean
+                      </button>
                     }
                   }
                 </mat-menu>
@@ -84,7 +142,9 @@
         <div class="empty">
           <mat-icon>table_restaurant</mat-icon>
           <p>No tables yet.</p>
-          @if (canConfigure()) { <p class="muted">Add them in the <b>Setup</b> tab.</p> }
+          @if (canConfigure()) {
+            <p class="muted">Add them in the <b>Setup</b> tab.</p>
+          }
         </div>
       }
     </mat-tab>
@@ -92,58 +152,214 @@
     @if (canConfigure()) {
       <mat-tab label="Setup">
         <div class="setup">
-          <section class="card">
-            <h2>Sections</h2>
-            <ul class="sections">
-              @for (s of board()!.sections; track s.id) {
-                <li>
-                  <input [value]="s.name" maxlength="60" (change)="renameSection(s, $any($event.target).value)"
-                         [attr.aria-label]="'Section name ' + s.name" />
-                  <button mat-icon-button type="button" (click)="deleteSection(s)" [attr.aria-label]="'Delete section ' + s.name">
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                </li>
+          <div class="stack">
+            <section class="card">
+              <h2>Sections</h2>
+              <ul class="sections">
+                @for (s of board()!.sections; track s.id) {
+                  <li>
+                    <input
+                      [value]="s.name"
+                      maxlength="60"
+                      (change)="renameSection(s, $any($event.target).value)"
+                      [attr.aria-label]="'Section name ' + s.name"
+                    />
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="deleteSection(s)"
+                      [attr.aria-label]="'Delete section ' + s.name"
+                    >
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </li>
+                }
+              </ul>
+              <form class="add" (submit)="$event.preventDefault(); addSection(secName)">
+                <input
+                  #secName
+                  placeholder="e.g. Terrace"
+                  maxlength="60"
+                  aria-label="New section name"
+                />
+                <button mat-stroked-button type="submit" [disabled]="busy() === 'section'">
+                  Add section
+                </button>
+              </form>
+            </section>
+
+            <section class="card" data-testid="waiters-card">
+              <h2>Waiters</h2>
+              <p class="muted hint">
+                Choose a waiter for each table in the list. A waiter can look after several tables.
+              </p>
+              <ul class="waiters">
+                @for (w of waiters(); track w.user_id) {
+                  <li>
+                    <span class="who"
+                      >{{ w.full_name }}
+                      <small class="muted"
+                        >{{ w.role_name }}
+                        @if (w.status === 'invited') {
+                          · invited
+                        }
+                      </small></span
+                    >
+                    <span class="their-tables">
+                      @for (l of w.table_labels; track l) {
+                        <span class="chip">{{ l }}</span>
+                      } @empty {
+                        <span class="muted">No tables</span>
+                      }
+                    </span>
+                  </li>
+                } @empty {
+                  <li class="muted">
+                    No staff can look after tables yet. Add waiters under Staff.
+                  </li>
+                }
+              </ul>
+            </section>
+
+            <section class="card" data-testid="agents-card">
+              <h2>Camera laptop</h2>
+              <p class="muted hint">
+                A laptop running the WaitLess Floor Agent watches the CCTV and tells the waiter in
+                charge of a table when guests sit down or leave.
+              </p>
+              <ul class="agents">
+                @for (a of agents(); track a.id) {
+                  <li>
+                    <span class="who">
+                      <span class="dot" [class.on]="a.online" aria-hidden="true"></span>
+                      {{ a.name }} <small class="muted">{{ agentStatus(a) }}</small>
+                    </span>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="disconnectAgent(a)"
+                      [attr.aria-label]="'Disconnect ' + a.name"
+                    >
+                      <mat-icon>link_off</mat-icon>
+                    </button>
+                  </li>
+                } @empty {
+                  <li class="muted">No laptop connected yet.</li>
+                }
+              </ul>
+              @if (pairing(); as p) {
+                <div class="pair" data-testid="pairing-code">
+                  <span>Type this code into the laptop within 15 minutes:</span>
+                  <b>{{ p.pairing_code }}</b>
+                  <code>python run.py --server {{ origin }} --pair {{ p.pairing_code }}</code>
+                </div>
               }
-            </ul>
-            <form class="add" (submit)="$event.preventDefault(); addSection(secName)">
-              <input #secName placeholder="e.g. Terrace" maxlength="60" aria-label="New section name" />
-              <button mat-stroked-button type="submit" [disabled]="busy() === 'section'">Add section</button>
-            </form>
-          </section>
+              <form class="add" (submit)="$event.preventDefault(); pairAgent(agentName)">
+                <input
+                  #agentName
+                  placeholder="Name, e.g. Front camera"
+                  maxlength="60"
+                  aria-label="Laptop name"
+                />
+                <button mat-stroked-button type="submit" [disabled]="busy() === 'agent'">
+                  Pair a laptop
+                </button>
+              </form>
+            </section>
+          </div>
 
           <section class="card">
             <h2>Tables</h2>
-            <form class="add add--table" (submit)="$event.preventDefault(); addTable(tLabel, tCap, tSec)">
-              <input #tLabel placeholder="Name, e.g. T6" maxlength="20" aria-label="New table name" />
+            <form
+              class="add add--table"
+              (submit)="$event.preventDefault(); addTable(tLabel, tCap, tSec)"
+            >
+              <input
+                #tLabel
+                placeholder="Name, e.g. T6"
+                maxlength="20"
+                aria-label="New table name"
+              />
               <input #tCap type="number" min="1" max="50" value="4" aria-label="Seats" />
               <select #tSec aria-label="Section">
                 <option value="">No section</option>
-                @for (s of board()!.sections; track s.id) { <option [value]="s.id">{{ s.name }}</option> }
+                @for (s of board()!.sections; track s.id) {
+                  <option [value]="s.id">{{ s.name }}</option>
+                }
               </select>
-              <button mat-flat-button type="submit" [disabled]="busy() === 'table'">Add table</button>
+              <button mat-flat-button type="submit" [disabled]="busy() === 'table'">
+                Add table
+              </button>
             </form>
             <table class="list">
-              <thead><tr><th>Table</th><th>Seats</th><th>Section</th><th>In use</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Table</th>
+                  <th>Seats</th>
+                  <th>Section</th>
+                  <th>Waiter</th>
+                  <th>In use</th>
+                </tr>
+              </thead>
               <tbody>
                 @for (t of setupTables(); track t.id) {
                   <tr [class.off]="!t.is_active">
-                    <td><input [value]="t.label" maxlength="20" (change)="updateTable(t, { label: $any($event.target).value })"
-                               [attr.aria-label]="'Name of table ' + t.label" /></td>
-                    <td><input type="number" min="1" max="50" [value]="t.capacity" class="num"
-                               (change)="updateTable(t, { capacity: +$any($event.target).value })"
-                               [attr.aria-label]="'Seats at ' + t.label" /></td>
                     <td>
-                      <select [value]="t.section_id ?? ''" (change)="updateTable(t, { section_id: $any($event.target).value || null })"
-                              [attr.aria-label]="'Section of ' + t.label">
+                      <input
+                        [value]="t.label"
+                        maxlength="20"
+                        (change)="updateTable(t, { label: $any($event.target).value })"
+                        [attr.aria-label]="'Name of table ' + t.label"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        min="1"
+                        max="50"
+                        [value]="t.capacity"
+                        class="num"
+                        (change)="updateTable(t, { capacity: +$any($event.target).value })"
+                        [attr.aria-label]="'Seats at ' + t.label"
+                      />
+                    </td>
+                    <td>
+                      <select
+                        [value]="t.section_id ?? ''"
+                        (change)="updateTable(t, { section_id: $any($event.target).value || null })"
+                        [attr.aria-label]="'Section of ' + t.label"
+                      >
                         <option value="">—</option>
                         @for (s of board()!.sections; track s.id) {
-                          <option [value]="s.id" [selected]="s.id === t.section_id">{{ s.name }}</option>
+                          <option [value]="s.id" [selected]="s.id === t.section_id">
+                            {{ s.name }}
+                          </option>
                         }
                       </select>
                     </td>
                     <td>
-                      <mat-slide-toggle [checked]="t.is_active" (change)="updateTable(t, { is_active: $event.checked })"
-                                        [attr.aria-label]="t.label + ' in use'" />
+                      <select
+                        [value]="t.waiter_user_id ?? ''"
+                        data-testid="table-waiter-select"
+                        (change)="
+                          updateTable(t, { waiter_user_id: $any($event.target).value || null })
+                        "
+                        [attr.aria-label]="'Waiter for ' + t.label"
+                      >
+                        <option value="">— Nobody —</option>
+                        @for (w of waiters(); track w.user_id) {
+                          <option [value]="w.user_id" [selected]="w.user_id === t.waiter_user_id">
+                            {{ w.full_name }}
+                          </option>
+                        }
+                      </select>
+                    </td>
+                    <td>
+                      <mat-slide-toggle
+                        [checked]="t.is_active"
+                        (change)="updateTable(t, { is_active: $event.checked })"
+                        [attr.aria-label]="t.label + ' in use'"
+                      />
                     </td>
                   </tr>
                 }

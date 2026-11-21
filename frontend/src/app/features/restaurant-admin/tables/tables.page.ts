@@ -15,11 +15,14 @@ import { ApiError } from '../../../core/http/api-error';
 import {
   Board,
   BoardTable,
+  FloorAgent,
   OperationsService,
   STATUS_LABEL,
   Section,
   Table,
+  TableChange,
   TableStatus,
+  WaiterOption,
 } from '../../../core/restaurant/operations.service';
 import { RealtimeService } from '../../../core/realtime/realtime.service';
 import { Branch } from '../../../core/tenancy/tenancy.models';
@@ -65,11 +68,16 @@ export class TablesPage implements OnInit {
   protected readonly auth = inject(AuthService);
 
   protected readonly statusLabel = STATUS_LABEL;
+  protected readonly origin = window.location.origin.replace(':4200', ':8000');
   protected readonly statuses: TableStatus[] = ['available', 'reserved', 'occupied', 'cleaning'];
   protected readonly branches = signal<Branch[]>([]);
   protected readonly branchId = signal<string | null>(null);
   protected readonly board = signal<Board | null>(null);
   protected readonly setupTables = signal<Table[]>([]);
+  protected readonly waiters = signal<WaiterOption[]>([]);
+  protected readonly agents = signal<FloorAgent[]>([]);
+  /** The agent just created: its one-time pairing code is shown once. */
+  protected readonly pairing = signal<FloorAgent | null>(null);
   protected readonly error = signal<ApiError | null>(null);
   protected readonly busy = signal<string | null>(null);
   protected readonly live = signal(false);
@@ -103,7 +111,12 @@ export class TablesPage implements OnInit {
     const off = this.realtime.on<{ branch_id: string }>('tables.changed', (e) => {
       if (e.branch_id === this.branchId()) this.reload();
     });
-    interval(30_000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.now.set(Date.now()));
+    interval(30_000)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.now.set(Date.now());
+        if (this.canConfigure()) this.loadAgents();
+      });
     this.destroyRef.onDestroy(() => {
       off();
       const b = this.branchId();
@@ -124,7 +137,11 @@ export class TablesPage implements OnInit {
     const id = this.branchId();
     if (!id) return;
     this.ops.board(id).subscribe({ next: (b) => this.board.set(b), error: (e: ApiError) => this.error.set(e) });
-    if (this.canConfigure()) this.ops.tables(id).subscribe((t) => this.setupTables.set(t));
+    if (this.canConfigure()) {
+      this.ops.tables(id).subscribe((t) => this.setupTables.set(t));
+      this.ops.tableWaiters(id).subscribe((w) => this.waiters.set(w));
+      this.loadAgents();
+    }
   }
 
   /** "17:30" today, "tomorrow 13:00", else "Wed 13:00" — in the branch time zone. */
@@ -238,8 +255,46 @@ export class TablesPage implements OnInit {
     );
   }
 
-  protected updateTable(t: Table, change: Partial<Pick<Table, 'section_id' | 'label' | 'capacity' | 'is_active'>>): void {
+  protected updateTable(t: Table, change: TableChange): void {
     this.run(t.id, this.ops.updateTable(t.id, change), () => this.reload());
+  }
+
+  // ---------- camera laptop (Floor Agent) ----------
+
+  protected loadAgents(): void {
+    const id = this.branchId();
+    if (id) this.ops.floorAgents(id).subscribe({ next: (a) => this.agents.set(a), error: () => undefined });
+  }
+
+  protected pairAgent(name: HTMLInputElement): void {
+    const id = this.branchId();
+    if (!id) return;
+    this.run('agent', this.ops.createFloorAgent(id, name.value.trim() || 'Floor agent'), (a) => {
+      this.pairing.set(a);
+      name.value = '';
+      this.loadAgents();
+    });
+  }
+
+  protected disconnectAgent(a: FloorAgent): void {
+    this.confirm(
+      {
+        title: `Disconnect "${a.name}"?`,
+        message: 'The laptop stops sending camera alerts until it is paired again with a new code.',
+        confirm: 'Disconnect',
+        danger: true,
+      },
+      () =>
+        this.run(a.id, this.ops.revokeFloorAgent(a.id), () => {
+          if (this.pairing()?.id === a.id) this.pairing.set(null);
+          this.loadAgents();
+        }),
+    );
+  }
+
+  protected agentStatus(a: FloorAgent): string {
+    if (a.status === 'waiting') return 'Waiting for the laptop to pair';
+    return a.online ? 'Online' : 'Offline';
   }
 
   // ---------- helpers ----------
